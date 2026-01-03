@@ -23,7 +23,7 @@ export class DebtLedger {
   storeId: number;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
-  refType: string; // SALE, PAYMENT, ADJUST
+  refType: string; // DEBT_SALE (Bán nợ), PAYMENT (Thu tiền), RECEIPT (Thu tiền), ADJUST (Điều chỉnh)
 
   @Column({ name: 'ref_id', nullable: true })
   refId: number;

@@ -30,6 +30,9 @@ import { ReceiptsModule } from './receipts/receipts.module';
 import { InventoryModule } from './inventory/inventory.module';
 import { CashModule } from './cash/cash.module';
 
+// Expenses
+import { ExpensesModule } from './expenses/expenses.module';
+
 // Reports
 import { ReportsModule } from './reports/reports.module';
 
@@ -68,6 +71,9 @@ import { ReportsModule } from './reports/reports.module';
     // Inventory & Cash
     InventoryModule,
     CashModule,
+
+    // Expenses
+    ExpensesModule,
 
     // Reports
     ReportsModule,

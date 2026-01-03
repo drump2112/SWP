@@ -19,7 +19,7 @@ export class CashLedger {
   storeId: number;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
-  refType: string; // RECEIPT, DEPOSIT, ADJUST
+  refType: string; // RECEIPT (Phiếu thu), DEPOSIT (Phiếu nộp), EXPENSE (Chi phí), ADJUST (Điều chỉnh), SHIFT_CLOSE, SHIFT_OPEN, SALE, PAYMENT
 
   @Column({ name: 'ref_id', nullable: true })
   refId: number;

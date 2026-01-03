@@ -62,10 +62,30 @@ export class ReportsController {
     );
   }
 
+  /**
+   * GET /reports/cash?storeId=1&fromDate=2024-01-01&toDate=2024-12-31
+   * Báo cáo sổ quỹ tiền mặt chi tiết
+   * - Kế toán/Director: Xem tất cả cửa hàng
+   * - Cửa hàng (STORE): Chỉ xem sổ quỹ của cửa hàng mình
+   */
   @Get('cash')
-  @Roles('ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getCashReport(@Query('storeId') storeId?: string) {
-    return this.reportsService.getCashReport(storeId ? +storeId : undefined);
+  @Roles('STORE', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getCashReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    // Nếu user là STORE, tự động lấy storeId của user
+    const effectiveStoreId = user.roleCode === 'STORE'
+      ? user.storeId
+      : (storeId ? +storeId : undefined);
+
+    return this.reportsService.getCashReport({
+      storeId: effectiveStoreId,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+    });
   }
 
   @Get('inventory')

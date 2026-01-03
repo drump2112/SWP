@@ -9,6 +9,8 @@ import { Shift } from '../entities/shift.entity';
 import { Customer } from '../entities/customer.entity';
 import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
+import { Receipt } from '../entities/receipt.entity';
+import { CashDeposit } from '../entities/cash-deposit.entity';
 
 @Injectable()
 export class ReportsService {
@@ -29,6 +31,10 @@ export class ReportsService {
     private storeRepository: Repository<Store>,
     @InjectRepository(ShiftDebtSale)
     private shiftDebtSaleRepository: Repository<ShiftDebtSale>,
+    @InjectRepository(Receipt)
+    private receiptRepository: Repository<Receipt>,
+    @InjectRepository(CashDeposit)
+    private cashDepositRepository: Repository<CashDeposit>,
   ) {}
 
   // ==================== BÁO CÁO CÔNG NỢ ====================
@@ -342,24 +348,138 @@ export class ReportsService {
     return query.getRawMany();
   }
 
-  // Báo cáo quỹ tiền mặt
-  async getCashReport(storeId?: number) {
-    const query = this.cashLedgerRepository
+  // ==================== BÁO CÁO SỔ QUỸ TIỀN MẶT ====================
+
+  /**
+   * Báo cáo sổ quỹ tiền mặt chi tiết
+   * Phản ánh qua phiếu thu và phiếu nộp
+   */
+  async getCashReport(params: {
+    storeId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+  }) {
+    const { storeId, fromDate, toDate } = params;
+
+    // Lấy số dư đầu kỳ (trước fromDate)
+    const openingBalanceQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
-      .leftJoin('cl.store', 'store')
-      .select('cl.store_id', 'storeId')
-      .addSelect('store.name', 'storeName')
-      .addSelect('SUM(cl.cash_in)', 'totalCashIn')
-      .addSelect('SUM(cl.cash_out)', 'totalCashOut')
-      .addSelect('SUM(cl.cash_in - cl.cash_out)', 'balance')
-      .groupBy('cl.store_id')
-      .addGroupBy('store.name');
+      .select('SUM(cl.cash_in - cl.cash_out)', 'balance');
 
     if (storeId) {
-      query.where('cl.store_id = :storeId', { storeId });
+      openingBalanceQuery.where('cl.store_id = :storeId', { storeId });
     }
 
-    return query.getRawMany();
+    if (fromDate) {
+      openingBalanceQuery.andWhere('cl.created_at < :fromDate', { fromDate });
+    }
+
+    const openingBalanceResult = await openingBalanceQuery.getRawOne();
+    const openingBalance = Number(openingBalanceResult?.balance || 0);
+
+    // Lấy chi tiết phát sinh trong kỳ
+    const ledgerQuery = this.cashLedgerRepository
+      .createQueryBuilder('cl')
+      .leftJoinAndSelect('cl.store', 'store')
+      .orderBy('cl.created_at', 'ASC');
+
+    if (storeId) {
+      ledgerQuery.where('cl.store_id = :storeId', { storeId });
+    }
+
+    if (fromDate && toDate) {
+      if (storeId) {
+        ledgerQuery.andWhere('cl.created_at BETWEEN :fromDate AND :toDate', {
+          fromDate,
+          toDate,
+        });
+      } else {
+        ledgerQuery.where('cl.created_at BETWEEN :fromDate AND :toDate', {
+          fromDate,
+          toDate,
+        });
+      }
+    }
+
+    const ledgers = await ledgerQuery.getMany();
+
+    // Lấy chi tiết từ receipts và deposits
+    const ledgersWithDetails = await Promise.all(
+      ledgers.map(async (l) => {
+        let details: any = null;
+
+        // Nếu là RECEIPT - lấy thông tin từ bảng receipts
+        if (l.refType === 'RECEIPT' && l.refId) {
+          const receipt = await this.receiptRepository.findOne({
+            where: { id: l.refId },
+            relations: ['receiptDetails', 'receiptDetails.customer'],
+          });
+
+          if (receipt) {
+            details = {
+              type: 'RECEIPT',
+              receiptType: receipt.receiptType,
+              customers: receipt.receiptDetails?.map((rd) => ({
+                customerName: rd.customer?.name || 'N/A',
+                amount: Number(rd.amount),
+              })) || [],
+              totalAmount: Number(receipt.amount),
+            };
+          }
+        }
+
+        // Nếu là DEPOSIT - lấy thông tin từ bảng cash_deposits
+        if (l.refType === 'DEPOSIT' && l.refId) {
+          const deposit = await this.cashDepositRepository.findOne({
+            where: { id: l.refId },
+          });
+
+          if (deposit) {
+            details = {
+              type: 'DEPOSIT',
+              depositDate: deposit.depositDate,
+              depositTime: deposit.depositTime,
+              receiverName: deposit.receiverName,
+              amount: Number(deposit.amount),
+              notes: deposit.notes,
+            };
+          }
+        }
+
+        return {
+          id: l.id,
+          date: l.createdAt,
+          refType: l.refType,
+          refId: l.refId,
+          cashIn: Number(l.cashIn),
+          cashOut: Number(l.cashOut),
+          storeName: l.store?.name || 'N/A',
+          details,
+        };
+      }),
+    );
+
+    // Tính toán số dư luỹ kế
+    let runningBalance = openingBalance;
+    const ledgersWithBalance = ledgersWithDetails.map((l) => {
+      runningBalance += l.cashIn - l.cashOut;
+      return {
+        ...l,
+        balance: runningBalance,
+      };
+    });
+
+    const totalCashIn = ledgers.reduce((sum, l) => sum + Number(l.cashIn), 0);
+    const totalCashOut = ledgers.reduce((sum, l) => sum + Number(l.cashOut), 0);
+    const closingBalance = openingBalance + totalCashIn - totalCashOut;
+
+    return {
+      openingBalance,
+      totalCashIn,
+      totalCashOut,
+      closingBalance,
+      ledgers: ledgersWithBalance,
+    };
   }
 
   // Báo cáo tồn kho

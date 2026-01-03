@@ -23,7 +23,7 @@ export class Receipt {
   shiftId: number;
 
   @Column({ name: 'receipt_type', length: 50, nullable: true })
-  receiptType: string; // CASH_SALES, DEBT_PAYMENT
+  receiptType: string; // CASH_SALES (Bán lẻ), DEBT_PAYMENT (Thu nợ)
 
   @Column({
     type: 'decimal',
@@ -32,6 +32,9 @@ export class Receipt {
     nullable: true,
   })
   amount: number;
+
+  @Column({ name: 'payment_method', length: 20, default: 'CASH' })
+  paymentMethod: string; // CASH, BANK_TRANSFER
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

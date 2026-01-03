@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsDateString, IsInt, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import { IsNotEmpty, IsDateString, IsInt, IsArray, ValidateNested, IsOptional, IsNumber, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateShiftDebtSaleDto, CreateReceiptDto, CreateCashDepositDto } from './shift-operations.dto';
 
@@ -14,6 +14,21 @@ class PumpReadingDto {
 
   @IsNotEmpty()
   endValue: number;
+}
+
+class ExpenseDto {
+  @IsInt()
+  expenseCategoryId: number;
+
+  @IsNumber()
+  amount: number;
+
+  @IsString()
+  description: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string; // CASH, BANK_TRANSFER
 }
 
 export class CloseShiftDto {
@@ -43,4 +58,10 @@ export class CloseShiftDto {
   @ValidateNested({ each: true })
   @Type(() => CreateCashDepositDto)
   deposits?: CreateCashDepositDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ExpenseDto)
+  expenses?: ExpenseDto[];
 }

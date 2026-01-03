@@ -9,12 +9,13 @@ import {
 } from 'typeorm';
 import { Store } from './store.entity';
 import { Shift } from './shift.entity';
+import { ExpenseCategory } from './expense-category.entity';
 import { User } from './user.entity';
 
-@Entity('cash_deposits')
-@Index('idx_cash_deposits_store', ['storeId', 'depositDate'])
-@Index('idx_cash_deposits_shift', ['shiftId'])
-export class CashDeposit {
+@Entity('expenses')
+@Index('idx_expenses_store', ['storeId', 'createdAt'])
+@Index('idx_expenses_shift', ['shiftId'])
+export class Expense {
   @PrimaryGeneratedColumn()
   id: number;
 
@@ -24,23 +25,20 @@ export class CashDeposit {
   @Column({ name: 'shift_id', nullable: true })
   shiftId: number;
 
+  @Column({ name: 'expense_category_id' })
+  expenseCategoryId: number;
+
   @Column({ type: 'decimal', precision: 18, scale: 2 })
   amount: number;
 
-  @Column({ name: 'deposit_date', type: 'date' })
-  depositDate: Date;
+  @Column({ type: 'text' })
+  description: string;
 
-  @Column({ name: 'deposit_time', type: 'time', nullable: true })
-  depositTime: string;
-
-  @Column({ name: 'receiver_name', length: 100, nullable: true })
-  receiverName: string;
-
-  @Column({ type: 'text', nullable: true })
-  notes: string;
+  @Column({ name: 'expense_date', type: 'date' })
+  expenseDate: Date;
 
   @Column({ name: 'payment_method', length: 20, default: 'CASH' })
-  paymentMethod: string; // CASH (nộp tiền mặt), BANK_TRANSFER (chuyển khoản)
+  paymentMethod: string; // CASH, BANK_TRANSFER
 
   @Column({ name: 'created_by', nullable: true })
   createdBy: number;
@@ -55,6 +53,10 @@ export class CashDeposit {
   @ManyToOne(() => Shift)
   @JoinColumn({ name: 'shift_id' })
   shift: Shift;
+
+  @ManyToOne(() => ExpenseCategory)
+  @JoinColumn({ name: 'expense_category_id' })
+  category: ExpenseCategory;
 
   @ManyToOne(() => User)
   @JoinColumn({ name: 'created_by' })

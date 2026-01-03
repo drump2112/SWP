@@ -313,7 +313,8 @@ const DebtReportPage: React.FC = () => {
                                       {ledger.refType === 'DEBT_SALE' ? 'Bán nợ' :
                                        ledger.refType === 'PAYMENT' ? 'Thu tiền' :
                                        ledger.refType === 'RECEIPT' ? 'Thu tiền' :
-                                       ledger.refType}
+                                       ledger.refType === 'ADJUST' ? 'Điều chỉnh' :
+                                       'Khác'}
                                     </span>
                                   </td>
                                   <td className="px-4 py-2">

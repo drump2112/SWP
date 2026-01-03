@@ -17,6 +17,7 @@ import StoreDetailPage from './pages/StoreDetailPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerCreditPage from './pages/CustomerCreditPage';
 import DebtReportPage from './pages/DebtReportPage';
+import CashReportPage from './pages/CashReportPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -160,6 +161,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <DebtReportPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/cash"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CashReportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

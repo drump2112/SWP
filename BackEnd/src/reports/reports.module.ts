@@ -8,6 +8,8 @@ import { Shift } from '../entities/shift.entity';
 import { Customer } from '../entities/customer.entity';
 import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
+import { Receipt } from '../entities/receipt.entity';
+import { CashDeposit } from '../entities/cash-deposit.entity';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 
@@ -22,6 +24,8 @@ import { ReportsController } from './reports.controller';
       Customer,
       Store,
       ShiftDebtSale,
+      Receipt,
+      CashDeposit,
     ]),
   ],
   controllers: [ReportsController],

@@ -57,6 +57,10 @@ export class CreateReceiptDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
 }
 
 export class ReceiptDetailDto {
@@ -98,4 +102,8 @@ export class CreateCashDepositDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
 }

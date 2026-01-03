@@ -73,6 +73,45 @@ export interface ShiftDetailReport {
   };
 }
 
+export interface CashReportParams {
+  storeId?: number;
+  fromDate?: string;
+  toDate?: string;
+}
+
+export interface CashReportData {
+  openingBalance: number; // Số dư đầu kỳ
+  totalCashIn: number; // Tổng tiền thu
+  totalCashOut: number; // Tổng tiền chi
+  closingBalance: number; // Số dư cuối kỳ
+  ledgers: Array<{
+    id: number;
+    date: string;
+    refType: string; // RECEIPT, DEPOSIT, ADJUST
+    refId: number;
+    cashIn: number;
+    cashOut: number;
+    balance: number; // Số dư luỹ kế
+    storeName: string;
+    details?: {
+      type: string;
+      // For RECEIPT
+      receiptType?: string;
+      customers?: Array<{
+        customerName: string;
+        amount: number;
+      }>;
+      totalAmount?: number;
+      // For DEPOSIT
+      depositDate?: string;
+      depositTime?: string;
+      receiverName?: string;
+      amount?: number;
+      notes?: string;
+    };
+  }>;
+}
+
 export const reportsApi = {
   // Báo cáo công nợ
   getDebtReport: async (params: DebtReportParams): Promise<DebtReportItem[]> => {
@@ -83,6 +122,12 @@ export const reportsApi = {
   // Báo cáo chi tiết ca
   getShiftDetailReport: async (shiftId: number): Promise<ShiftDetailReport> => {
     const { data } = await api.get(`/reports/shift/${shiftId}`);
+    return data;
+  },
+
+  // Báo cáo sổ quỹ tiền mặt
+  getCashReport: async (params: CashReportParams): Promise<CashReportData> => {
+    const { data } = await api.get('/reports/cash', { params });
     return data;
   },
 };

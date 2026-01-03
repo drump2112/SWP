@@ -52,6 +52,9 @@ export class Sale {
   @Column({ name: 'customer_id', nullable: true })
   customerId: number;
 
+  @Column({ name: 'payment_method', length: 20, default: 'CASH' })
+  paymentMethod: string; // CASH (Tiền mặt), BANK_TRANSFER (Chuyển khoản), DEBT (Công nợ)
+
   @ManyToOne(() => Shift, (shift) => shift.sales)
   @JoinColumn({ name: 'shift_id' })
   shift: Shift;

@@ -13,6 +13,7 @@ import { DebtLedger } from '../entities/debt-ledger.entity';
 import { CashLedger } from '../entities/cash-ledger.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
+import { Expense } from '../entities/expense.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
@@ -44,6 +45,8 @@ export class ShiftsService {
     private receiptRepository: Repository<Receipt>,
     @InjectRepository(ReceiptDetail)
     private receiptDetailRepository: Repository<ReceiptDetail>,
+    @InjectRepository(Expense)
+    private expenseRepository: Repository<Expense>,
     private dataSource: DataSource,
   ) {}
 
@@ -267,6 +270,7 @@ export class ShiftsService {
             shiftId: shift.id,
             receiptType: receipt.receiptType,
             amount: receipt.amount,
+            paymentMethod: receipt.paymentMethod || 'CASH',
             notes: receipt.notes,
           });
 
@@ -290,15 +294,17 @@ export class ShiftsService {
             });
           }
 
-          // Ghi sổ quỹ (thu tiền mặt)
-          await manager.save(CashLedger, {
-            storeId: receipt.storeId,
-            refType: 'RECEIPT',
-            refId: receiptRecord.id,
-            cashIn: receipt.amount,
-            cashOut: 0,
-            notes: receipt.notes || 'Thu tiền thanh toán nợ',
-          });
+          // Ghi sổ quỹ (chỉ nếu thu tiền mặt)
+          if (receiptRecord.paymentMethod === 'CASH') {
+            await manager.save(CashLedger, {
+              storeId: receipt.storeId,
+              refType: 'RECEIPT',
+              refId: receiptRecord.id,
+              cashIn: receipt.amount,
+              cashOut: 0,
+              notes: receipt.notes || 'Thu tiền thanh toán nợ',
+            });
+          }
         }
       }
 
@@ -313,18 +319,54 @@ export class ShiftsService {
             depositDate: new Date(deposit.depositDate),
             depositTime: deposit.depositTime,
             receiverName: deposit.receiverName,
+            paymentMethod: deposit.paymentMethod || 'CASH',
             notes: deposit.notes,
           });
 
-          // Ghi sổ quỹ (chi tiền mặt)
-          await manager.save(CashLedger, {
-            storeId: deposit.storeId,
-            refType: 'DEPOSIT',
-            refId: depositRecord.id,
-            cashIn: 0,
-            cashOut: deposit.amount,
-            notes: deposit.notes || 'Nộp tiền về công ty',
+          // Ghi sổ quỹ (chỉ nếu nộp tiền mặt)
+          if (depositRecord.paymentMethod === 'CASH') {
+            await manager.save(CashLedger, {
+              storeId: deposit.storeId,
+              refType: 'DEPOSIT',
+              refId: depositRecord.id,
+              cashIn: 0,
+              cashOut: deposit.amount,
+              notes: deposit.notes || 'Nộp tiền về công ty',
+            });
+          }
+        }
+      }
+
+      // 6.4. Xử lý Expenses (chi phí)
+      if (closeShiftDto.expenses && closeShiftDto.expenses.length > 0) {
+        const today = new Date();
+
+        for (const expense of closeShiftDto.expenses) {
+          // Lưu expense record
+          const expenseRecord = await manager.save(Expense, {
+            storeId: shift.storeId,
+            shiftId: shift.id,
+            expenseCategoryId: expense.expenseCategoryId,
+            amount: expense.amount,
+            description: expense.description,
+            expenseDate: today,
+            paymentMethod: expense.paymentMethod || 'CASH',
+            createdBy: user?.id,
           });
+
+          // Ghi sổ quỹ hoặc ngân hàng
+          if (expenseRecord.paymentMethod === 'CASH') {
+            // Chi bằng tiền mặt - ghi vào cash_ledger
+            await manager.save(CashLedger, {
+              storeId: shift.storeId,
+              refType: 'EXPENSE',
+              refId: expenseRecord.id,
+              cashIn: 0,
+              cashOut: expense.amount,
+              notes: expense.description,
+            });
+          }
+          // Nếu BANK_TRANSFER thì không ghi vào cash_ledger (chỉ ghi expense)
         }
       }
 

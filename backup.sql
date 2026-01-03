@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fDXpZ1LmbtBzJcGoaOSDcMy3RRUhEk0O8c97SmXnceEd43uoJPkDPoD4DlDbEhx
+\restrict q3hT4Drp2tSLSr3HOHZefUeZIjceTWeU4DxryKu4ShvGB5a9L11AaDSxGipvpjQ
 
 -- Dumped from database version 15.15 (Debian 15.15-1.pgdg13+1)
 -- Dumped by pg_dump version 15.15 (Debian 15.15-1.pgdg13+1)
@@ -77,6 +77,88 @@ ALTER SEQUENCE public.audit_logs_id_seq OWNED BY public.audit_logs.id;
 
 
 --
+-- Name: bank_accounts; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.bank_accounts (
+    id integer NOT NULL,
+    "accountNumber" character varying(50) NOT NULL,
+    "bankName" character varying(100) NOT NULL,
+    "accountName" character varying(200) NOT NULL,
+    description text,
+    is_company_account boolean DEFAULT true NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.bank_accounts OWNER TO postgres;
+
+--
+-- Name: bank_accounts_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.bank_accounts_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.bank_accounts_id_seq OWNER TO postgres;
+
+--
+-- Name: bank_accounts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.bank_accounts_id_seq OWNED BY public.bank_accounts.id;
+
+
+--
+-- Name: bank_ledger; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.bank_ledger (
+    id integer NOT NULL,
+    bank_account_id integer NOT NULL,
+    store_id integer,
+    ref_type character varying(50) NOT NULL,
+    ref_id integer,
+    bank_in numeric(18,2) DEFAULT '0'::numeric NOT NULL,
+    bank_out numeric(18,2) DEFAULT '0'::numeric NOT NULL,
+    notes text,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.bank_ledger OWNER TO postgres;
+
+--
+-- Name: bank_ledger_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.bank_ledger_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.bank_ledger_id_seq OWNER TO postgres;
+
+--
+-- Name: bank_ledger_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.bank_ledger_id_seq OWNED BY public.bank_ledger.id;
+
+
+--
 -- Name: cash_deposits; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -90,7 +172,8 @@ CREATE TABLE public.cash_deposits (
     receiver_name character varying(100),
     notes text,
     created_by integer,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    payment_method character varying(20) DEFAULT 'CASH'::character varying NOT NULL
 );
 
 
@@ -248,6 +331,87 @@ ALTER TABLE public.debt_ledger_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.debt_ledger_id_seq OWNED BY public.debt_ledger.id;
+
+
+--
+-- Name: expense_categories; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.expense_categories (
+    id integer NOT NULL,
+    code character varying(20) NOT NULL,
+    name character varying(200) NOT NULL,
+    description text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.expense_categories OWNER TO postgres;
+
+--
+-- Name: expense_categories_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.expense_categories_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.expense_categories_id_seq OWNER TO postgres;
+
+--
+-- Name: expense_categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.expense_categories_id_seq OWNED BY public.expense_categories.id;
+
+
+--
+-- Name: expenses; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.expenses (
+    id integer NOT NULL,
+    store_id integer NOT NULL,
+    shift_id integer,
+    expense_category_id integer NOT NULL,
+    amount numeric(18,2) NOT NULL,
+    description text NOT NULL,
+    expense_date date NOT NULL,
+    created_by integer,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    payment_method character varying(20) DEFAULT 'CASH'::character varying NOT NULL
+);
+
+
+ALTER TABLE public.expenses OWNER TO postgres;
+
+--
+-- Name: expenses_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.expenses_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.expenses_id_seq OWNER TO postgres;
+
+--
+-- Name: expenses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.expenses_id_seq OWNED BY public.expenses.id;
 
 
 --
@@ -603,7 +767,8 @@ CREATE TABLE public.receipts (
     shift_id integer,
     receipt_type character varying(50),
     amount numeric(18,2),
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    payment_method character varying(20) DEFAULT 'CASH'::character varying NOT NULL
 );
 
 
@@ -724,7 +889,8 @@ CREATE TABLE public.sales (
     quantity numeric(18,3),
     unit_price numeric(18,2),
     amount numeric(18,2),
-    customer_id integer
+    customer_id integer,
+    payment_method character varying(20) DEFAULT 'CASH'::character varying NOT NULL
 );
 
 
@@ -1049,6 +1215,20 @@ ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.a
 
 
 --
+-- Name: bank_accounts id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_accounts ALTER COLUMN id SET DEFAULT nextval('public.bank_accounts_id_seq'::regclass);
+
+
+--
+-- Name: bank_ledger id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_ledger ALTER COLUMN id SET DEFAULT nextval('public.bank_ledger_id_seq'::regclass);
+
+
+--
 -- Name: cash_deposits id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -1074,6 +1254,20 @@ ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.cu
 --
 
 ALTER TABLE ONLY public.debt_ledger ALTER COLUMN id SET DEFAULT nextval('public.debt_ledger_id_seq'::regclass);
+
+
+--
+-- Name: expense_categories id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expense_categories ALTER COLUMN id SET DEFAULT nextval('public.expense_categories_id_seq'::regclass);
+
+
+--
+-- Name: expenses id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses ALTER COLUMN id SET DEFAULT nextval('public.expenses_id_seq'::regclass);
 
 
 --
@@ -1227,10 +1421,26 @@ COPY public.audit_logs (id, table_name, record_id, action, old_data, new_data, c
 
 
 --
+-- Data for Name: bank_accounts; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.bank_accounts (id, "accountNumber", "bankName", "accountName", description, is_company_account, is_active, created_at, updated_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: bank_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.bank_ledger (id, bank_account_id, store_id, ref_type, ref_id, bank_in, bank_out, notes, created_at) FROM stdin;
+\.
+
+
+--
 -- Data for Name: cash_deposits; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit_time, receiver_name, notes, created_by, created_at) FROM stdin;
+COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit_time, receiver_name, notes, created_by, created_at, payment_method) FROM stdin;
 \.
 
 
@@ -1270,6 +1480,26 @@ COPY public.debt_ledger (id, customer_id, store_id, ref_type, ref_id, debit, cre
 10	1	1	DEBT_SALE	9	862500.00	0.00	2026-01-02 15:10:18.358462	\N
 11	2	1	DEBT_SALE	10	862500.00	0.00	2026-01-02 15:10:18.358462	\N
 12	1	2	DEBT_SALE	11	1759000.00	0.00	2026-01-02 15:57:22.087025	\N
+\.
+
+
+--
+-- Data for Name: expense_categories; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.expense_categories (id, code, name, description, is_active, created_at, updated_at) FROM stdin;
+1	642	Chi phí quản lý doanh nghiệp	Chi phí quản lý DN theo TT200	t	2026-01-03 14:51:37.34881	2026-01-03 14:51:37.34881
+2	641	Chi phí bán hàng	Chi phí phát sinh trong quá trình tiêu thụ sản phẩm	t	2026-01-03 14:51:37.34881	2026-01-03 14:51:37.34881
+3	627	Chi phí dịch vụ mua ngoài	Chi phí dịch vụ thuê ngoài	t	2026-01-03 14:51:37.34881	2026-01-03 14:51:37.34881
+4	811	Chi phí khác	Các khoản chi phí khác	t	2026-01-03 14:51:37.34881	2026-01-03 14:51:37.34881
+\.
+
+
+--
+-- Data for Name: expenses; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.expenses (id, store_id, shift_id, expense_category_id, amount, description, expense_date, created_by, created_at, payment_method) FROM stdin;
 \.
 
 
@@ -1374,7 +1604,7 @@ COPY public.receipt_details (id, receipt_id, customer_id, amount) FROM stdin;
 -- Data for Name: receipts; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.receipts (id, store_id, shift_id, receipt_type, amount, created_at) FROM stdin;
+COPY public.receipts (id, store_id, shift_id, receipt_type, amount, created_at, payment_method) FROM stdin;
 \.
 
 
@@ -1413,17 +1643,17 @@ COPY public.roles (id, code, name) FROM stdin;
 -- Data for Name: sales; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.sales (id, shift_id, store_id, product_id, quantity, unit_price, amount, customer_id) FROM stdin;
-27	2	1	3	120.000	17250.00	2070000.00	\N
-28	2	1	3	120.000	17250.00	2070000.00	\N
-29	2	1	2	120.000	18910.00	2269200.00	\N
-30	2	1	2	120.000	18910.00	2269200.00	\N
-31	2	1	2	119.999	18910.00	2269181.09	\N
-32	2	1	3	50.000	17250.00	862500.00	1
-33	2	1	3	50.000	17250.00	862500.00	2
-34	5	2	2	100.000	19280.00	1928000.00	\N
-35	5	2	3	500.000	17590.00	8795000.00	\N
-36	5	2	3	100.000	17590.00	1759000.00	1
+COPY public.sales (id, shift_id, store_id, product_id, quantity, unit_price, amount, customer_id, payment_method) FROM stdin;
+27	2	1	3	120.000	17250.00	2070000.00	\N	CASH
+28	2	1	3	120.000	17250.00	2070000.00	\N	CASH
+29	2	1	2	120.000	18910.00	2269200.00	\N	CASH
+30	2	1	2	120.000	18910.00	2269200.00	\N	CASH
+31	2	1	2	119.999	18910.00	2269181.09	\N	CASH
+32	2	1	3	50.000	17250.00	862500.00	1	CASH
+33	2	1	3	50.000	17250.00	862500.00	2	CASH
+34	5	2	2	100.000	19280.00	1928000.00	\N	CASH
+35	5	2	3	500.000	17590.00	8795000.00	\N	CASH
+36	5	2	3	100.000	17590.00	1759000.00	1	CASH
 \.
 
 
@@ -1512,6 +1742,20 @@ SELECT pg_catalog.setval('public.audit_logs_id_seq', 2, true);
 
 
 --
+-- Name: bank_accounts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.bank_accounts_id_seq', 1, false);
+
+
+--
+-- Name: bank_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.bank_ledger_id_seq', 1, false);
+
+
+--
 -- Name: cash_deposits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
@@ -1537,6 +1781,20 @@ SELECT pg_catalog.setval('public.customers_id_seq', 2, true);
 --
 
 SELECT pg_catalog.setval('public.debt_ledger_id_seq', 12, true);
+
+
+--
+-- Name: expense_categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.expense_categories_id_seq', 4, true);
+
+
+--
+-- Name: expenses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.expenses_id_seq', 1, false);
 
 
 --
@@ -1720,6 +1978,14 @@ ALTER TABLE ONLY public.role_permissions
 
 
 --
+-- Name: bank_ledger PK_318068fbd0f3cdf21a7dc2ccd9f; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_ledger
+    ADD CONSTRAINT "PK_318068fbd0f3cdf21a7dc2ccd9f" PRIMARY KEY (id);
+
+
+--
 -- Name: product_prices PK_31c33ddacf759f7c0e5d327c4bb; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1824,6 +2090,14 @@ ALTER TABLE ONLY public.permissions
 
 
 --
+-- Name: expenses PK_94c3ceb17e3140abc9282c20610; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT "PK_94c3ceb17e3140abc9282c20610" PRIMARY KEY (id);
+
+
+--
 -- Name: users PK_a3ffb1c0c8416b9fc6f907b7433; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -1856,11 +2130,27 @@ ALTER TABLE ONLY public.pumps
 
 
 --
+-- Name: bank_accounts PK_c872de764f2038224a013ff25ed; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_accounts
+    ADD CONSTRAINT "PK_c872de764f2038224a013ff25ed" PRIMARY KEY (id);
+
+
+--
 -- Name: customer_stores PK_ca5f36854f424425ea3f0655091; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.customer_stores
     ADD CONSTRAINT "PK_ca5f36854f424425ea3f0655091" PRIMARY KEY (customer_id, store_id);
+
+
+--
+-- Name: expense_categories PK_d0ef31e189d9523461215b62775; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expense_categories
+    ADD CONSTRAINT "PK_d0ef31e189d9523461215b62775" PRIMARY KEY (id);
 
 
 --
@@ -1893,6 +2183,14 @@ ALTER TABLE ONLY public.pump_readings
 
 ALTER TABLE ONLY public.shift_adjustments
     ADD CONSTRAINT "PK_f662575f03ec154f35ff26b2c71" PRIMARY KEY (id);
+
+
+--
+-- Name: expense_categories UQ_6e1e6e388d00c18c4bb5a2206e6; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expense_categories
+    ADD CONSTRAINT "UQ_6e1e6e388d00c18c4bb5a2206e6" UNIQUE (code);
 
 
 --
@@ -1944,6 +2242,13 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: idx_bank_ledger_account; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_bank_ledger_account ON public.bank_ledger USING btree (bank_account_id, created_at);
+
+
+--
 -- Name: idx_cash_deposits_shift; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -1969,6 +2274,20 @@ CREATE INDEX idx_cash_ledger_store ON public.cash_ledger USING btree (store_id, 
 --
 
 CREATE INDEX idx_debt_ledger_customer ON public.debt_ledger USING btree (customer_id, created_at);
+
+
+--
+-- Name: idx_expenses_shift; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_expenses_shift ON public.expenses USING btree (shift_id);
+
+
+--
+-- Name: idx_expenses_store; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_expenses_store ON public.expenses USING btree (store_id, created_at);
 
 
 --
@@ -2019,6 +2338,14 @@ CREATE UNIQUE INDEX ux_shift_store_date ON public.shifts USING btree (store_id, 
 
 ALTER TABLE ONLY public.receipts
     ADD CONSTRAINT "FK_03db286bb378d5fb8db44b7b761" FOREIGN KEY (shift_id) REFERENCES public.shifts(id);
+
+
+--
+-- Name: expenses FK_0848ee9225a5825a95d9ab1da55; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT "FK_0848ee9225a5825a95d9ab1da55" FOREIGN KEY (expense_category_id) REFERENCES public.expense_categories(id);
 
 
 --
@@ -2182,11 +2509,27 @@ ALTER TABLE ONLY public.shift_debt_sales
 
 
 --
+-- Name: bank_ledger FK_5f19c3be73494094073e93a0fb0; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_ledger
+    ADD CONSTRAINT "FK_5f19c3be73494094073e93a0fb0" FOREIGN KEY (store_id) REFERENCES public.stores(id);
+
+
+--
 -- Name: pump_readings FK_5f25c3cde1b32a7f2f589642007; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.pump_readings
     ADD CONSTRAINT "FK_5f25c3cde1b32a7f2f589642007" FOREIGN KEY (shift_id) REFERENCES public.shifts(id);
+
+
+--
+-- Name: expenses FK_60dc343125132e11cb89abbd5aa; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT "FK_60dc343125132e11cb89abbd5aa" FOREIGN KEY (store_id) REFERENCES public.stores(id);
 
 
 --
@@ -2203,6 +2546,14 @@ ALTER TABLE ONLY public.inventory_ledger
 
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT "FK_6c1fae113ae666969a94d79d637" FOREIGN KEY (store_id) REFERENCES public.stores(id);
+
+
+--
+-- Name: expenses FK_7c0c012c2f8e6578277c239ee61; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT "FK_7c0c012c2f8e6578277c239ee61" FOREIGN KEY (created_by) REFERENCES public.users(id);
 
 
 --
@@ -2283,6 +2634,14 @@ ALTER TABLE ONLY public.inventory_document_items
 
 ALTER TABLE ONLY public.product_prices
     ADD CONSTRAINT "FK_b1123feb1f3fbc7112d507827ce" FOREIGN KEY (region_id) REFERENCES public.regions(id);
+
+
+--
+-- Name: expenses FK_b8220647a9e8ba971320a94d49a; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.expenses
+    ADD CONSTRAINT "FK_b8220647a9e8ba971320a94d49a" FOREIGN KEY (shift_id) REFERENCES public.shifts(id);
 
 
 --
@@ -2374,6 +2733,14 @@ ALTER TABLE ONLY public.cash_deposits
 
 
 --
+-- Name: bank_ledger FK_f7d9067c7b84f0b7fd5cb5fd18a; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.bank_ledger
+    ADD CONSTRAINT "FK_f7d9067c7b84f0b7fd5cb5fd18a" FOREIGN KEY (bank_account_id) REFERENCES public.bank_accounts(id);
+
+
+--
 -- Name: inventory_document_items FK_ff5c9b654b5c227f10c20bb864b; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2385,5 +2752,5 @@ ALTER TABLE ONLY public.inventory_document_items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fDXpZ1LmbtBzJcGoaOSDcMy3RRUhEk0O8c97SmXnceEd43uoJPkDPoD4DlDbEhx
+\unrestrict q3hT4Drp2tSLSr3HOHZefUeZIjceTWeU4DxryKu4ShvGB5a9L11AaDSxGipvpjQ
 

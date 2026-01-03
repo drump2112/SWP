@@ -12,6 +12,7 @@ import { DebtLedger } from '../entities/debt-ledger.entity';
 import { CashLedger } from '../entities/cash-ledger.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
+import { Expense } from '../entities/expense.entity';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
 
@@ -30,6 +31,7 @@ import { ShiftsController } from './shifts.controller';
       CashLedger,
       Receipt,
       ReceiptDetail,
+      Expense,
     ]),
   ],
   controllers: [ShiftsController],
