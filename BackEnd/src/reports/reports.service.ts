@@ -1,0 +1,391 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, Between } from 'typeorm';
+import { DebtLedger } from '../entities/debt-ledger.entity';
+import { Sale } from '../entities/sale.entity';
+import { CashLedger } from '../entities/cash-ledger.entity';
+import { InventoryLedger } from '../entities/inventory-ledger.entity';
+import { Shift } from '../entities/shift.entity';
+import { Customer } from '../entities/customer.entity';
+import { Store } from '../entities/store.entity';
+import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
+
+@Injectable()
+export class ReportsService {
+  constructor(
+    @InjectRepository(DebtLedger)
+    private debtLedgerRepository: Repository<DebtLedger>,
+    @InjectRepository(Sale)
+    private saleRepository: Repository<Sale>,
+    @InjectRepository(CashLedger)
+    private cashLedgerRepository: Repository<CashLedger>,
+    @InjectRepository(InventoryLedger)
+    private inventoryLedgerRepository: Repository<InventoryLedger>,
+    @InjectRepository(Shift)
+    private shiftRepository: Repository<Shift>,
+    @InjectRepository(Customer)
+    private customerRepository: Repository<Customer>,
+    @InjectRepository(Store)
+    private storeRepository: Repository<Store>,
+    @InjectRepository(ShiftDebtSale)
+    private shiftDebtSaleRepository: Repository<ShiftDebtSale>,
+  ) {}
+
+  // ==================== BÁO CÁO CÔNG NỢ ====================
+
+  /**
+   * Báo cáo công nợ chi tiết theo khách hàng
+   * - Kế toán: Xem tất cả cửa hàng
+   * - Cửa hàng: Chỉ xem khách nợ tại cửa hàng của mình
+   */
+  async getDebtReport(params: {
+    storeId?: number;
+    customerId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+  }) {
+    const { storeId, customerId, fromDate, toDate } = params;
+
+    // Lấy danh sách khách hàng
+    const customerQuery = this.customerRepository.createQueryBuilder('c');
+
+    if (storeId) {
+      customerQuery
+        .innerJoin('c.stores', 'cs')
+        .where('cs.store_id = :storeId', { storeId });
+    }
+
+    if (customerId) {
+      customerQuery.andWhere('c.id = :customerId', { customerId });
+    }
+
+    const customers = await customerQuery
+      .orderBy('c.code', 'ASC')
+      .getMany();
+
+    // Lấy chi tiết công nợ cho từng khách hàng
+    const results = await Promise.all(
+      customers.map(async (customer) => {
+        // Lấy dư đầu kỳ (trước fromDate)
+        const openingBalance = fromDate
+          ? await this.getCustomerBalance(customer.id, storeId, new Date(0), fromDate)
+          : 0;
+
+        // Lấy phát sinh trong kỳ
+        const ledgerQuery = this.debtLedgerRepository
+          .createQueryBuilder('dl')
+          .where('dl.customer_id = :customerId', { customerId: customer.id });
+
+        if (storeId) {
+          ledgerQuery.andWhere('dl.store_id = :storeId', { storeId });
+        }
+
+        if (fromDate && toDate) {
+          ledgerQuery.andWhere('dl.created_at BETWEEN :fromDate AND :toDate', {
+            fromDate,
+            toDate,
+          });
+        }
+
+        const ledgers = await ledgerQuery
+          .orderBy('dl.created_at', 'ASC')
+          .getMany();
+
+        const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
+        const totalCredit = ledgers.reduce((sum, l) => sum + Number(l.credit), 0);
+        const closingBalance = openingBalance + totalDebit - totalCredit;
+
+        return {
+          customer: {
+            id: customer.id,
+            code: customer.code,
+            name: customer.name,
+            phone: customer.phone,
+            address: customer.address,
+            creditLimit: customer.creditLimit,
+          },
+          openingBalance, // Dư đầu kỳ
+          totalDebit, // Phát sinh nợ (bán công nợ)
+          totalCredit, // Phát sinh có (thu tiền)
+          closingBalance, // Dư cuối kỳ
+          ledgers: ledgers.map((l) => ({
+            id: l.id,
+            date: l.createdAt,
+            refType: l.refType,
+            refId: l.refId,
+            debit: Number(l.debit),
+            credit: Number(l.credit),
+          })),
+        };
+      }),
+    );
+
+    // Lọc chỉ hiển thị khách có phát sinh hoặc dư cuối kỳ
+    return results.filter(
+      (r) =>
+        r.openingBalance !== 0 ||
+        r.totalDebit !== 0 ||
+        r.totalCredit !== 0 ||
+        r.closingBalance !== 0,
+    );
+  }
+
+  /**
+   * Tính số dư công nợ của khách hàng tại 1 thời điểm
+   */
+  private async getCustomerBalance(
+    customerId: number,
+    storeId: number | undefined,
+    fromDate: Date,
+    toDate: Date,
+  ): Promise<number> {
+    const query = this.debtLedgerRepository
+      .createQueryBuilder('dl')
+      .select('SUM(dl.debit - dl.credit)', 'balance')
+      .where('dl.customer_id = :customerId', { customerId })
+      .andWhere('dl.created_at < :toDate', { toDate });
+
+    if (storeId) {
+      query.andWhere('dl.store_id = :storeId', { storeId });
+    }
+
+    const result = await query.getRawOne();
+    return result?.balance ? Number(result.balance) : 0;
+  }
+
+  // ==================== BÁO CÁO CA ====================
+
+  /**
+   * Báo cáo chi tiết ca làm việc
+   */
+  async getShiftDetailReport(shiftId: number) {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: [
+        'store',
+        'pumpReadings',
+        'pumpReadings.pump',
+        'pumpReadings.product',
+        'sales',
+        'sales.product',
+      ],
+    });
+
+    if (!shift) {
+      throw new Error('Shift not found');
+    }
+
+
+
+    // Lấy phiếu thu tiền (thanh toán nợ)
+    const receipts = await this.cashLedgerRepository.find({
+      where: {
+        refType: 'RECEIPT',
+        // refId sẽ là receipt_id, cần join với receipts table
+      },
+      relations: ['store'],
+    });
+
+    const totalReceipts = receipts
+      .filter((r) => {
+        // Chỉ lấy receipts trong ca này
+        // TODO: Cần thêm shift_id vào receipts table
+        return true;
+      })
+      .reduce((sum, r) => sum + Number(r.cashIn), 0);
+
+    // Lấy phiếu nộp tiền
+    const deposits = await this.cashLedgerRepository.find({
+      where: {
+        refType: 'CASH_DEPOSIT',
+        storeId: shift.storeId,
+      },
+    });
+
+    const totalDeposits = deposits
+      .filter((d) => {
+        // Chỉ lấy deposits trong ca này
+        // TODO: Cần thêm shift_id vào cash_deposits table
+        return true;
+      })
+      .reduce((sum, d) => sum + Number(d.cashOut), 0);
+
+    // Tính toán
+    const totalFromPumps = shift.pumpReadings.reduce((sum, reading) => {
+      return sum + Number(reading.quantity) * Number(reading.unitPrice || 0);
+    }, 0);
+
+    // Lấy doanh số bán công nợ từ shift_debt_sales
+    const debtSalesData = await this.shiftDebtSaleRepository.find({
+      where: { shiftId },
+      relations: ['customer', 'product'],
+    });
+
+    const totalDebtSales = debtSalesData.reduce((sum, sale) => sum + Number(sale.amount), 0);
+    const totalRetailSales = totalFromPumps - totalDebtSales;
+
+    return {
+      shift: {
+        id: shift.id,
+        shiftNo: shift.shiftNo,
+        shiftDate: shift.shiftDate,
+        status: shift.status,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        store: {
+          id: shift.store.id,
+          code: shift.store.code,
+          name: shift.store.name,
+        },
+      },
+      pumpReadings: shift.pumpReadings.map((reading) => ({
+        pumpCode: reading.pump.pumpCode,
+        pumpName: reading.pump.name,
+        productName: reading.product.name,
+        startReading: Number(reading.startReading),
+        endReading: Number(reading.endReading),
+        quantity: Number(reading.quantity),
+        unitPrice: Number(reading.unitPrice),
+        amount: Number(reading.quantity) * Number(reading.unitPrice),
+      })),
+      debtSales: debtSalesData.map((sale) => ({
+        customerCode: sale.customer?.code,
+        customerName: sale.customer?.name,
+        productName: sale.product?.name,
+        quantity: Number(sale.quantity),
+        unitPrice: Number(sale.unitPrice),
+        amount: Number(sale.amount),
+      })),
+      summary: {
+        totalFromPumps, // Tổng từ vòi bơm
+        totalDebtSales, // Bán công nợ
+        totalRetailSales, // Bán lẻ = Tổng - Công nợ
+        totalReceipts, // Thu tiền nợ
+        totalDeposits, // Nộp về công ty
+        cashBalance: totalRetailSales + totalReceipts - totalDeposits, // Số dư quỹ
+      },
+    };
+  }
+
+  // ==================== CÁC BÁO CÁO KHÁC ====================
+
+  // Báo cáo doanh thu theo cửa hàng
+  async getSalesReport(fromDate: Date, toDate: Date, storeId?: number) {
+    const query = this.saleRepository
+      .createQueryBuilder('s')
+      .leftJoin('s.shift', 'shift')
+      .leftJoin('s.store', 'store')
+      .leftJoin('s.product', 'product')
+      .select('store.id', 'storeId')
+      .addSelect('store.name', 'storeName')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(s.quantity)', 'totalQuantity')
+      .addSelect('SUM(s.amount)', 'totalAmount')
+      .where('shift.shift_date >= :fromDate', { fromDate })
+      .andWhere('shift.shift_date <= :toDate', { toDate })
+      .groupBy('store.id')
+      .addGroupBy('store.name')
+      .addGroupBy('product.id')
+      .addGroupBy('product.name');
+
+    if (storeId) {
+      query.andWhere('s.store_id = :storeId', { storeId });
+    }
+
+    return query.getRawMany();
+  }
+
+  // Báo cáo quỹ tiền mặt
+  async getCashReport(storeId?: number) {
+    const query = this.cashLedgerRepository
+      .createQueryBuilder('cl')
+      .leftJoin('cl.store', 'store')
+      .select('cl.store_id', 'storeId')
+      .addSelect('store.name', 'storeName')
+      .addSelect('SUM(cl.cash_in)', 'totalCashIn')
+      .addSelect('SUM(cl.cash_out)', 'totalCashOut')
+      .addSelect('SUM(cl.cash_in - cl.cash_out)', 'balance')
+      .groupBy('cl.store_id')
+      .addGroupBy('store.name');
+
+    if (storeId) {
+      query.where('cl.store_id = :storeId', { storeId });
+    }
+
+    return query.getRawMany();
+  }
+
+  // Báo cáo tồn kho
+  async getInventoryReport(warehouseId?: number) {
+    const query = this.inventoryLedgerRepository
+      .createQueryBuilder('il')
+      .leftJoin('il.warehouse', 'warehouse')
+      .leftJoin('il.product', 'product')
+      .select('il.warehouse_id', 'warehouseId')
+      .addSelect('warehouse.type', 'warehouseType')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('product.unit', 'unit')
+      .addSelect('SUM(il.quantity_in)', 'totalIn')
+      .addSelect('SUM(il.quantity_out)', 'totalOut')
+      .addSelect('SUM(il.quantity_in - il.quantity_out)', 'balance')
+      .groupBy('il.warehouse_id')
+      .addGroupBy('warehouse.type')
+      .addGroupBy('product.id')
+      .addGroupBy('product.name')
+      .addGroupBy('product.unit')
+      .having('SUM(il.quantity_in - il.quantity_out) != 0');
+
+    if (warehouseId) {
+      query.where('il.warehouse_id = :warehouseId', { warehouseId });
+    }
+
+    return query.getRawMany();
+  }
+
+  // Dashboard tổng quan cho giám đốc
+  async getDashboard(fromDate: Date, toDate: Date) {
+    const [
+      totalSales,
+      debtSummary,
+      cashSummary,
+      inventorySummary,
+    ] = await Promise.all([
+      // Tổng doanh thu
+      this.saleRepository
+        .createQueryBuilder('s')
+        .leftJoin('s.shift', 'shift')
+        .select('SUM(s.amount)', 'total')
+        .where('shift.shift_date >= :fromDate', { fromDate })
+        .andWhere('shift.shift_date <= :toDate', { toDate })
+        .getRawOne(),
+
+      // Tổng công nợ
+      this.debtLedgerRepository
+        .createQueryBuilder('dl')
+        .select('SUM(dl.debit - dl.credit)', 'total')
+        .getRawOne(),
+
+      // Tổng quỹ tiền mặt
+      this.cashLedgerRepository
+        .createQueryBuilder('cl')
+        .select('SUM(cl.cash_in - cl.cash_out)', 'total')
+        .getRawOne(),
+
+      // Tổng giá trị tồn kho (simplified)
+      this.inventoryLedgerRepository
+        .createQueryBuilder('il')
+        .select('SUM(il.quantity_in - il.quantity_out)', 'total')
+        .getRawOne(),
+    ]);
+
+    return {
+      period: { fromDate, toDate },
+      totalSales: Number(totalSales?.total || 0),
+      totalDebt: Number(debtSummary?.total || 0),
+      totalCash: Number(cashSummary?.total || 0),
+      totalInventory: Number(inventorySummary?.total || 0),
+    };
+  }
+}

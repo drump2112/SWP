@@ -1,0 +1,8 @@
+<svg width="200" height="60" viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="60" fill="#315eac"/>
+  <path d="M30 15C30 12.2386 32.2386 10 35 10H40C42.7614 10 45 12.2386 45 15V25C45 27.7614 42.7614 30 40 30H35C32.2386 30 30 27.7614 30 25V15Z" fill="#f78f1e"/>
+  <path d="M30 35C30 32.2386 32.2386 30 35 30H40C42.7614 30 45 32.2386 45 35V45C45 47.7614 42.7614 50 40 50H35C32.2386 50 30 47.7614 30 45V35Z" fill="#f78f1e" opacity="0.7"/>
+  <rect x="37" y="15" width="3" height="30" fill="white"/>
+  <text x="55" y="35" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="white">QLXD</text>
+  <text x="55" y="48" font-family="Arial, sans-serif" font-size="10" fill="#E0E0E0">Quản Lý Xăng Dầu</text>
+</svg>
