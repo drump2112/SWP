@@ -82,12 +82,10 @@ const CashReportPage: React.FC = () => {
     <div className="p-6">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-center gap-2">
-          <BanknotesIcon className="h-8 w-8 text-green-600" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            Báo Cáo Sổ Quỹ Tiền Mặt
-          </h1>
-        </div>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+          <BanknotesIcon className="h-8 w-8 text-blue-600" />
+          Báo Cáo Sổ Quỹ Tiền Mặt
+        </h1>
         <p className="text-gray-600 mt-2">
           Theo dõi thu chi tiền mặt qua phiếu thu và phiếu nộp
         </p>
@@ -132,7 +130,7 @@ const CashReportPage: React.FC = () => {
               type="date"
               value={filters.fromDate || ''}
               onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 hover:border-green-300 transition-all"
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
             />
           </div>
 
@@ -144,7 +142,7 @@ const CashReportPage: React.FC = () => {
               type="date"
               value={filters.toDate || ''}
               onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 hover:border-green-300 transition-all"
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
             />
           </div>
         </div>
@@ -211,7 +209,7 @@ const CashReportPage: React.FC = () => {
             <thead>
               {/* Opening Balance Row */}
               <tr className="bg-blue-50">
-                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900" colSpan={4}>
+                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900" colSpan={5}>
                   Số dư đầu kỳ
                 </th>
                 <th className="px-6 py-4 text-center text-sm font-bold text-blue-700">
@@ -225,6 +223,9 @@ const CashReportPage: React.FC = () => {
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
                   Loại chứng từ
+                </th>
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                  Hình thức
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
                   Tiền thu (₫)
@@ -259,6 +260,13 @@ const CashReportPage: React.FC = () => {
                         }`}>
                           {getRefTypeLabel(ledger.refType)}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 text-center text-sm">
+                        {ledger.details?.paymentMethod === 'BANK_TRANSFER' ? (
+                          <span className="text-xs font-medium text-blue-600">🏦 CK</span>
+                        ) : (
+                          <span className="text-xs font-medium text-green-600">💵 TM</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center text-sm">
                         {ledger.cashIn > 0 ? (
@@ -389,7 +397,7 @@ const CashReportPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
                     Không có giao dịch trong kỳ này
                   </td>
                 </tr>
@@ -398,7 +406,7 @@ const CashReportPage: React.FC = () => {
               {/* Closing Balance Row */}
               {report?.ledgers && report.ledgers.length > 0 && (
                 <tr className="bg-purple-50 font-bold">
-                  <td className="px-6 py-4 text-center text-sm text-gray-900" colSpan={4}>
+                  <td className="px-6 py-4 text-center text-sm text-gray-900" colSpan={6}>
                     Số dư cuối kỳ
                   </td>
                   <td className="px-6 py-4 text-center text-sm text-purple-700">

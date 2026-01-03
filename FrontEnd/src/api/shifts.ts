@@ -69,6 +69,7 @@ export interface CashDepositDto {
   depositTime?: string;
   receiverName?: string;
   notes?: string;
+  paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
 }
 
 export interface ReceiptDetailDto {
@@ -83,6 +84,7 @@ export interface CreateReceiptDto {
   amount: number;
   details: ReceiptDetailDto[];
   notes?: string;
+  paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
 }
 
 export const shiftsApi = {

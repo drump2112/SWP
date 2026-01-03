@@ -51,7 +51,26 @@ export class ShiftsService {
   ) {}
 
   async create(createShiftDto: CreateShiftDto): Promise<Shift> {
-    // Kiểm tra ca đã tồn tại chưa
+    // 1. Kiểm tra ca trước của cửa hàng này đã đóng chưa
+    const previousOpenShift = await this.shiftRepository.findOne({
+      where: {
+        storeId: createShiftDto.storeId,
+        status: 'OPEN',
+      },
+      order: {
+        shiftDate: 'DESC',
+        shiftNo: 'DESC',
+      },
+    });
+
+    if (previousOpenShift) {
+      throw new BadRequestException(
+        `Không thể mở ca mới. Ca ${previousOpenShift.shiftNo} ngày ${new Date(previousOpenShift.shiftDate).toLocaleDateString('vi-VN')} vẫn đang mở. ` +
+        `Vui lòng chốt ca trước đó trước khi mở ca mới.`
+      );
+    }
+
+    // 2. Kiểm tra ca này đã tồn tại chưa
     const existingShift = await this.shiftRepository.findOne({
       where: {
         storeId: createShiftDto.storeId,

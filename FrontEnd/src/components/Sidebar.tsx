@@ -32,17 +32,31 @@ const navigation: NavItem[] = [
   { name: 'Cửa hàng', href: '/stores', icon: BuildingStorefrontIcon },
   { name: 'Tài khoản', href: '/users', icon: UsersIcon },
   { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon },
-  { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon },
-  { name: 'Sản phẩm', href: '/products', icon: CubeIcon },
-  { name: 'Quản lý giá', href: '/prices', icon: TagIcon },
-  { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon },
-  { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon },
+  {
+    name: 'Quản lý sản phẩm',
+    href: '/products',
+    icon: CubeIcon,
+    children: [
+      { name: 'Sản phẩm', href: '/products', icon: CubeIcon },
+      { name: 'Quản lý giá', href: '/prices', icon: TagIcon },
+    ],
+  },
+  {
+    name: 'Quản lý kho',
+    href: '/inventory',
+    icon: CircleStackIcon,
+    children: [
+      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon },
+      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon },
+    ],
+  },
   {
     name: 'Báo cáo',
     href: '/reports',
     icon: ChartBarIcon,
     children: [
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon },
+      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon },
       { name: 'Báo cáo doanh thu', href: '/reports/sales', icon: BanknotesIcon },
       { name: 'Báo cáo quỹ', href: '/reports/cash', icon: BanknotesIcon },
     ],
@@ -53,7 +67,24 @@ const navigation: NavItem[] = [
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
-  const [openMenus, setOpenMenus] = useState<string[]>(['Báo cáo']); // Mở sẵn menu Báo cáo
+
+  // Hàm kiểm tra xem route hiện tại có thuộc menu không
+  const getInitialOpenMenus = () => {
+    const openMenus: string[] = [];
+    navigation.forEach((item) => {
+      if (item.children) {
+        const hasActiveChild = item.children.some(
+          (child) => location.pathname === child.href || location.pathname.startsWith(child.href + '/')
+        );
+        if (hasActiveChild) {
+          openMenus.push(item.name);
+        }
+      }
+    });
+    return openMenus;
+  };
+
+  const [openMenus, setOpenMenus] = useState<string[]>(getInitialOpenMenus());
 
   const toggleMenu = (name: string) => {
     setOpenMenus((prev) =>
@@ -61,15 +92,34 @@ const Sidebar: React.FC = () => {
     );
   };
 
-  const isActive = (href: string) => {
+  const isActive = (href: string, hasChildren: boolean = false) => {
     if (href === '/') {
       return location.pathname === '/';
     }
-    // Exact match hoặc match với sub-routes (nhưng không match với routes dài hơn)
-    return location.pathname === href || 
-           (location.pathname.startsWith(href + '/') && !navigation.some(
-             nav => nav.href !== href && nav.href.startsWith(href) && location.pathname.startsWith(nav.href)
-           ));
+
+    // Nếu là menu có children, chỉ active khi exact match với href chính
+    if (hasChildren) {
+      return location.pathname === href;
+    }
+
+    // Kiểm tra xem có item con nào của navigation match với current path không
+    const hasChildRoute = navigation.some((nav) => {
+      if (nav.children) {
+        return nav.children.some(
+          (child) => child.href !== href &&
+                     (location.pathname === child.href || location.pathname.startsWith(child.href + '/'))
+        );
+      }
+      return false;
+    });
+
+    // Nếu có child route match, thì parent không active
+    if (hasChildRoute && location.pathname.startsWith(href + '/')) {
+      return false;
+    }
+
+    // Exact match hoặc starts with + '/'
+    return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
   return (
@@ -96,7 +146,7 @@ const Sidebar: React.FC = () => {
         {navigation.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isMenuOpen = openMenus.includes(item.name);
-          const itemActive = isActive(item.href);
+          const itemActive = isActive(item.href, hasChildren);
           const Icon = item.icon;
 
           return (

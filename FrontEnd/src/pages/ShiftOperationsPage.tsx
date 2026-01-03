@@ -7,7 +7,8 @@ import { productsApi } from '../api/products';
 import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
 import { useAuth } from '../contexts/AuthContext';
-import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
+import { showSuccess, showConfirm } from '../utils/sweetalert';
+import { toast } from 'react-toastify';
 import SearchableSelect from '../components/SearchableSelect';
 import {
   PlusIcon,
@@ -205,7 +206,7 @@ const ShiftOperationsPage: React.FC = () => {
             pumpCode: pump.pumpCode,
             productId: pump.productId,
             startValue: previousEndValue,
-            endValue: previousEndValue, // Bắt đầu = số cuối ca trước
+            endValue: 0, // KHÔNG fill sẵn, để người dùng nhập
           };
         });
 
@@ -280,7 +281,10 @@ const ShiftOperationsPage: React.FC = () => {
       navigate('/shifts');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Chốt ca thất bại');
+      toast.error(error.response?.data?.message || 'Chốt ca thất bại', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     },
   });
 
@@ -306,6 +310,14 @@ const ShiftOperationsPage: React.FC = () => {
       // Giới hạn 3 chữ số thập phân
       numValue = Math.round(numValue * 1000) / 1000;
 
+      // Validation realtime: Nếu đang nhập endValue và nhỏ hơn startValue
+      if (field === 'endValue' && numValue < currentReading.startValue && numValue > 0) {
+        toast.error(`Số cuối (${numValue}) không được nhỏ hơn số đầu (${currentReading.startValue})!`, {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      }
+
       return {
         ...prev,
         [pumpId]: {
@@ -324,24 +336,26 @@ const ShiftOperationsPage: React.FC = () => {
     return quantity * price;
   };
 
-  const hasError = (reading: PumpReadingDto) => {
-    return reading.endValue < reading.startValue;
-  };
-
   const handleCloseShift = async () => {
     const readingsArray = Object.values(pumpReadings);
 
     // Validation 1: Số cuối >= số đầu
     const hasInvalidReadings = readingsArray.some((r) => r.endValue < r.startValue);
     if (hasInvalidReadings) {
-      showError('Số cuối phải lớn hơn hoặc bằng số đầu!');
+      toast.error('Số cuối phải lớn hơn hoặc bằng số đầu!', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
     // Validation 1.5: Kiểm tra có giá cho tất cả sản phẩm
     const missingPrices = readingsArray.filter((r) => !productPrices[r.productId] || productPrices[r.productId] === 0);
     if (missingPrices.length > 0) {
-      showError('Có sản phẩm chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.');
+      toast.error('Có sản phẩm chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -454,6 +468,7 @@ const ShiftOperationsPage: React.FC = () => {
       amount,
       details: [{ customerId, amount }],
       notes: formData.get('notes') as string || undefined,
+      paymentMethod: formData.get('paymentMethod') as string || 'CASH',
     };
 
     // Lưu vào draft state thay vì API
@@ -478,6 +493,7 @@ const ShiftOperationsPage: React.FC = () => {
       depositTime: formData.get('depositTime') as string || undefined,
       receiverName: formData.get('receiverName') as string || undefined,
       notes: formData.get('notes') as string || undefined,
+      paymentMethod: formData.get('paymentMethod') as string || 'CASH',
     };
 
     // Lưu vào draft state thay vì API
@@ -843,7 +859,7 @@ const ShiftOperationsPage: React.FC = () => {
                             <td className="px-4 py-3 text-right">
                               <input
                                 type="number"
-                                step="0.001"
+                                step="1"
                                 min="0"
                                 value={reading.endValue}
                                 onChange={(e) => handlePumpReadingChange(pump.id, 'endValue', e.target.value)}
@@ -853,16 +869,9 @@ const ShiftOperationsPage: React.FC = () => {
                                     e.preventDefault();
                                   }
                                 }}
-                                className={`w-32 px-3 py-2 border rounded-lg text-right text-sm focus:ring-2 transition-colors ${
-                                  hasError(reading)
-                                    ? 'border-red-500 bg-red-50 focus:ring-red-500'
-                                    : 'border-gray-300 focus:ring-blue-500'
-                                }`}
-                                placeholder="0.000"
+                                className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-blue-500 transition-colors"
+                                placeholder="0"
                               />
-                              {hasError(reading) && (
-                                <div className="text-xs text-red-600 mt-1">Số cuối &lt; số đầu</div>
-                              )}
                             </td>
                             <td className="px-4 py-3 text-right">
                               <span className={`text-sm font-bold px-3 py-1 rounded-full ${quantity < 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -1104,7 +1113,7 @@ const ShiftOperationsPage: React.FC = () => {
                         );
                       })
                     ) : (
-                      <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có doanh số bán công nợ (dữ liệu chưa lưu vào database)</td></tr>
+                      <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có doanh số bán công nợ </td></tr>
                     )
                   ) : (
                     // Hiển thị data từ report khi ca đã chốt
@@ -1169,6 +1178,14 @@ const ShiftOperationsPage: React.FC = () => {
                       <input type="number" name="amount" step="1" min="0" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: 5000000" />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
+                      <select name="paymentMethod" defaultValue="CASH" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="CASH">💵 Tiền mặt</option>
+                        <option value="BANK_TRANSFER">🏦 Chuyển khoản</option>
+                      </select>
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
                       <input type="text" name="notes" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: Thu tiền hàng tháng 12" />
@@ -1219,7 +1236,7 @@ const ShiftOperationsPage: React.FC = () => {
                           );
                         })
                       ) : (
-                        <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu thu tiền (dữ liệu chưa lưu vào database)</td></tr>
+                        <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu thu tiền </td></tr>
                       )
                     ) : (
                       // Data từ report khi ca đã chốt
@@ -1280,6 +1297,14 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
+                      <select name="paymentMethod" defaultValue="CASH" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="CASH">💵 Tiền mặt</option>
+                        <option value="BANK_TRANSFER">🏦 Chuyển khoản</option>
+                      </select>
+                    </div>
+
+                    <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Người nhận</label>
                       <input type="text" name="receiverName" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Tên người nhận tiền" />
                     </div>
@@ -1327,7 +1352,7 @@ const ShiftOperationsPage: React.FC = () => {
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nộp tiền (dữ liệu chưa lưu vào database)</td></tr>
+                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nộp tiền </td></tr>
                       )
                     ) : (
                       // Data từ report khi ca đã chốt
