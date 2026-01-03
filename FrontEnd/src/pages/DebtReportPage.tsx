@@ -143,7 +143,7 @@ const DebtReportPage: React.FC = () => {
               type="date"
               value={filters.fromDate || ''}
               onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
             />
           </div>
 
@@ -155,7 +155,7 @@ const DebtReportPage: React.FC = () => {
               type="date"
               value={filters.toDate || ''}
               onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
             />
           </div>
         </div>
@@ -292,23 +292,68 @@ const DebtReportPage: React.FC = () => {
                               <tr>
                                 <th className="px-4 py-2 text-left">Ngày</th>
                                 <th className="px-4 py-2 text-left">Loại</th>
-                                <th className="px-4 py-2 text-right">Nợ</th>
-                                <th className="px-4 py-2 text-right">Có</th>
+                                <th className="px-4 py-2 text-left">Sản phẩm</th>
+                                <th className="px-4 py-2 text-right">Số lượng (L)</th>
+                                <th className="px-4 py-2 text-right">Đơn giá (₫/L)</th>
+                                <th className="px-4 py-2 text-right">Nợ (₫)</th>
+                                <th className="px-4 py-2 text-right">Có (₫)</th>
                                 <th className="px-4 py-2 text-left">Ghi chú</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {item.ledgers.map((ledger) => (
-                                <tr key={ledger.id} className="border-t">
-                                  <td className="px-4 py-2">{dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}</td>
-                                  <td className="px-4 py-2">{ledger.refType}</td>
-                                  <td className="px-4 py-2 text-right text-red-600">
-                                    {ledger.debit > 0 ? ledger.debit.toLocaleString('vi-VN') + ' ₫' : '-'}
+                              {item.ledgers.map((ledger: any) => (
+                                <tr key={ledger.id} className="border-t hover:bg-gray-100">
+                                  <td className="px-4 py-2 whitespace-nowrap">{dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}</td>
+                                  <td className="px-4 py-2">
+                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                      ledger.refType === 'DEBT_SALE'
+                                        ? 'bg-red-100 text-red-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {ledger.refType === 'DEBT_SALE' ? 'Bán nợ' :
+                                       ledger.refType === 'PAYMENT' ? 'Thu tiền' :
+                                       ledger.refType === 'RECEIPT' ? 'Thu tiền' :
+                                       ledger.refType}
+                                    </span>
                                   </td>
-                                  <td className="px-4 py-2 text-right text-green-600">
-                                    {ledger.credit > 0 ? ledger.credit.toLocaleString('vi-VN') + ' ₫' : '-'}
+                                  <td className="px-4 py-2">
+                                    {ledger.productDetails ? (
+                                      <span className="font-medium text-gray-900">
+                                        {ledger.productDetails.productName}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
                                   </td>
-                                  <td className="px-4 py-2">{ledger.notes || '-'}</td>
+                                  <td className="px-4 py-2 text-right font-mono">
+                                    {ledger.productDetails ? (
+                                      ledger.productDetails.quantity.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-mono">
+                                    {ledger.productDetails ? (
+                                      ledger.productDetails.unitPrice.toLocaleString('vi-VN')
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-semibold">
+                                    {ledger.debit > 0 ? (
+                                      <span className="text-red-600">{ledger.debit.toLocaleString('vi-VN')}</span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-right font-semibold">
+                                    {ledger.credit > 0 ? (
+                                      <span className="text-green-600">{ledger.credit.toLocaleString('vi-VN')}</span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-4 py-2 text-gray-600">{ledger.notes || '-'}</td>
                                 </tr>
                               ))}
                             </tbody>

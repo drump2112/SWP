@@ -73,16 +73,7 @@ const LoginPage: React.FC = () => {
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:border-transparent transition-all"
-                onFocus={(e) => {
-                  e.currentTarget.style.outline = 'none';
-                  e.currentTarget.style.boxShadow = '0 0 0 2px rgba(49, 94, 172, 0.2)';
-                  e.currentTarget.style.borderColor = '#315eac';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.boxShadow = '';
-                  e.currentTarget.style.borderColor = '#d1d5db';
-                }}
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                 placeholder="Nhập tên đăng nhập"
               />
             </div>
@@ -99,16 +90,7 @@ const LoginPage: React.FC = () => {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none transition-all"
-                  onFocus={(e) => {
-                    e.currentTarget.style.outline = 'none';
-                    e.currentTarget.style.boxShadow = '0 0 0 2px rgba(49, 94, 172, 0.2)';
-                    e.currentTarget.style.borderColor = '#315eac';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.boxShadow = '';
-                    e.currentTarget.style.borderColor = '#d1d5db';
-                  }}
+                  className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                   placeholder="Nhập mật khẩu"
                 />
                 <button

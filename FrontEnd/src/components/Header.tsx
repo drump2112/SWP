@@ -12,6 +12,9 @@ const Header: React.FC = () => {
     navigate('/login');
   };
 
+  // Debug: Log user data to check store info
+  console.log('🔍 User data:', user);
+
   return (
     <header className="bg-white border-b-2 border-gray-200 shadow-md">
       <div className="flex items-center justify-between h-16 px-6">
@@ -25,7 +28,9 @@ const Header: React.FC = () => {
             <UserCircleIcon className="h-9 w-9 text-gray-600 mr-3" />
             <div>
               <p className="font-semibold text-gray-800">{user?.fullName}</p>
-              <p className="text-gray-500 text-xs font-medium">{user?.roleCode}</p>
+              <p className="text-gray-500 text-xs font-medium">
+                {user?.store ? user.store.name : user?.roleCode}
+              </p>
             </div>
           </div>
           <button

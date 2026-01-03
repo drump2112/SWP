@@ -109,6 +109,45 @@ export class ReportsService {
         const totalCredit = ledgers.reduce((sum, l) => sum + Number(l.credit), 0);
         const closingBalance = openingBalance + totalDebit - totalCredit;
 
+        // Lấy chi tiết từ shift_debt_sales để hiển thị sản phẩm, số lượng, giá
+        const ledgersWithDetails = await Promise.all(
+          ledgers.map(async (l) => {
+            let productDetails: null | {
+              productName: string;
+              quantity: number;
+              unitPrice: number;
+              amount: number;
+            } = null;
+
+            if (l.refType === 'DEBT_SALE' && l.refId) {
+              const debtSale = await this.shiftDebtSaleRepository.findOne({
+                where: { id: l.refId },
+                relations: ['product'],
+              });
+
+              if (debtSale) {
+                productDetails = {
+                  productName: debtSale.product?.name || 'N/A',
+                  quantity: Number(debtSale.quantity),
+                  unitPrice: Number(debtSale.unitPrice),
+                  amount: Number(debtSale.amount),
+                };
+              }
+            }
+
+            return {
+              id: l.id,
+              date: l.createdAt,
+              refType: l.refType,
+              refId: l.refId,
+              debit: Number(l.debit),
+              credit: Number(l.credit),
+              notes: l.notes,
+              productDetails, // Thông tin sản phẩm nếu là DEBT_SALE
+            };
+          }),
+        );
+
         return {
           customer: {
             id: customer.id,
@@ -122,14 +161,7 @@ export class ReportsService {
           totalDebit, // Phát sinh nợ (bán công nợ)
           totalCredit, // Phát sinh có (thu tiền)
           closingBalance, // Dư cuối kỳ
-          ledgers: ledgers.map((l) => ({
-            id: l.id,
-            date: l.createdAt,
-            refType: l.refType,
-            refId: l.refId,
-            debit: Number(l.debit),
-            credit: Number(l.credit),
-          })),
+          ledgers: ledgersWithDetails,
         };
       }),
     );

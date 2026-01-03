@@ -34,6 +34,9 @@ export class DebtLedger {
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
   credit: number; // Thanh toán nợ
 
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

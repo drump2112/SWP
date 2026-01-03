@@ -314,7 +314,7 @@ const PricesPage: React.FC = () => {
                   type="date"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                 />
               </div>
 
@@ -367,7 +367,7 @@ const PricesPage: React.FC = () => {
                           placeholder="0"
                           min="0"
                           step="100"
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
                         />
                       </div>
 

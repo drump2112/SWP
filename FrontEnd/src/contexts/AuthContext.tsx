@@ -8,6 +8,10 @@ interface User {
   fullName: string;
   roleCode: string;
   storeId: number;
+  store?: {
+    id: number;
+    name: string;
+  };
 }
 
 interface AuthContextType {

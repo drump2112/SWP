@@ -161,7 +161,7 @@ const TanksPage: React.FC = () => {
                 placeholder="Tìm kiếm theo tên hoặc mã bồn..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
               />
               <SearchableSelect
                 options={[
@@ -318,7 +318,7 @@ const TanksPage: React.FC = () => {
                     name="tankCode"
                     defaultValue={editingTank?.tankCode}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: TANK-001"
                   />
                 </div>
@@ -332,7 +332,7 @@ const TanksPage: React.FC = () => {
                     name="name"
                     defaultValue={editingTank?.name}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: Bồn xăng 95"
                   />
                 </div>
@@ -362,7 +362,7 @@ const TanksPage: React.FC = () => {
                     required
                     step="0.001"
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: 50000"
                   />
                 </div>
@@ -377,7 +377,7 @@ const TanksPage: React.FC = () => {
                     defaultValue={editingTank?.currentStock || 0}
                     step="0.001"
                     min="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: 25000"
                   />
                 </div>

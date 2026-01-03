@@ -179,7 +179,7 @@ const PumpsPage: React.FC = () => {
                 placeholder="Tìm kiếm theo tên hoặc mã vòi..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
               />
               <SearchableSelect
                 options={[
@@ -354,7 +354,7 @@ const PumpsPage: React.FC = () => {
                     name="pumpCode"
                     defaultValue={editingPump?.pumpCode}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: PUMP-001"
                   />
                 </div>
@@ -368,7 +368,7 @@ const PumpsPage: React.FC = () => {
                     name="name"
                     defaultValue={editingPump?.name}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: Vòi số 1"
                   />
                 </div>

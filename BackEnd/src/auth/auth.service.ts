@@ -20,7 +20,7 @@ export class AuthService {
 
     const user = await this.userRepository.findOne({
       where: { username, isActive: true },
-      relations: ['role'],
+      relations: ['role', 'store'],
     });
 
     if (!user) {
@@ -47,6 +47,10 @@ export class AuthService {
         fullName: user.fullName,
         roleCode: user.role?.code,
         storeId: user.storeId,
+        store: user.store ? {
+          id: user.store.id,
+          name: user.store.name,
+        } : null,
       },
     };
   }

@@ -126,7 +126,7 @@ const ProductsPage: React.FC = () => {
                 placeholder="Tìm kiếm theo tên hoặc mã sản phẩm..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
               />
             </div>
             <button
@@ -236,7 +236,7 @@ const ProductsPage: React.FC = () => {
                     name="code"
                     defaultValue={editingProduct?.code}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="Nhập mã sản phẩm"
                   />
                 </div>
@@ -250,7 +250,7 @@ const ProductsPage: React.FC = () => {
                     name="name"
                     defaultValue={editingProduct?.name}
                     required
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="Nhập tên sản phẩm"
                   />
                 </div>
@@ -263,7 +263,7 @@ const ProductsPage: React.FC = () => {
                     type="text"
                     name="unit"
                     defaultValue={editingProduct?.unit}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: Lít, Kg, Thùng..."
                   />
                 </div>

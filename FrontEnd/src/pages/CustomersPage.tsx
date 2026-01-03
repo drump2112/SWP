@@ -155,7 +155,7 @@ const CustomersPage: React.FC = () => {
         <div className="mt-4 sm:mt-0">
           <button
             onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
           >
             <PlusIcon className="h-5 w-5 mr-2" />
             Thêm khách hàng
@@ -174,7 +174,7 @@ const CustomersPage: React.FC = () => {
             placeholder="Tìm kiếm theo mã, tên, số điện thoại, địa chỉ..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm transition-all"
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent sm:text-sm transition-all"
           />
         </div>
       </div>
@@ -235,7 +235,7 @@ const CustomersPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                     <button
                       onClick={() => handleEdit(customer)}
-                      className="inline-flex items-center px-3 py-1.5 border border-blue-300 rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                      className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
                     >
                       <PencilIcon className="h-4 w-4 mr-1" />
                       Sửa
@@ -301,7 +301,7 @@ const CustomersPage: React.FC = () => {
                       id="code"
                       name="code"
                       defaultValue={editingCustomer?.code || ''}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                       placeholder="Để trống để tự sinh"
                       disabled={!!editingCustomer}
                     />
@@ -326,7 +326,7 @@ const CustomersPage: React.FC = () => {
                         const taxCode = (document.getElementById('taxCode') as HTMLInputElement)?.value;
                         if (!editingCustomer) checkDuplicate(name, e.target.value, taxCode);
                       }}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                       placeholder="VD: 0123456789"
                     />
                   </div>
@@ -347,7 +347,7 @@ const CustomersPage: React.FC = () => {
                       const taxCode = (document.getElementById('taxCode') as HTMLInputElement)?.value;
                       if (!editingCustomer) checkDuplicate(e.target.value, phone, taxCode);
                     }}
-                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: Công ty ABC"
                   />
                 </div>
@@ -361,7 +361,7 @@ const CustomersPage: React.FC = () => {
                     id="address"
                     name="address"
                     defaultValue={editingCustomer?.address || ''}
-                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                     placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM"
                   />
                 </div>
@@ -381,7 +381,7 @@ const CustomersPage: React.FC = () => {
                         const phone = (document.getElementById('phone') as HTMLInputElement)?.value;
                         if (!editingCustomer) checkDuplicate(name, phone, e.target.value);
                       }}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                       placeholder="VD: 0123456789"
                     />
                   </div>
@@ -397,7 +397,7 @@ const CustomersPage: React.FC = () => {
                       min="0"
                       step="1000"
                       defaultValue={editingCustomer?.creditLimit || ''}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                       placeholder="VD: 50000000"
                     />
                   </div>
@@ -412,7 +412,7 @@ const CustomersPage: React.FC = () => {
                     name="notes"
                     rows={3}
                     defaultValue={editingCustomer?.notes || ''}
-                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none"
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all resize-none"
                     placeholder="Ghi chú thêm về khách hàng..."
                   />
                 </div>
@@ -421,14 +421,14 @@ const CustomersPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleCloseModal}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
                   >
                     Hủy
                   </button>
                   <button
                     type="submit"
                     disabled={createMutation.isPending || updateMutation.isPending}
-                    className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-all"
+                    className="px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition-all"
                   >
                     {createMutation.isPending || updateMutation.isPending
                       ? 'Đang xử lý...'

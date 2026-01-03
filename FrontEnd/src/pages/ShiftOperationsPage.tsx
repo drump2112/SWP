@@ -197,7 +197,7 @@ const ShiftOperationsPage: React.FC = () => {
         // Init pump readings với số đầu từ ca trước (nếu có)
         const initialReadings: Record<number, PumpReadingDto> = {};
         pumps.forEach((pump: any) => {
-          const previousEndValue = previousData.hasPreviousShift 
+          const previousEndValue = previousData.hasPreviousShift
             ? (previousData.readings[pump.pumpCode] || 0)
             : 0;
 
@@ -833,7 +833,7 @@ const ShiftOperationsPage: React.FC = () => {
                                   }
                                 }}
                                 disabled={hasPreviousShift}
-                                className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-blue-500 transition-colors ${
+                                className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${
                                   hasPreviousShift ? 'bg-gray-100 cursor-not-allowed text-gray-600' : ''
                                 }`}
                                 placeholder="0.000"

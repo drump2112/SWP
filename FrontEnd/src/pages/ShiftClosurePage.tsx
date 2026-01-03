@@ -127,7 +127,7 @@ const ShiftClosurePage: React.FC = () => {
               placeholder="Tìm kiếm theo ca, ngày, cửa hàng..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
             />
           </div>
         </div>
@@ -202,7 +202,7 @@ const ShiftClosurePage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                     <button
                       onClick={() => navigate(`/shifts/${shift.id}/operations`)}
-                      className="inline-flex items-center px-3 py-1.5 border border-blue-300 rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all"
+                      className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
                     >
                       <DocumentTextIcon className="h-4 w-4 mr-1" />
                       Chi tiết
