@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { shiftsApi, type CreateShiftDto, type CloseShiftDto, type PumpReadingDto, type Shift, type ShiftDebtSaleDto, type CashDepositDto } from '../api/shifts';
+import { shiftsApi, type CreateShiftDto, type CloseShiftDto, type PumpReadingDto, type Shift } from '../api/shifts';
 import { pumpsApi } from '../api/pumps';
 import { productsApi } from '../api/products';
 import { storesApi } from '../api/stores';
-import { customersApi } from '../api/customers';
 import { useAuth } from '../contexts/AuthContext';
 import { showSuccess, showError, showWarning, showConfirm } from '../utils/sweetalert';
 import {
@@ -13,11 +12,6 @@ import {
   XMarkIcon,
   CheckIcon,
   ClockIcon,
-  TrashIcon,
-  BanknotesIcon,
-  CreditCardIcon,
-  BuildingLibraryIcon,
-  ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 
@@ -232,6 +226,7 @@ const ShiftManagementPage: React.FC = () => {
       const confirmed = await showConfirm(
         'Có vòi chưa nhập số liệu. Bạn có chắc muốn chốt ca?',
         'Cảnh báo',
+        'warning',
         'Chốt ca',
         'Hủy'
       );

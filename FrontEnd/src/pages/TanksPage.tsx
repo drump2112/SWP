@@ -4,7 +4,7 @@ import { tanksApi, type Tank, type CreateTankDto, type UpdateTankDto } from '../
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
 import { showConfirm } from '../utils/sweetalert';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CircleStackIcon } from '@heroicons/react/24/outline';
 import SearchableSelect from '../components/SearchableSelect';
 
 const TanksPage: React.FC = () => {
@@ -12,11 +12,11 @@ const TanksPage: React.FC = () => {
   const [editingTank, setEditingTank] = useState<Tank | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStoreId, setFilterStoreId] = useState<number | 'all'>('all');
-  
+
   // State cho SearchableSelect
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
-  
+
   const queryClient = useQueryClient();
 
   const { data: tanks, isLoading } = useQuery({
@@ -88,7 +88,7 @@ const TanksPage: React.FC = () => {
       };
       createMutation.mutate(createData);
     }
-    
+
     // Reset states
     setSelectedStoreId(null);
     setSelectedProductId(null);
@@ -145,7 +145,10 @@ const TanksPage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Quản lý bồn bể</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+          <CircleStackIcon className="h-8 w-8 text-blue-600" />
+          Quản lý bồn bể
+        </h1>
         <p className="text-gray-600 mt-2">Quản lý bồn chứa xăng dầu tại các cửa hàng</p>
       </div>
 
@@ -275,7 +278,7 @@ const TanksPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white">
-              <h2 className="text-xl font-bold text-gray-900">
+              <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 {editingTank ? 'Chỉnh sửa bồn bể' : 'Thêm bồn bể mới'}
               </h2>
               <button

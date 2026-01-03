@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi, type Customer, type CreateCustomerDto, type UpdateCustomerDto } from '../api/customers';
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/sweetalert';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, ExclamationTriangleIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
 const CustomersPage: React.FC = () => {
@@ -144,7 +144,8 @@ const CustomersPage: React.FC = () => {
       {/* Header */}
       <div className="sm:flex sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+            <UserIcon className="h-8 w-8 text-blue-600" />
             Quản lý khách hàng
           </h1>
           <p className="mt-2 text-sm text-gray-600">

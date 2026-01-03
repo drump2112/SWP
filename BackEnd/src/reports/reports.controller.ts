@@ -3,6 +3,7 @@ import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -12,19 +13,25 @@ export class ReportsController {
   /**
    * GET /reports/debt?storeId=1&fromDate=2024-01-01&toDate=2024-12-31
    * Báo cáo công nợ chi tiết theo khách hàng
-   * - Kế toán/Admin: Bỏ storeId để xem tất cả
-   * - Cửa hàng: Phải truyền storeId
+   * - Kế toán/Admin/Sales/Director: Xem tất cả hoặc filter theo storeId
+   * - Cửa hàng (STORE): Chỉ xem công nợ của cửa hàng mình
    */
   @Get('debt')
-  @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getDebtReport(
+    @CurrentUser() user: any,
     @Query('storeId') storeId?: string,
     @Query('customerId') customerId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
+    // Nếu user là STORE, tự động lấy storeId của user
+    const effectiveStoreId = user.roleCode === 'STORE'
+      ? user.storeId
+      : (storeId ? +storeId : undefined);
+
     return this.reportsService.getDebtReport({
-      storeId: storeId ? +storeId : undefined,
+      storeId: effectiveStoreId,
       customerId: customerId ? +customerId : undefined,
       fromDate: fromDate ? new Date(fromDate) : undefined,
       toDate: toDate ? new Date(toDate) : undefined,

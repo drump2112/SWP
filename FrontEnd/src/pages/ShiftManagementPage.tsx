@@ -138,7 +138,10 @@ const ShiftManagementPage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Quản lý ca làm việc</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+          <ClockIcon className="h-8 w-8 text-blue-600" />
+          Quản lý ca làm việc
+        </h1>
         <p className="text-gray-600 mt-2">Tạo ca mới và chốt ca làm việc</p>
       </div>
 
@@ -270,7 +273,7 @@ const ShiftManagementPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl transform transition-all">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold text-gray-900">Tạo ca mới</h3>
+              <h3 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Tạo ca mới</h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
                 className="text-gray-400 hover:text-gray-500 transition-colors"

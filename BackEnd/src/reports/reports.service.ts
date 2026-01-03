@@ -46,20 +46,34 @@ export class ReportsService {
   }) {
     const { storeId, customerId, fromDate, toDate } = params;
 
-    // Lấy danh sách khách hàng
-    const customerQuery = this.customerRepository.createQueryBuilder('c');
+    // Lấy danh sách ID khách hàng có giao dịch công nợ
+    const customerIdsQuery = this.debtLedgerRepository
+      .createQueryBuilder('dl')
+      .select('DISTINCT dl.customer_id', 'customerId');
 
     if (storeId) {
-      customerQuery
-        .innerJoin('c.stores', 'cs')
-        .where('cs.store_id = :storeId', { storeId });
+      customerIdsQuery.where('dl.store_id = :storeId', { storeId });
     }
 
     if (customerId) {
-      customerQuery.andWhere('c.id = :customerId', { customerId });
+      if (storeId) {
+        customerIdsQuery.andWhere('dl.customer_id = :customerId', { customerId });
+      } else {
+        customerIdsQuery.where('dl.customer_id = :customerId', { customerId });
+      }
     }
 
-    const customers = await customerQuery
+    const customerIdsResult = await customerIdsQuery.getRawMany();
+    const customerIds = customerIdsResult.map(r => r.customerId);
+
+    if (customerIds.length === 0) {
+      return [];
+    }
+
+    // Lấy thông tin khách hàng
+    const customers = await this.customerRepository
+      .createQueryBuilder('c')
+      .where('c.id IN (:...customerIds)', { customerIds })
       .orderBy('c.code', 'ASC')
       .getMany();
 

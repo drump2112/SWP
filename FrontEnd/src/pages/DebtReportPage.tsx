@@ -99,14 +99,14 @@ const DebtReportPage: React.FC = () => {
               <SearchableSelect
                 options={[
                   { value: '', label: 'Tất cả cửa hàng' },
-                  ...(stores?.map(store => ({ 
-                    value: store.id, 
-                    label: `${store.code} - ${store.name}` 
+                  ...(stores?.map(store => ({
+                    value: store.id.toString(),
+                    label: `${store.code} - ${store.name}`
                   })) || [])
                 ]}
-                value={filters.storeId || ''}
+                value={filters.storeId?.toString() || ''}
                 onChange={(value) =>
-                  setFilters({ ...filters, storeId: value ? +value : undefined })
+                  setFilters({ ...filters, storeId: value && value !== '' ? +value : undefined })
                 }
                 placeholder="Chọn cửa hàng"
                 isClearable
@@ -121,9 +121,9 @@ const DebtReportPage: React.FC = () => {
             <SearchableSelect
               options={[
                 { value: '', label: 'Tất cả khách hàng' },
-                ...(customers?.map(customer => ({ 
-                  value: customer.id, 
-                  label: `${customer.code} - ${customer.name}` 
+                ...(customers?.map(customer => ({
+                  value: customer.id,
+                  label: `${customer.code} - ${customer.name}`
                 })) || [])
               ]}
               value={filters.customerId || ''}

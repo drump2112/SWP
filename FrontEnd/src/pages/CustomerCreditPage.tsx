@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { customersApi } from '../api/customers';
 import { useAuth } from '../contexts/AuthContext';
-import { MagnifyingGlassIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon, CreditCardIcon } from '@heroicons/react/24/outline';
 
 const CustomerCreditPage: React.FC = () => {
   const { user } = useAuth();
@@ -85,7 +85,8 @@ const CustomerCreditPage: React.FC = () => {
     <div className="px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+          <CreditCardIcon className="h-8 w-8 text-blue-600" />
           Quản lý hạn mức công nợ
         </h1>
         <p className="mt-2 text-sm text-gray-600">

@@ -52,7 +52,7 @@ export class ShiftsService {
     const existingShift = await this.shiftRepository.findOne({
       where: {
         storeId: createShiftDto.storeId,
-        shiftDate: createShiftDto.shiftDate,
+        shiftDate: new Date(createShiftDto.shiftDate),
         shiftNo: createShiftDto.shiftNo,
       },
     });

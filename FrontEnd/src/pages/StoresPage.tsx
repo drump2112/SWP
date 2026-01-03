@@ -10,6 +10,7 @@ import {
   TrashIcon,
   XMarkIcon,
   EyeIcon,
+  BuildingStorefrontIcon,
 } from '@heroicons/react/24/outline';
 import { showConfirm } from '../utils/sweetalert';
 import SearchableSelect from '../components/SearchableSelect';
@@ -103,7 +104,7 @@ const StoresPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: number) => {
     const confirmed = await showConfirm(
       'Bạn có chắc chắn muốn xóa cửa hàng này?',
       'Xác nhận xóa'
@@ -125,7 +126,10 @@ const StoresPage: React.FC = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Quản Lý Cửa Hàng</h2>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+            <BuildingStorefrontIcon className="h-8 w-8 text-blue-600" />
+            Quản Lý Cửa Hàng
+          </h2>
           <p className="text-gray-600 mt-2">Danh sách các cửa hàng trong hệ thống</p>
         </div>
         <button
@@ -226,7 +230,7 @@ const StoresPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex justify-between items-center px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 {editingStore ? 'Sửa cửa hàng' : 'Thêm cửa hàng mới'}
               </h3>
               <button onClick={closeDialog} className="text-gray-400 hover:text-gray-600">

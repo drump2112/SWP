@@ -286,7 +286,7 @@ const PricesPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
             <div className="flex justify-between items-center p-6 border-b">
               <div>
-                <h2 className="text-xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   Áp dụng giá cho khu vực: {regions?.find(r => r.id === selectedRegionId)?.name}
                 </h2>
                 <p className="text-sm text-gray-500 mt-1">
@@ -345,9 +345,9 @@ const PricesPage: React.FC = () => {
                         <SearchableSelect
                           options={[
                             { value: 0, label: '-- Chọn sản phẩm --' },
-                            ...(products?.map(product => ({ 
-                              value: product.id, 
-                              label: `${product.name} (${product.code})` 
+                            ...(products?.map(product => ({
+                              value: product.id,
+                              label: `${product.name} (${product.code})`
                             })) || [])
                           ]}
                           value={item.productId}

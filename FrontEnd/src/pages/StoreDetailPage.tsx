@@ -2,7 +2,7 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { storesApi } from '../api/stores';
-import { ArrowLeftIcon } from '@heroicons/react/24/outline';
+import { ArrowLeftIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 import StoreDetailTabs from '../components/StoreDetailTabs';
 
 const StoreDetailPage: React.FC = () => {
@@ -53,7 +53,10 @@ const StoreDetailPage: React.FC = () => {
         </button>
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{store.name}</h1>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+              <BuildingStorefrontIcon className="h-8 w-8 text-blue-600" />
+              {store.name}
+            </h1>
             <p className="text-gray-600 mt-2">Mã: {store.code}</p>
           </div>
           <span

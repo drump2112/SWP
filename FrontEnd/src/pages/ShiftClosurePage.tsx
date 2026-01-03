@@ -108,7 +108,10 @@ const ShiftClosurePage: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Quản lý ca làm việc</h1>
+        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+          <ClockIcon className="h-8 w-8 text-blue-600" />
+          Quản lý ca làm việc
+        </h1>
         <p className="text-gray-600 mt-2">
           {isAdmin
             ? 'Xem tất cả các ca của hệ thống'
