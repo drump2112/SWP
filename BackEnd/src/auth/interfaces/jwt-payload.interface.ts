@@ -3,4 +3,5 @@ export interface JwtPayload {
   username: string;
   roleCode: string;
   storeId?: number;
+  jti?: string; // JWT ID for refresh token revocation
 }

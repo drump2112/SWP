@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { getDatabaseConfig } from './config/database.config';
@@ -44,6 +45,14 @@ import { ReportsModule } from './reports/reports.module';
       envFilePath: '.env',
     }),
 
+    // Rate Limiting
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 1 minute
+        limit: 10, // 10 requests per minute
+      },
+    ]),
+
     // Database
     TypeOrmModule.forRoot(getDatabaseConfig()),
 
@@ -81,5 +90,4 @@ import { ReportsModule } from './reports/reports.module';
   controllers: [AppController],
   providers: [AppService],
 })
-
 export class AppModule {}
