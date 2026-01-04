@@ -18,55 +18,91 @@ import {
   ChevronDownIcon,
   ChevronRightIcon,
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NavItem {
   name: string;
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   children?: NavItem[];
+  roles?: string[]; // Các role được phép truy cập
 }
 
 const navigation: NavItem[] = [
   { name: 'Trang chủ', href: '/', icon: HomeIcon },
-  { name: 'Quản lý ca', href: '/shifts', icon: ClockIcon },
-  { name: 'Cửa hàng', href: '/stores', icon: BuildingStorefrontIcon },
-  { name: 'Tài khoản', href: '/users', icon: UsersIcon },
-  { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon },
+  {
+    name: 'Quản lý ca',
+    href: '/shifts',
+    icon: ClockIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'STORE']
+  },
+  {
+    name: 'Cửa hàng',
+    href: '/stores',
+    icon: BuildingStorefrontIcon,
+    roles: ['ADMIN', 'DIRECTOR']
+  },
+  {
+    name: 'Tài khoản',
+    href: '/users',
+    icon: UsersIcon,
+    roles: ['ADMIN', 'DIRECTOR']
+  },
+  {
+    name: 'Khách hàng',
+    href: '/customers',
+    icon: UserGroupIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING']
+  },
   {
     name: 'Quản lý sản phẩm',
     href: '/products',
     icon: CubeIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'SALES'],
     children: [
-      { name: 'Sản phẩm', href: '/products', icon: CubeIcon },
-      { name: 'Quản lý giá', href: '/prices', icon: TagIcon },
+      { name: 'Sản phẩm', href: '/products', icon: CubeIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
+      { name: 'Quản lý giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
     ],
   },
   {
     name: 'Quản lý kho',
     href: '/inventory',
     icon: CircleStackIcon,
+    roles: ['ADMIN', 'DIRECTOR'],
     children: [
-      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon },
-      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon },
+      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
+      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],
   },
   {
     name: 'Báo cáo',
     href: '/reports',
     icon: ChartBarIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'],
     children: [
-      { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon },
-      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon },
-      { name: 'Báo cáo doanh thu', href: '/reports/sales', icon: BanknotesIcon },
-      { name: 'Báo cáo quỹ', href: '/reports/cash', icon: BanknotesIcon },
+      { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Báo cáo doanh thu', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Báo cáo quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
     ],
   },
-  { name: 'Hóa đơn', href: '/receipts', icon: DocumentTextIcon },
-  { name: 'Cài đặt', href: '/settings', icon: Cog6ToothIcon },
+  {
+    name: 'Hóa đơn',
+    href: '/receipts',
+    icon: DocumentTextIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING']
+  },
+  {
+    name: 'Cài đặt',
+    href: '/settings',
+    icon: Cog6ToothIcon,
+    roles: ['ADMIN']
+  },
 ];
 
 const Sidebar: React.FC = () => {
   const location = useLocation();
+  const { user } = useAuth();
 
   // Hàm kiểm tra xem route hiện tại có thuộc menu không
   const getInitialOpenMenus = () => {
@@ -85,6 +121,27 @@ const Sidebar: React.FC = () => {
   };
 
   const [openMenus, setOpenMenus] = useState<string[]>(getInitialOpenMenus());
+
+  // Hàm kiểm tra quyền truy cập
+  const hasPermission = (item: NavItem): boolean => {
+    if (!item.roles || item.roles.length === 0) return true; // Nếu không có roles thì mọi người đều truy cập được
+    if (!user?.roleCode) return false;
+    return item.roles.includes(user.roleCode);
+  };
+
+  // Lọc navigation dựa trên quyền
+  const filteredNavigation = navigation.filter((item) => {
+    if (!hasPermission(item)) return false;
+
+    // Nếu có children, filter children
+    if (item.children) {
+      item.children = item.children.filter(child => hasPermission(child));
+      // Nếu tất cả children đều bị filter, ẩn parent
+      if (item.children.length === 0) return false;
+    }
+
+    return true;
+  });
 
   const toggleMenu = (name: string) => {
     setOpenMenus((prev) =>
@@ -143,7 +200,7 @@ const Sidebar: React.FC = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
-        {navigation.map((item) => {
+        {filteredNavigation.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isMenuOpen = openMenus.includes(item.name);
           const itemActive = isActive(item.href, hasChildren);

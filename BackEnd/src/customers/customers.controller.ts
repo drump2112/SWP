@@ -13,7 +13,7 @@ export class CustomersController {
   constructor(private customersService: CustomersService) {}
 
   @Post()
-  @Roles('STORE', 'SALES', 'ADMIN')
+  @Roles('SALES', 'ADMIN')
   create(@Body() createCustomerDto: CreateCustomerDto) {
     return this.customersService.create(createCustomerDto);
   }
@@ -31,7 +31,7 @@ export class CustomersController {
   }
 
   @Put(':id')
-  @Roles('STORE', 'SALES', 'ADMIN')
+  @Roles('SALES', 'ADMIN')
   update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
     return this.customersService.update(+id, updateCustomerDto);
   }
@@ -70,7 +70,7 @@ export class CustomersController {
   }
 
   @Post('check-duplicate')
-  @Roles('STORE', 'SALES', 'ADMIN')
+  @Roles('SALES', 'ADMIN')
   checkDuplicate(@Body() body: { name?: string; phone?: string; taxCode?: string }) {
     return this.customersService.checkDuplicate(body);
   }

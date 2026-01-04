@@ -7,7 +7,7 @@ import { productsApi } from '../api/products';
 import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
 import { useAuth } from '../contexts/AuthContext';
-import { showSuccess, showConfirm } from '../utils/sweetalert';
+import { showConfirm } from '../utils/sweetalert';
 import { toast } from 'react-toastify';
 import SearchableSelect from '../components/SearchableSelect';
 import {
@@ -54,11 +54,15 @@ const ShiftOperationsPage: React.FC = () => {
       const data = await shiftsApi.getReport(Number(shiftId));
       console.log('📊 Shift report loaded:', {
         shiftId,
+        status: data.shift?.status,
         cashDeposits: data.cashDeposits?.length || 0,
-        totalDeposits: data.summary?.totalDeposits || 0,
         receipts: data.receipts?.length || 0,
         debtSales: data.debtSales?.length || 0,
+        pumpReadings: data.pumpReadings?.length || 0,
       });
+      console.log('📋 Receipts data:', data.receipts);
+      console.log('💰 Cash deposits data:', data.cashDeposits);
+      console.log('🔧 Pump readings data:', data.pumpReadings);
       return data;
     },
     enabled: !!shiftId,
@@ -178,7 +182,7 @@ const ShiftOperationsPage: React.FC = () => {
           if (parsed.deposits && parsed.deposits.length > 0) {
             setDraftDeposits(parsed.deposits);
           }
-          showSuccess('Đã khôi phục dữ liệu chưa lưu từ lần trước');
+          toast.success('Đã khôi phục dữ liệu chưa lưu từ lần trước', { position: 'top-right', autoClose: 3000 });
           return;
         }
       } catch (e) {
@@ -214,7 +218,7 @@ const ShiftOperationsPage: React.FC = () => {
         setPumpReadings(initialReadings);
 
         if (previousData.hasPreviousShift) {
-          showSuccess(`Đã tự động điền số đầu từ ca ${previousData.previousShiftNo} ngày ${previousData.previousShiftDate}`);
+          toast.success(`Đã tự động điền số đầu từ ca ${previousData.previousShiftNo} ngày ${previousData.previousShiftDate}`, { position: 'top-right', autoClose: 3000 });
         }
       } catch (error) {
         console.error('Failed to fetch previous readings:', error);
@@ -241,6 +245,7 @@ const ShiftOperationsPage: React.FC = () => {
     if (!store?.regionId || !pumps || pumps.length === 0) return;
 
     const fetchPrices = async () => {
+      console.log('🔍 Fetching prices for region:', store.regionId);
       const prices: Record<number, number> = {};
       const uniqueProductIds = [...new Set(pumps.map((p: any) => p.productId))];
 
@@ -248,12 +253,14 @@ const ShiftOperationsPage: React.FC = () => {
         try {
           const priceData = await productsApi.getCurrentPrice(productId, store.regionId);
           prices[productId] = Number(priceData.price);
+          console.log(`✅ Price for product ${productId}:`, priceData.price);
         } catch (error) {
-          console.error(`Failed to fetch price for product ${productId}:`, error);
+          console.error(`❌ Failed to fetch price for product ${productId}:`, error);
           prices[productId] = 0;
         }
       }
 
+      console.log('💰 All prices loaded:', prices);
       setProductPrices(prices);
     };
 
@@ -277,7 +284,7 @@ const ShiftOperationsPage: React.FC = () => {
       setDraftReceipts([]);
       setDraftDeposits([]);
       setHasUnsavedChanges(false);
-      showSuccess('Đã chốt ca thành công! Tất cả dữ liệu đã được lưu vào database.');
+      toast.success('Đã chốt ca thành công! Tất cả dữ liệu đã được lưu vào database.', { position: 'top-right', autoClose: 3000 });
       navigate('/shifts');
     },
     onError: (error: any) => {
@@ -332,8 +339,15 @@ const ShiftOperationsPage: React.FC = () => {
 
   const calculateAmount = (reading: PumpReadingDto) => {
     const quantity = calculateQuantity(reading);
-    const price = productPrices[reading.productId] || 0;
-    return quantity * price;
+    const price = productPrices[reading.productId];
+
+    if (!price || isNaN(price)) {
+      console.warn('⚠️ Price not found for productId:', reading.productId, 'Available prices:', productPrices);
+      return 0;
+    }
+
+    const amount = quantity * price;
+    return isNaN(amount) ? 0 : amount;
   };
 
   const handleCloseShift = async () => {
@@ -379,17 +393,44 @@ const ShiftOperationsPage: React.FC = () => {
     const totalRetailCalc = totalAmount - draftDebtTotal;
 
     // Validation 3: Confirm chốt ca với tất cả thông tin
+    const confirmHtml = `
+      <div class="text-left">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 1rem;">
+          <tbody>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; font-weight: 600;">Tổng số lít:</td>
+              <td style="padding: 8px 0; text-align: right;">${totalLiters.toFixed(3)} lít</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; font-weight: 600;">Tổng doanh thu:</td>
+              <td style="padding: 8px 0; text-align: right;">${totalAmount.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; font-weight: 600;">Bán công nợ (${draftDebtSales.length} phiếu):</td>
+              <td style="padding: 8px 0; text-align: right;">${draftDebtTotal.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; font-weight: 600;">Bán lẻ:</td>
+              <td style="padding: 8px 0; text-align: right;">${totalRetailCalc.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+              <td style="padding: 8px 0; font-weight: 600;">Thu tiền (${draftReceipts.length} phiếu):</td>
+              <td style="padding: 8px 0; text-align: right;">${draftReceiptTotal.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: 600;">Nộp tiền (${draftDeposits.length} phiếu):</td>
+              <td style="padding: 8px 0; text-align: right;">${draftDepositTotal.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="color: #dc2626; font-weight: 600; font-size: 0.875rem;">
+          ⚠️ Hành động này sẽ lưu TẤT CẢ dữ liệu vào database và không thể hoàn tác!
+        </div>
+      </div>
+    `;
+
     const confirmed = await showConfirm(
-      `Xác nhận chốt ca với:<br/>
-      <strong>📊 Doanh thu:</strong><br/>
-      • Tổng số lít: <strong>${totalLiters.toFixed(3)} lít</strong><br/>
-      • Tổng doanh thu: <strong>${totalAmount.toLocaleString('vi-VN')} ₫</strong><br/>
-      • Bán công nợ: <strong>${draftDebtTotal.toLocaleString('vi-VN')} ₫</strong> (${draftDebtSales.length} phiếu)<br/>
-      • Bán lẻ: <strong>${totalRetailCalc.toLocaleString('vi-VN')} ₫</strong><br/><br/>
-      <strong>💰 Thu chi:</strong><br/>
-      • Thu tiền (thanh toán nợ): <strong>${draftReceiptTotal.toLocaleString('vi-VN')} ₫</strong> (${draftReceipts.length} phiếu)<br/>
-      • Nộp về công ty: <strong>${draftDepositTotal.toLocaleString('vi-VN')} ₫</strong> (${draftDeposits.length} phiếu)<br/><br/>
-      <span class="text-red-600 font-semibold">⚠️ Hành động này sẽ lưu TẤT CẢ dữ liệu vào database và không thể hoàn tác!</span>`,
+      confirmHtml,
       'Xác nhận chốt ca'
     );
     if (!confirmed) return;
@@ -451,7 +492,7 @@ const ShiftOperationsPage: React.FC = () => {
     setDebtSaleFormPrice(0);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
-    showSuccess('Đã thêm vào danh sách công nợ (chưa lưu vào database)');
+    toast.success('Đã thêm vào danh sách công nợ (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
   };
 
   const handleReceiptSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -476,7 +517,7 @@ const ShiftOperationsPage: React.FC = () => {
     setShowReceiptForm(false);
     setSelectedReceiptCustomer(null);
     e.currentTarget.reset();
-    showSuccess('Đã thêm vào danh sách phiếu thu (chưa lưu vào database)');
+    toast.success('Đã thêm vào danh sách phiếu thu (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
   };
 
   const handleDepositSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -500,14 +541,14 @@ const ShiftOperationsPage: React.FC = () => {
     setDraftDeposits(prev => [...prev, data]);
     setShowDepositForm(false);
     e.currentTarget.reset();
-    showSuccess('Đã thêm vào danh sách nộp tiền (chưa lưu vào database)');
+    toast.success('Đã thêm vào danh sách nộp tiền (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
   };
 
   const handleDeleteDebtSale = async (id: string) => {
     const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa doanh số này?', 'Xác nhận xóa');
     if (confirmed) {
       setDraftDebtSales(prev => prev.filter(item => item.id !== id));
-      showSuccess('Đã xóa khỏi danh sách');
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
     }
   };
 
@@ -515,7 +556,7 @@ const ShiftOperationsPage: React.FC = () => {
     const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu thu này?', 'Xác nhận xóa');
     if (confirmed) {
       setDraftReceipts(prev => prev.filter(item => item.id !== id));
-      showSuccess('Đã xóa khỏi danh sách');
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
     }
   };
 
@@ -523,7 +564,7 @@ const ShiftOperationsPage: React.FC = () => {
     const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu nộp này?', 'Xác nhận xóa');
     if (confirmed) {
       setDraftDeposits(prev => prev.filter(item => item.id !== id));
-      showSuccess('Đã xóa khỏi danh sách');
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
     }
   };
 
@@ -553,11 +594,14 @@ const ShiftOperationsPage: React.FC = () => {
         const draftKey = `shift_${shiftId}_draft_data`;
         localStorage.removeItem(draftKey);
       }
-      showSuccess('Đã xóa toàn bộ dữ liệu chưa lưu');
+      toast.success('Đã xóa toàn bộ dữ liệu chưa lưu', { position: 'top-right', autoClose: 3000 });
     }
   };
 
   const formatCurrency = (value: number) => {
+    if (isNaN(value) || value === null || value === undefined) {
+      return '0 ₫';
+    }
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
@@ -604,9 +648,12 @@ const ShiftOperationsPage: React.FC = () => {
     fuelPumpsCount: fuelPumps.length,
     pumpReadingsCount: Object.keys(pumpReadings).length,
     pumpReadingsData: pumpReadings,
+    productPrices,
     isShiftOpen,
     activeTab,
     shiftStatus: report?.shift.status,
+    receiptsCount: isShiftOpen ? draftReceipts.length : report?.receipts?.length || 0,
+    depositsCount: isShiftOpen ? draftDeposits.length : report?.cashDeposits?.length || 0,
   });
 
   return (
@@ -819,8 +866,9 @@ const ShiftOperationsPage: React.FC = () => {
                         if (!reading) return null;
 
                         const quantity = calculateQuantity(reading);
-                        const unitPrice = productPrices[pump.productId] || 0;
+                        const unitPrice = productPrices[pump.productId];
                         const amount = calculateAmount(reading);
+                        const isPriceLoaded = unitPrice && unitPrice > 0 && !isNaN(unitPrice);
 
                         return (
                           <tr key={pump.id} className="hover:bg-blue-50">
@@ -878,8 +926,20 @@ const ShiftOperationsPage: React.FC = () => {
                                 {quantity.toFixed(3)}
                               </span>
                             </td>
-                            <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">{formatCurrency(unitPrice)}</td>
-                            <td className="px-4 py-3 text-right text-sm font-bold text-green-600">{formatCurrency(amount)}</td>
+                            <td className="px-4 py-3 text-right text-sm font-medium">
+                              {isPriceLoaded ? (
+                                <span className="text-gray-700">{formatCurrency(unitPrice)}</span>
+                              ) : (
+                                <span className="text-yellow-600 text-xs">Đang tải...</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-right text-sm font-bold">
+                              {isPriceLoaded ? (
+                                <span className="text-green-600">{formatCurrency(amount)}</span>
+                              ) : (
+                                <span className="text-yellow-600 text-xs">Đang tải...</span>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
@@ -926,7 +986,22 @@ const ShiftOperationsPage: React.FC = () => {
                     <tbody className="divide-y divide-gray-200 bg-white">
                       {report?.pumpReadings && report.pumpReadings.length > 0 ? (
                         report.pumpReadings.map((reading: any) => {
-                          const amount = reading.quantity * reading.unitPrice;
+                          // Ưu tiên lấy unitPrice đã lưu trong pump_readings (giá tại thời điểm chốt ca)
+                          // Nếu không có (dữ liệu cũ), fallback sang productPrices (giá hiện tại - có thể sai)
+                          const unitPrice = reading.unitPrice || productPrices[reading.productId] || 0;
+                          const quantity = Number(reading.quantity) || 0;
+                          const amount = quantity * unitPrice;
+
+                          console.log('💵 Closed shift reading:', {
+                            pumpCode: reading.pumpCode,
+                            productId: reading.productId,
+                            quantity,
+                            unitPriceFromDB: reading.unitPrice,
+                            unitPriceFromCurrent: productPrices[reading.productId],
+                            unitPriceUsed: unitPrice,
+                            amount,
+                          });
+
                           return (
                             <tr key={reading.id}>
                               <td className="px-4 py-3">
@@ -941,11 +1016,15 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-4 py-3 text-right text-sm text-gray-700">{Number(reading.endValue).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
                               <td className="px-4 py-3 text-right">
                                 <span className="text-sm font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
-                                  {Number(reading.quantity).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} L
+                                  {quantity.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} L
                                 </span>
                               </td>
-                              <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">{Number(reading.unitPrice).toLocaleString('vi-VN')} ₫</td>
-                              <td className="px-4 py-3 text-right text-sm font-bold text-green-600">{amount.toLocaleString('vi-VN')} ₫</td>
+                              <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">
+                                {unitPrice > 0 ? `${unitPrice.toLocaleString('vi-VN')} ₫` : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
+                                {amount > 0 ? `${amount.toLocaleString('vi-VN')} ₫` : '-'}
+                              </td>
                             </tr>
                           );
                         })
@@ -1047,10 +1126,10 @@ const ShiftOperationsPage: React.FC = () => {
                       step="1"
                       min="0"
                       required
+                      readOnly
                       value={debtSaleFormPrice || ''}
-                      onChange={(e) => setDebtSaleFormPrice(parseFloat(e.target.value) || 0)}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="VD: 23500"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
+                      placeholder="Tự động theo sản phẩm"
                     />
                   </div>
 
@@ -1242,10 +1321,13 @@ const ShiftOperationsPage: React.FC = () => {
                       // Data từ report khi ca đã chốt
                       report?.receipts && report.receipts.length > 0 ? (
                         report.receipts.map((receipt: any) => {
-                          const customerNames = receipt.details?.map((d: any) => {
+                          const customerNames = receipt.receiptDetails?.map((d: any) => {
                             const cust = customers?.find(c => c.id === d.customerId);
                             return cust?.name || d.customer?.name || 'N/A';
-                          }).join(', ') || '-';
+                          }).join(', ') || (receipt.details?.map((d: any) => {
+                            const cust = customers?.find(c => c.id === d.customerId);
+                            return cust?.name || d.customer?.name || 'N/A';
+                          }).join(', ')) || '-';
                           return (
                             <tr key={receipt.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">{dayjs(receipt.createdAt).format('DD/MM/YYYY HH:mm')}</td>

@@ -52,6 +52,15 @@ export class PumpReading {
   })
   quantity: number;
 
+  @Column({
+    name: 'unit_price',
+    type: 'decimal',
+    precision: 18,
+    scale: 2,
+    nullable: true,
+  })
+  unitPrice: number;
+
   @ManyToOne(() => Shift, (shift) => shift.pumpReadings)
   @JoinColumn({ name: 'shift_id' })
   shift: Shift;

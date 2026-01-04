@@ -125,9 +125,33 @@ export class ShiftsService {
       // Lưu trạng thái cũ để ghi audit log
       const oldData = { ...shift };
 
-      // 1. Lưu số liệu cột bơm (bulk insert)
+      // 1. Lưu số liệu cột bơm (bulk insert với unitPrice để lưu vết giá)
+      // Lấy giá trước để dùng cho cả pump_readings và sales
+      const productIds = [...new Set(closeShiftDto.pumpReadings.map(r => r.productId))];
+      const prices = await manager.find(ProductPrice, {
+        where: productIds.map(productId => ({
+          productId,
+          regionId: shift.store.regionId,
+        })),
+      });
+
+      const priceMap = new Map<number, number>();
+      for (const price of prices) {
+        if (price.validFrom <= new Date() && (!price.validTo || price.validTo > new Date())) {
+          priceMap.set(price.productId, Number(price.price));
+        }
+      }
+
+      // Validate: Tất cả sản phẩm phải có giá
+      const missingPrices = closeShiftDto.pumpReadings.filter(r => !priceMap.has(r.productId));
+      if (missingPrices.length > 0) {
+        const productIdsStr = [...new Set(missingPrices.map(r => r.productId))].join(', ');
+        throw new BadRequestException(`Không tìm thấy giá cho sản phẩm: ${productIdsStr}. Vui lòng cập nhật bảng giá.`);
+      }
+
       const pumpReadingsData = closeShiftDto.pumpReadings.map(reading => {
         const quantity = reading.endValue - reading.startValue;
+        const unitPrice = priceMap.get(reading.productId)!;
         return {
           shiftId: shift.id,
           pumpCode: reading.pumpCode,
@@ -135,6 +159,7 @@ export class ShiftsService {
           startValue: reading.startValue,
           endValue: reading.endValue,
           quantity,
+          unitPrice, // Lưu giá tại thời điểm chốt ca để đảm bảo tính toàn vẹn dữ liệu kế toán
         };
       });
 
@@ -145,26 +170,7 @@ export class ShiftsService {
         .values(pumpReadingsData)
         .execute();
 
-      // 2. Lấy giá sản phẩm (1 query thay vì N queries)
-      const productIds = [...new Set(closeShiftDto.pumpReadings.map(r => r.productId))];
-      const prices = await manager
-        .createQueryBuilder(ProductPrice, 'pp')
-        .where('pp.product_id IN (:...productIds)', { productIds })
-        .andWhere('pp.region_id = :regionId', { regionId: shift.store.regionId })
-        .andWhere('pp.valid_from <= :now', { now: new Date() })
-        .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', { now: new Date() })
-        .getMany();
-
-      const priceMap = new Map(prices.map(p => [p.productId, Number(p.price)]));
-
-      // Validate: Tất cả sản phẩm phải có giá
-      const missingPrices = pumpReadingsData.filter(r => !priceMap.has(r.productId));
-      if (missingPrices.length > 0) {
-        const productIdsStr = missingPrices.map(r => r.productId).join(', ');
-        throw new BadRequestException(`Không tìm thấy giá cho sản phẩm: ${productIdsStr}. Vui lòng cập nhật bảng giá.`);
-      }
-
-      // 3. Tạo sales từ pump readings (bulk insert)
+      // 2. Tạo sales từ pump readings (đã có giá từ priceMap ở trên)
       const salesData = pumpReadingsData.map(reading => {
         const unitPrice = priceMap.get(reading.productId)!; // Safe after validation
         return {
@@ -817,11 +823,14 @@ export class ShiftsService {
   }
 
   async getShiftReceipts(shiftId: number) {
-    return this.receiptRepository.find({
+    const receipts = await this.receiptRepository.find({
       where: { shiftId },
       relations: ['receiptDetails', 'receiptDetails.customer'],
       order: { createdAt: 'ASC' },
     });
+
+    console.log(`📋 Found ${receipts.length} receipts for shift ${shiftId}`);
+    return receipts;
   }
 
   // ==================== PREVIOUS SHIFT READINGS ====================
