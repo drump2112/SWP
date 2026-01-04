@@ -31,7 +31,6 @@ QLXD/
 ### 🏪 STORE (Cửa hàng)
 - ✅ Chốt ca (theo số liệu cột bơm)
 - ✅ Kê công nợ trong ca
-- ✅ Thêm mới khách hàng công nợ
 - ✅ Lập phiếu thu tiền (bán hàng + thanh toán nợ)
 - ✅ Lập phiếu nộp tiền về công ty
 - ✅ Lập phiếu nhập xuất

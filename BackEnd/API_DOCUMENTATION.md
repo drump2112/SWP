@@ -141,7 +141,6 @@ API sẽ chạy tại: `http://localhost:3000/api`
 ### STORE (Cửa hàng)
 - Mở/Chốt ca
 - Kê công nợ trong ca
-- Thêm khách hàng
 - Lập phiếu thu
 - Lập phiếu nộp tiền
 - Lập phiếu nhập xuất

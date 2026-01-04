@@ -152,15 +152,17 @@ const CustomersPage: React.FC = () => {
             Quản lý thông tin khách hàng và công nợ
           </p>
         </div>
-        <div className="mt-4 sm:mt-0">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
-          >
-            <PlusIcon className="h-5 w-5 mr-2" />
-            Thêm khách hàng
-          </button>
-        </div>
+        {user?.roleCode !== 'STORE' && (
+          <div className="mt-4 sm:mt-0">
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+            >
+              <PlusIcon className="h-5 w-5 mr-2" />
+              Thêm khách hàng
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Search */}
@@ -233,20 +235,24 @@ const CustomersPage: React.FC = () => {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleEdit(customer)}
-                      className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
-                    >
-                      <PencilIcon className="h-4 w-4 mr-1" />
-                      Sửa
-                    </button>
-                    <button
-                      onClick={() => handleDelete(customer.id)}
-                      className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all"
-                    >
-                      <TrashIcon className="h-4 w-4 mr-1" />
-                      Xóa
-                    </button>
+                    {user?.roleCode !== 'STORE' && (
+                      <button
+                        onClick={() => handleEdit(customer)}
+                        className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                      >
+                        <PencilIcon className="h-4 w-4 mr-1" />
+                        Sửa
+                      </button>
+                    )}
+                    {user?.roleCode === 'ADMIN' && (
+                      <button
+                        onClick={() => handleDelete(customer.id)}
+                        className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all"
+                      >
+                        <TrashIcon className="h-4 w-4 mr-1" />
+                        Xóa
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

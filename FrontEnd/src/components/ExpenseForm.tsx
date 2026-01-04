@@ -18,6 +18,7 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ storeId, onSuccess }) 
     expenseCategoryId: 0,
     amount: '',
     description: '',
+    paymentMethod: 'CASH', // Mặc định tiền mặt
   });
 
   useEffect(() => {
@@ -45,10 +46,11 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ storeId, onSuccess }) 
         expenseCategoryId: formData.expenseCategoryId,
         amount: parseFloat(formData.amount),
         description: formData.description,
+        paymentMethod: formData.paymentMethod,
         expenseDate: new Date().toISOString().split('T')[0],
       });
 
-      setFormData({ expenseCategoryId: categories[0]?.id || 0, amount: '', description: '' });
+      setFormData({ expenseCategoryId: categories[0]?.id || 0, amount: '', description: '', paymentMethod: 'CASH' });
       onSuccess();
     } catch (error) {
       console.error('Error creating expense:', error);
@@ -92,6 +94,20 @@ export const ExpenseForm: React.FC<ExpenseFormProps> = ({ storeId, onSuccess }) 
           step="0.01"
           required
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Loại thanh toán
+        </label>
+        <select
+          value={formData.paymentMethod}
+          onChange={(e) => setFormData({ ...formData, paymentMethod: e.target.value })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        >
+          <option value="CASH">💵 Tiền mặt</option>
+          <option value="BANK_TRANSFER">🏦 Chuyển khoản</option>
+        </select>
       </div>
 
       <div>
