@@ -13,7 +13,7 @@ export class TokenCleanupService {
     private userTokenRepository: Repository<UserToken>,
   ) {}
 
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
+  @Cron(CronExpression.EVERY_DAY_AT_3AM) // Run at 3:00 AM every day
   async handleCron() {
     this.logger.debug('Running token cleanup job...');
 

@@ -22,7 +22,7 @@ import { JwtStrategy } from './jwt.strategy';
           configService.get<string>('JWT_SECRET') ||
           'your-super-secret-jwt-key-change-in-production',
         signOptions: {
-          expiresIn: '1h', // Access token expires in 1 hour
+          expiresIn: '30m', // Access token expires in 30 minutes
         },
       }),
       inject: [ConfigService],

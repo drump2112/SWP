@@ -37,7 +37,6 @@ import { ExpensesModule } from './expenses/expenses.module';
 
 // Reports
 import { ReportsModule } from './reports/reports.module';
-import { TokenCleanupService } from './auth/token-cleanup.service';
 
 @Module({
   imports: [
@@ -93,6 +92,6 @@ import { TokenCleanupService } from './auth/token-cleanup.service';
     ReportsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, TokenCleanupService],
+  providers: [AppService],
 })
 export class AppModule {}
