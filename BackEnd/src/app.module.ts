@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
@@ -36,6 +37,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 
 // Reports
 import { ReportsModule } from './reports/reports.module';
+import { TokenCleanupService } from './auth/token-cleanup.service';
 
 @Module({
   imports: [
@@ -44,6 +46,9 @@ import { ReportsModule } from './reports/reports.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+
+    // Schedule
+    ScheduleModule.forRoot(),
 
     // Rate Limiting
     ThrottlerModule.forRoot([
@@ -88,6 +93,6 @@ import { ReportsModule } from './reports/reports.module';
     ReportsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, TokenCleanupService],
 })
 export class AppModule {}
