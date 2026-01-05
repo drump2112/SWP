@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authApi } from '../api/auth';
-import type { LoginDto } from '../api/auth';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { authApi } from "../api/auth";
+import type { LoginDto } from "../api/auth";
 
 interface User {
   id: number;
@@ -32,8 +32,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     // Load user from localStorage on mount
-    const savedToken = localStorage.getItem('access_token');
-    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem("access_token");
+    const savedUser = localStorage.getItem("user");
 
     if (savedToken && savedUser) {
       setToken(savedToken);
@@ -46,15 +46,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const response = await authApi.login(data);
     setToken(response.access_token);
     setUser(response.user);
-    localStorage.setItem('access_token', response.access_token);
-    localStorage.setItem('user', JSON.stringify(response.user));
+    localStorage.setItem("access_token", response.access_token);
+    localStorage.setItem("user", JSON.stringify(response.user));
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await authApi.logout();
+    } catch (error) {
+      console.error("Logout failed", error);
+    }
     setToken(null);
     setUser(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
   };
 
   return (
@@ -76,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
+    throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 };

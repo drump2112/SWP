@@ -1,4 +1,4 @@
-import api from './client';
+import api from "./client";
 
 export interface LoginDto {
   username: string;
@@ -18,7 +18,10 @@ export interface LoginResponse {
 
 export const authApi = {
   login: async (data: LoginDto): Promise<LoginResponse> => {
-    const response = await api.post('/auth/login', data);
+    const response = await api.post("/auth/login", data);
     return response.data;
+  },
+  logout: async (): Promise<void> => {
+    await api.post("/auth/logout");
   },
 };

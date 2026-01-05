@@ -1,0 +1,10 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Migrations",
+			"type": "shell",
+			"command": "npx typeorm-ts-node-commonjs migration:run -d ormconfig.ts"
+		}
+	]
+}
