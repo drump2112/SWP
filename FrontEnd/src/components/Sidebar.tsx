@@ -68,9 +68,9 @@ const navigation: NavItem[] = [
     name: 'Quản lý kho',
     href: '/inventory',
     icon: CircleStackIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'STORE'],
+    roles: ['ADMIN', 'DIRECTOR'],
     children: [
-      { name: 'Nhập kho', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE'] },
+      { name: 'Nhập hàng', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],
@@ -130,19 +130,25 @@ const Sidebar: React.FC = () => {
     return item.roles.includes(user.roleCode);
   };
 
-  // Lọc navigation dựa trên quyền
-  const filteredNavigation = navigation.filter((item) => {
-    if (!hasPermission(item)) return false;
-
-    // Nếu có children, filter children
-    if (item.children) {
-      item.children = item.children.filter(child => hasPermission(child));
-      // Nếu tất cả children đều bị filter, ẩn parent
-      if (item.children.length === 0) return false;
-    }
-
-    return true;
-  });
+  // Lọc navigation dựa trên quyền (không mutate navigation gốc)
+  const filteredNavigation = navigation
+    .filter(item => hasPermission(item))
+    .map(item => {
+      if (item.children) {
+        return {
+          ...item,
+          children: item.children.filter(child => hasPermission(child))
+        };
+      }
+      return item;
+    })
+    .filter(item => {
+      // Nếu item có children mà bị filter hết thì ẩn luôn parent
+      if (item.children && item.children.length === 0) {
+        return false;
+      }
+      return true;
+    });
 
   const toggleMenu = (name: string) => {
     setOpenMenus((prev) =>

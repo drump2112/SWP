@@ -21,6 +21,14 @@ export class UpdateCustomerDto {
   @IsOptional()
   phone?: string;
 
+  @IsString()
+  @IsOptional()
+  type?: string;
+
+  @IsNumber()
+  @IsOptional()
+  storeId?: number;
+
   @IsNumber()
   @IsOptional()
   creditLimit?: number;

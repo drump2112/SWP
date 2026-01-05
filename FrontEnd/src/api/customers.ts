@@ -7,8 +7,10 @@ export interface Customer {
   taxCode?: string;
   address?: string;
   phone?: string;
+  type?: 'EXTERNAL' | 'INTERNAL';
   creditLimit?: number;
   notes?: string;
+  customerStores?: { storeId: number; store?: { name: string } }[];
 }
 
 export interface CreateCustomerDto {
@@ -18,6 +20,7 @@ export interface CreateCustomerDto {
   taxCode?: string;
   address?: string;
   phone?: string;
+  type?: 'EXTERNAL' | 'INTERNAL';
   creditLimit?: number;
   notes?: string;
 }
@@ -28,6 +31,8 @@ export interface UpdateCustomerDto {
   taxCode?: string;
   address?: string;
   phone?: string;
+  type?: 'EXTERNAL' | 'INTERNAL';
+  storeId?: number;
   creditLimit?: number;
   notes?: string;
 }
@@ -36,6 +41,7 @@ export interface CreditStatus {
   customerId: number;
   customerName: string;
   customerCode: string;
+  customerType?: 'EXTERNAL' | 'INTERNAL';
   storeId?: number;
   creditLimit: number;
   currentDebt: number;
@@ -86,6 +92,12 @@ export const customersApi = {
   getCreditStatus: async (id: number, storeId?: number): Promise<CreditStatus> => {
     const params = storeId ? { storeId } : {};
     const response = await api.get(`/customers/${id}/credit-status`, { params });
+    return response.data;
+  },
+
+  getAllCreditStatus: async (storeId?: number): Promise<CreditStatus[]> => {
+    const params = storeId ? { storeId } : {};
+    const response = await api.get('/customers/credit-status/all', { params });
     return response.data;
   },
 

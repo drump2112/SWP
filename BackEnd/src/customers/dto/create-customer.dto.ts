@@ -24,6 +24,10 @@ export class CreateCustomerDto {
   @IsOptional()
   phone?: string;
 
+  @IsString()
+  @IsOptional()
+  type?: string;
+
   @IsNumber()
   @IsOptional()
   creditLimit?: number;

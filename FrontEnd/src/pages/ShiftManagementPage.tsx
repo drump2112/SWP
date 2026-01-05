@@ -171,10 +171,10 @@ const ShiftManagementPage: React.FC = () => {
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
               <tr>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Ca
+                  Ngày
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Ngày
+                  Ca
                 </th>
                 {(user?.roleCode === 'ADMIN' || user?.roleCode === 'DIRECTOR' || user?.roleCode === 'ACCOUNTING') && (
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -199,14 +199,14 @@ const ShiftManagementPage: React.FC = () => {
               {filteredShifts?.map((shift) => (
                 <tr key={shift.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="flex items-center justify-center">
-                      <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
-                      <span className="text-sm font-medium text-gray-900">Ca {shift.shiftNo}</span>
+                    <div className="text-sm text-gray-900">
+                      {dayjs(shift.shiftDate).format('DD/MM/YYYY')}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-900">
-                      {dayjs(shift.shiftDate).format('DD/MM/YYYY')}
+                    <div className="flex items-center justify-center">
+                      <ClockIcon className="h-5 w-5 text-gray-400 mr-2" />
+                      <span className="text-sm font-medium text-gray-900">Ca {shift.shiftNo}</span>
                     </div>
                   </td>
                   {(user?.roleCode === 'ADMIN' || user?.roleCode === 'DIRECTOR' || user?.roleCode === 'ACCOUNTING') && (

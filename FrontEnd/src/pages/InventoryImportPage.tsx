@@ -46,7 +46,7 @@ const InventoryImportPage: React.FC = () => {
   const createMutation = useMutation({
     mutationFn: inventoryApi.createDocument,
     onSuccess: () => {
-      toast.success('Nhập kho thành công');
+      toast.success('Nhập hàng thành công');
       // Reset form
       setItems([{ productId: 0, quantity: 0, unitPrice: 0 }]);
       setSupplierName('');
@@ -116,9 +116,9 @@ const InventoryImportPage: React.FC = () => {
         <div>
           <h2 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
             <CircleStackIcon className="h-8 w-8 text-blue-600" />
-            Nhập Kho Hàng Hóa
+            Nhập Hàng Hóa
           </h2>
-          <p className="text-gray-600 mt-2">Tạo phiếu nhập kho xăng dầu và hàng hóa</p>
+          <p className="text-gray-600 mt-2">Tạo phiếu nhập xăng dầu và hàng hóa</p>
         </div>
       </div>
 
@@ -231,7 +231,6 @@ const InventoryImportPage: React.FC = () => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {items.map((item, index) => {
-                          // Check if tanks are available for this product
                           const availableTanks = tanks?.filter(t => t.productId === item.productId) || [];
                           const tankOptions = availableTanks.map(t => ({ value: t.id, label: t.name }));
 

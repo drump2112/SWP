@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi, type Customer, type CreateCustomerDto, type UpdateCustomerDto } from '../api/customers';
+import { storesApi } from '../api/stores';
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/sweetalert';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, ExclamationTriangleIcon, UserIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
+import SearchableSelect from '../components/SearchableSelect';
 
 const CustomersPage: React.FC = () => {
   const { user } = useAuth();
@@ -11,11 +13,18 @@ const CustomersPage: React.FC = () => {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState<string>('');
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { data: customers, isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: () => customersApi.getAll(),
+  });
+
+  const { data: stores } = useQuery({
+    queryKey: ['stores'],
+    queryFn: storesApi.getAll,
+    enabled: !user?.storeId, // Only fetch if user is not assigned to a store
   });
 
   const createMutation = useMutation({
@@ -66,13 +75,16 @@ const CustomersPage: React.FC = () => {
       taxCode: formData.get('taxCode') as string || undefined,
       address: formData.get('address') as string || undefined,
       phone: formData.get('phone') as string || undefined,
+      type: formData.get('type') as 'EXTERNAL' | 'INTERNAL' || 'EXTERNAL',
       creditLimit: formData.get('creditLimit') ? Number(formData.get('creditLimit')) : undefined,
       notes: formData.get('notes') as string || undefined,
     };
 
-    // Thêm storeId nếu user là STORE
-    if (user?.storeId && !editingCustomer) {
+    // Thêm storeId nếu user là STORE hoặc đã chọn từ dropdown
+    if (user?.storeId) {
       data.storeId = user.storeId;
+    } else if (selectedStoreId) {
+      data.storeId = selectedStoreId;
     }
 
     if (editingCustomer) {
@@ -102,7 +114,19 @@ const CustomersPage: React.FC = () => {
 
   const handleEdit = (customer: Customer) => {
     setEditingCustomer(customer);
+    if (customer.customerStores && customer.customerStores.length > 0) {
+      setSelectedStoreId(customer.customerStores[0].storeId);
+    } else {
+      setSelectedStoreId(null);
+    }
     setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingCustomer(null);
+    setSelectedStoreId(null);
+    setDuplicateWarning('');
   };
 
   const handleDelete = async (id: number) => {
@@ -115,11 +139,7 @@ const CustomersPage: React.FC = () => {
     }
   };
 
-  const handleCloseModal = () => {
-    setIsModalOpen(false);
-    setEditingCustomer(null);
-    setDuplicateWarning('');
-  };
+
 
   const filteredCustomers = customers?.filter((customer) => {
     const matchesSearch =
@@ -214,7 +234,14 @@ const CustomersPage: React.FC = () => {
                     {customer.code}
                   </td>
                   <td className="px-6 py-4 text-center text-sm text-gray-700">
-                    <div className="font-medium">{customer.name}</div>
+                    <div className="font-medium flex items-center justify-center gap-2">
+                      {customer.name}
+                      {customer.type === 'INTERNAL' && (
+                        <span className="px-2 py-0.5 text-xs font-bold bg-purple-100 text-purple-700 rounded-full border border-purple-200">
+                          Nội bộ
+                        </span>
+                      )}
+                    </div>
                     {customer.taxCode && (
                       <div className="text-xs text-gray-500">MST: {customer.taxCode}</div>
                     )}
@@ -297,6 +324,28 @@ const CustomersPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Store Selection for Admin */}
+                {!user?.storeId && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Cửa hàng <span className="text-red-500">*</span>
+                    </label>
+                    <SearchableSelect
+                      options={stores?.map(store => ({
+                        value: store.id,
+                        label: store.name
+                      })) || []}
+                      value={selectedStoreId}
+                      onChange={(value) => setSelectedStoreId(value as number)}
+                      placeholder="Chọn cửa hàng quản lý khách hàng này"
+                      required
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Khách hàng/Nhân viên này sẽ thuộc về cửa hàng được chọn.
+                    </p>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-1">
@@ -336,6 +385,21 @@ const CustomersPage: React.FC = () => {
                       placeholder="VD: 0123456789"
                     />
                   </div>
+                </div>
+
+                <div className="mb-4">
+                  <label htmlFor="type" className="block text-sm font-medium text-gray-700 mb-1">
+                    Loại khách hàng
+                  </label>
+                  <select
+                    id="type"
+                    name="type"
+                    defaultValue={editingCustomer?.type || 'EXTERNAL'}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                  >
+                    <option value="EXTERNAL">Khách hàng thường (Bên ngoài)</option>
+                    <option value="INTERNAL">Nội bộ (Nhân viên/Cửa hàng trưởng)</option>
+                  </select>
                 </div>
 
                 <div>

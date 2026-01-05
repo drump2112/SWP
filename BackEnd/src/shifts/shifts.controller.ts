@@ -120,4 +120,5 @@ export class ShiftsController {
   getPreviousShiftReadings(@Param('shiftId') shiftId: string) {
     return this.shiftsService.getPreviousShiftReadings(+shiftId);
   }
+
 }

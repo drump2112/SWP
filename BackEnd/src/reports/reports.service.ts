@@ -11,6 +11,7 @@ import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
+import { PumpReading } from '../entities/pump-reading.entity';
 
 @Injectable()
 export class ReportsService {
@@ -35,6 +36,8 @@ export class ReportsService {
     private receiptRepository: Repository<Receipt>,
     @InjectRepository(CashDeposit)
     private cashDepositRepository: Repository<CashDeposit>,
+    @InjectRepository(PumpReading)
+    private pumpReadingRepository: Repository<PumpReading>,
   ) {}
 
   // ==================== BÁO CÁO CÔNG NỢ ====================
@@ -557,5 +560,59 @@ export class ReportsService {
       totalCash: Number(cashSummary?.total || 0),
       totalInventory: Number(inventorySummary?.total || 0),
     };
+  }
+
+  // ==================== BÁO CÁO XUẤT HÀNG (SALES REPORT) ====================
+
+  /**
+   * Báo cáo xuất hàng theo cột bơm
+   */
+  async getSalesByPumpReport(storeId: number, fromDate: Date, toDate: Date) {
+    const sql = `
+      SELECT
+        COALESCE(p.id, 0) as "pumpId",
+        COALESCE(p.pump_code, pr.pump_code) as "pumpCode",
+        COALESCE(p.name, pr.pump_code) as "pumpName",
+        prod.name as "productName",
+        SUM(pr.quantity) as "totalQuantity",
+        SUM(pr.quantity * pr.unit_price) as "totalAmount"
+      FROM pump_readings pr
+      LEFT JOIN shifts s ON pr.shift_id = s.id
+      LEFT JOIN pumps p ON p.pump_code = pr.pump_code AND p.store_id = s.store_id
+      LEFT JOIN products prod ON pr.product_id = prod.id
+      WHERE s.store_id = $1
+      AND s.shift_date BETWEEN $2 AND $3
+      GROUP BY p.id, p.pump_code, p.name, pr.pump_code, prod.name
+      ORDER BY "pumpCode" ASC
+    `;
+
+    const result = await this.pumpReadingRepository.query(sql, [storeId, fromDate, toDate]);
+
+    // Convert string numbers to numbers (Postgres returns sums as strings)
+    return result.map(row => ({
+      ...row,
+      totalQuantity: Number(row.totalQuantity),
+      totalAmount: Number(row.totalAmount),
+    }));
+  }
+
+  /**
+   * Báo cáo xuất hàng theo mặt hàng
+   */
+  async getSalesByProductReport(storeId: number, fromDate: Date, toDate: Date) {
+    const query = this.pumpReadingRepository.createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('pr.product', 'product')
+      .select('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(pr.quantity)', 'totalQuantity')
+      .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
+      .where('shift.store_id = :storeId', { storeId })
+      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .groupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy('product.name', 'ASC');
+
+    return query.getRawMany();
   }
 }

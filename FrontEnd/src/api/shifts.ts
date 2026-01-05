@@ -13,6 +13,7 @@ export interface CloseShiftDto {
   debtSales?: ShiftDebtSaleDto[];
   receipts?: CreateReceiptDto[];
   deposits?: CashDepositDto[];
+  closedAt?: string;
 }
 
 export interface CreateShiftDto {

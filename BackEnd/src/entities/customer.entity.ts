@@ -20,6 +20,9 @@ export class Customer {
   @Column({ length: 20, nullable: true })
   phone: string;
 
+  @Column({ length: 20, default: 'EXTERNAL' })
+  type: string; // EXTERNAL, INTERNAL
+
   @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
   creditLimit: number;
 

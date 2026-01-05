@@ -60,6 +60,12 @@ export class CustomersController {
     return this.customersService.getDebtStatement(+id, storeId ? +storeId : undefined);
   }
 
+  @Get('credit-status/all')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getAllCreditStatus(@Query('storeId') storeId?: string) {
+    return this.customersService.getAllCreditStatus(storeId ? +storeId : undefined);
+  }
+
   @Get(':id/credit-status')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getCreditStatus(

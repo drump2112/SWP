@@ -8,11 +8,13 @@ import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/sweetalert';
+import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import SearchableSelect from '../components/SearchableSelect';
 import {
   PlusIcon,
   TrashIcon,
+  PencilIcon,
   BanknotesIcon,
   CreditCardIcon,
   BuildingLibraryIcon,
@@ -27,13 +29,18 @@ const ShiftOperationsPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'pump' | 'debt' | 'cash'>('pump');
+  const [activeTab, setActiveTab] = useState<'pump' | 'debt' | 'receipt' | 'deposit' | 'import' | 'export' | 'inventory'>('pump');
   const [showDebtSaleForm, setShowDebtSaleForm] = useState(false);
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
+  const [showImportForm, setShowImportForm] = useState(false);
+  const [showExportForm, setShowExportForm] = useState(false);
+  const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [pumpReadings, setPumpReadings] = useState<Record<number, PumpReadingDto>>({});
   const [productPrices, setProductPrices] = useState<Record<number, number>>({});
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
+  const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
+  const [retailCustomerId, setRetailCustomerId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPreviousShift, setHasPreviousShift] = useState(false);
 
@@ -42,10 +49,18 @@ const ShiftOperationsPage: React.FC = () => {
   const [selectedDebtProduct, setSelectedDebtProduct] = useState<number | null>(null);
   const [selectedReceiptCustomer, setSelectedReceiptCustomer] = useState<number | null>(null);
 
+  // Editing state
+  const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
+  const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
+
   // Draft Mode: Store all data until shift close
   const [draftDebtSales, setDraftDebtSales] = useState<Array<ShiftDebtSaleDto & { id: string }>>([]);
   const [draftReceipts, setDraftReceipts] = useState<Array<CreateReceiptDto & { id: string }>>([]);
   const [draftDeposits, setDraftDeposits] = useState<Array<CashDepositDto & { id: string }>>([]);
+  // TODO: Define types for Import/Export
+  const [draftImports, setDraftImports] = useState<any[]>([]);
+  const [draftExports, setDraftExports] = useState<any[]>([]);
+  const [draftInventoryChecks, setDraftInventoryChecks] = useState<any[]>([]);
 
   // Fetch shift report
   const { data: report, isLoading } = useQuery({
@@ -72,6 +87,13 @@ const ShiftOperationsPage: React.FC = () => {
   const { data: customers } = useQuery({
     queryKey: ['customers'],
     queryFn: () => customersApi.getAll(),
+  });
+
+  // Fetch store-specific customers (for Retail Responsibility)
+  const { data: storeCustomers } = useQuery({
+    queryKey: ['customers', report?.shift.storeId],
+    queryFn: () => customersApi.getAll(report?.shift.storeId),
+    enabled: !!report?.shift.storeId,
   });
 
   // Fetch products
@@ -119,7 +141,7 @@ const ShiftOperationsPage: React.FC = () => {
     const hasPumpData = Object.values(pumpReadings).some(
       reading => reading.startValue !== 0 || reading.endValue !== 0
     );
-    const hasDraftData = draftDebtSales.length > 0 || draftReceipts.length > 0 || draftDeposits.length > 0;
+    const hasDraftData = draftDebtSales.length > 0 || draftReceipts.length > 0 || draftDeposits.length > 0 || draftImports.length > 0 || draftExports.length > 0 || draftInventoryChecks.length > 0;
     setHasUnsavedChanges(hasPumpData || hasDraftData);
 
     // Auto-save to localStorage (debounced)
@@ -130,17 +152,27 @@ const ShiftOperationsPage: React.FC = () => {
         debtSales: draftDebtSales,
         receipts: draftReceipts,
         deposits: draftDeposits,
+        imports: draftImports,
+        exports: draftExports,
+        inventoryChecks: draftInventoryChecks,
+        declaredRetailQuantities,
+        retailCustomerId,
       };
       localStorage.setItem(draftKey, JSON.stringify(draftData));
     }
-  }, [pumpReadings, draftDebtSales, draftReceipts, draftDeposits, shiftId]);
+  }, [pumpReadings, draftDebtSales, draftReceipts, draftDeposits, draftImports, draftExports, draftInventoryChecks, declaredRetailQuantities, retailCustomerId, shiftId]);
 
   // Reset forms khi chuyển tab
   useEffect(() => {
     setShowDebtSaleForm(false);
     setShowReceiptForm(false);
     setShowDepositForm(false);
+    setShowImportForm(false);
+    setShowExportForm(false);
+    setShowInventoryForm(false);
     setDebtSaleFormPrice(0);
+    setEditingReceiptId(null);
+    setEditingDepositId(null);
   }, [activeTab]);
 
   // Initialize pump readings
@@ -181,6 +213,21 @@ const ShiftOperationsPage: React.FC = () => {
           }
           if (parsed.deposits && parsed.deposits.length > 0) {
             setDraftDeposits(parsed.deposits);
+          }
+          if (parsed.imports && parsed.imports.length > 0) {
+            setDraftImports(parsed.imports);
+          }
+          if (parsed.exports && parsed.exports.length > 0) {
+            setDraftExports(parsed.exports);
+          }
+          if (parsed.inventoryChecks && parsed.inventoryChecks.length > 0) {
+            setDraftInventoryChecks(parsed.inventoryChecks);
+          }
+          if (parsed.declaredRetailQuantities) {
+            setDeclaredRetailQuantities(parsed.declaredRetailQuantities);
+          }
+          if (parsed.retailCustomerId) {
+            setRetailCustomerId(parsed.retailCustomerId);
           }
           toast.success('Đã khôi phục dữ liệu chưa lưu từ lần trước', { position: 'top-right', autoClose: 3000 });
           return;
@@ -317,14 +364,6 @@ const ShiftOperationsPage: React.FC = () => {
       // Giới hạn 3 chữ số thập phân
       numValue = Math.round(numValue * 1000) / 1000;
 
-      // Validation realtime: Nếu đang nhập endValue và nhỏ hơn startValue
-      if (field === 'endValue' && numValue < currentReading.startValue && numValue > 0) {
-        toast.error(`Số cuối (${numValue}) không được nhỏ hơn số đầu (${currentReading.startValue})!`, {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-      }
-
       return {
         ...prev,
         [pumpId]: {
@@ -352,6 +391,14 @@ const ShiftOperationsPage: React.FC = () => {
 
   const handleCloseShift = async () => {
     const readingsArray = Object.values(pumpReadings);
+
+    // Tính toán trước để dùng cho validation
+    const totalLiters = readingsArray.reduce((sum, r) => sum + (r.endValue - r.startValue), 0);
+    const totalAmount = calculateTotalFromPumps();
+    const draftDebtTotal = draftDebtSales.reduce((sum, ds) => sum + (ds.quantity * ds.unitPrice), 0);
+    const draftReceiptTotal = draftReceipts.reduce((sum, r) => sum + r.amount, 0);
+    const draftDepositTotal = draftDeposits.reduce((sum, d) => sum + d.amount, 0);
+    const totalRetailCalc = totalAmount - draftDebtTotal;
 
     // Validation 1: Số cuối >= số đầu
     const hasInvalidReadings = readingsArray.some((r) => r.endValue < r.startValue);
@@ -384,13 +431,61 @@ const ShiftOperationsPage: React.FC = () => {
       if (!confirmed) return;
     }
 
-    // Tính toán để hiển thị trong confirmation
-    const totalLiters = readingsArray.reduce((sum, r) => sum + (r.endValue - r.startValue), 0);
-    const totalAmount = calculateTotalFromPumps();
-    const draftDebtTotal = draftDebtSales.reduce((sum, ds) => sum + (ds.quantity * ds.unitPrice), 0);
-    const draftReceiptTotal = draftReceipts.reduce((sum, r) => sum + r.amount, 0);
-    const draftDepositTotal = draftDeposits.reduce((sum, d) => sum + d.amount, 0);
-    const totalRetailCalc = totalAmount - draftDebtTotal;
+    // Validation 2.5: Kiểm tra đối chiếu lượng hàng bán (BẮT BUỘC)
+    const productIds = Array.from(new Set(readingsArray.map(r => r.productId)));
+    const invalidProducts: string[] = [];
+
+    for (const productId of productIds) {
+      const product = products?.find(p => p.id === productId);
+
+      // 1. Total Pump Quantity
+      const pumpQty = readingsArray
+        .filter(r => r.productId === productId)
+        .reduce((sum, r) => sum + calculateQuantity(r), 0);
+
+      // 2. Total Debt Quantity
+      const debtQty = draftDebtSales
+        .filter(s => s.productId === productId)
+        .reduce((sum, s) => sum + s.quantity, 0);
+
+      // 3. Declared Retail Quantity
+      const declaredQty = declaredRetailQuantities[productId];
+
+      if (declaredQty === undefined || declaredQty === null) {
+        toast.error(`Vui lòng nhập "Bán lẻ thực tế" cho sản phẩm ${product?.name || productId} ở Tab 2!`, {
+          position: 'top-right',
+          autoClose: 5000,
+        });
+        setActiveTab('debt');
+        return;
+      }
+
+      const totalDeclared = debtQty + declaredQty;
+      const diff = Math.abs(pumpQty - totalDeclared);
+
+      if (diff > 0.1) { // Allow 0.1 liter tolerance
+        invalidProducts.push(`${product?.name || productId} (Lệch ${diff.toFixed(3)} lít)`);
+      }
+    }
+
+    if (invalidProducts.length > 0) {
+      toast.error(`Lượng hàng bán không khớp:\n${invalidProducts.join('\n')}\nVui lòng kiểm tra lại!`, {
+        position: 'top-right',
+        autoClose: 7000,
+      });
+      return; // CHẶN KHÔNG CHO CHỐT
+    }
+
+    // Validation 2.6: Kiểm tra đã chọn người chịu trách nhiệm bán lẻ chưa (nếu có bán lẻ)
+    const hasRetailSales = Object.values(declaredRetailQuantities).some(q => q > 0);
+    if (hasRetailSales && !retailCustomerId) {
+      toast.error('Vui lòng chọn "Người chịu trách nhiệm doanh thu bán lẻ" ở Tab 2!', {
+        position: 'top-right',
+        autoClose: 5000,
+      });
+      setActiveTab('debt');
+      return;
+    }
 
     // Validation 3: Confirm chốt ca với tất cả thông tin
     const confirmHtml = `
@@ -402,7 +497,7 @@ const ShiftOperationsPage: React.FC = () => {
               <td style="padding: 8px 0; text-align: right;">${totalLiters.toFixed(3)} lít</td>
             </tr>
             <tr style="border-bottom: 1px solid #e5e7eb;">
-              <td style="padding: 8px 0; font-weight: 600;">Tổng doanh thu:</td>
+              <td style="padding: 8px 0; font-weight: 600;">Tổng doanh thu (Vòi bơm):</td>
               <td style="padding: 8px 0; text-align: right;">${totalAmount.toLocaleString('vi-VN')} ₫</td>
             </tr>
             <tr style="border-bottom: 1px solid #e5e7eb;">
@@ -410,8 +505,14 @@ const ShiftOperationsPage: React.FC = () => {
               <td style="padding: 8px 0; text-align: right;">${draftDebtTotal.toLocaleString('vi-VN')} ₫</td>
             </tr>
             <tr style="border-bottom: 1px solid #e5e7eb;">
-              <td style="padding: 8px 0; font-weight: 600;">Bán lẻ:</td>
+              <td style="padding: 8px 0; font-weight: 600;">Bán lẻ (Tính toán):</td>
               <td style="padding: 8px 0; text-align: right;">${totalRetailCalc.toLocaleString('vi-VN')} ₫</td>
+            </tr>
+            <tr style="border-bottom: 1px solid #e5e7eb; background-color: #f0fdf4;">
+              <td style="padding: 8px 0; font-weight: 600; color: #166534;">Đối chiếu lượng hàng:</td>
+              <td style="padding: 8px 0; text-align: right; font-weight: bold; color: #166534;">
+                Đã khớp ✅
+              </td>
             </tr>
             <tr style="border-bottom: 1px solid #e5e7eb;">
               <td style="padding: 8px 0; font-weight: 600;">Thu tiền (${draftReceipts.length} phiếu):</td>
@@ -429,23 +530,68 @@ const ShiftOperationsPage: React.FC = () => {
       </div>
     `;
 
-    const confirmed = await showConfirm(
-      confirmHtml,
-      'Xác nhận chốt ca'
-    );
-    if (!confirmed) return;
+    const result = await Swal.fire({
+      title: 'Xác nhận chốt ca',
+      html: `
+        ${confirmHtml}
+        <div class="mt-4 text-left">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian chốt ca</label>
+          <input type="datetime-local" id="closedAt" class="swal2-input" style="margin: 0; width: 100%;" value="${dayjs().format('YYYY-MM-DDTHH:mm')}">
+        </div>
+      `,
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#2563eb',
+      cancelButtonColor: '#d33',
+      confirmButtonText: 'Xác nhận chốt ca',
+      cancelButtonText: 'Hủy',
+      preConfirm: () => {
+        const closedAtInput = document.getElementById('closedAt') as HTMLInputElement;
+        if (!closedAtInput.value) {
+          Swal.showValidationMessage('Vui lòng chọn thời gian chốt ca');
+        }
+        return closedAtInput.value;
+      }
+    });
+
+    if (!result.isConfirmed) return;
+
+    const closedAt = result.value;
+
+    // Generate Debt Sales from Retail Quantities
+    const retailDebtSales = [];
+    if (retailCustomerId) {
+      for (const [productIdStr, quantity] of Object.entries(declaredRetailQuantities)) {
+        const productId = Number(productIdStr);
+        if (quantity > 0) {
+          const price = productPrices[productId] || 0;
+          retailDebtSales.push({
+            shiftId: Number(shiftId),
+            customerId: retailCustomerId,
+            productId: productId,
+            quantity: quantity,
+            unitPrice: price,
+            notes: 'Bán lẻ (Ghi nợ người phụ trách)',
+          });
+        }
+      }
+    }
 
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
+      closedAt: closedAt ? new Date(closedAt).toISOString() : undefined,
       pumpReadings: readingsArray,
-      debtSales: draftDebtSales.map(ds => ({
-        shiftId: Number(shiftId),
-        customerId: ds.customerId,
-        productId: ds.productId,
-        quantity: ds.quantity,
-        unitPrice: ds.unitPrice,
-        notes: ds.notes,
-      })),
+      debtSales: [
+        ...draftDebtSales.map(ds => ({
+          shiftId: Number(shiftId),
+          customerId: ds.customerId,
+          productId: ds.productId,
+          quantity: ds.quantity,
+          unitPrice: ds.unitPrice,
+          notes: ds.notes,
+        })),
+        ...retailDebtSales
+      ],
       receipts: draftReceipts.map(r => ({
         storeId: r.storeId,
         shiftId: Number(shiftId),
@@ -492,7 +638,7 @@ const ShiftOperationsPage: React.FC = () => {
     setDebtSaleFormPrice(0);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
-    toast.success('Đã thêm vào danh sách công nợ (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
+    toast.success('Đã thêm vào danh sách công nợ', { position: 'top-right', autoClose: 3000 });
   };
 
   const handleReceiptSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -500,48 +646,104 @@ const ShiftOperationsPage: React.FC = () => {
     const formData = new FormData(e.currentTarget);
     const customerId = Number(formData.get('customerId'));
     const amount = Number(formData.get('amount'));
+    const notes = formData.get('notes') as string || undefined;
+    const paymentMethod = formData.get('paymentMethod') as string || 'CASH';
 
-    const data: CreateReceiptDto & { id: string } = {
-      id: `draft_${Date.now()}`, // Temporary ID
-      storeId: user?.storeId || report?.shift.storeId || 0,
-      shiftId: Number(shiftId),
-      receiptType: 'DEBT_COLLECTION',
-      amount,
-      details: [{ customerId, amount }],
-      notes: formData.get('notes') as string || undefined,
-      paymentMethod: formData.get('paymentMethod') as string || 'CASH',
-    };
+    if (editingReceiptId) {
+      setDraftReceipts(prev => prev.map(item => {
+        if (item.id === editingReceiptId) {
+          return {
+            ...item,
+            amount,
+            details: [{ customerId, amount }],
+            notes,
+            paymentMethod
+          };
+        }
+        return item;
+      }));
+      setEditingReceiptId(null);
+      toast.success('Đã cập nhật phiếu thu', { position: 'top-right', autoClose: 3000 });
+    } else {
+      const data: CreateReceiptDto & { id: string } = {
+        id: `draft_${Date.now()}`, // Temporary ID
+        storeId: user?.storeId || report?.shift.storeId || 0,
+        shiftId: Number(shiftId),
+        receiptType: 'DEBT_COLLECTION',
+        amount,
+        details: [{ customerId, amount }],
+        notes,
+        paymentMethod,
+      };
+      // Lưu vào draft state thay vì API
+      setDraftReceipts(prev => [...prev, data]);
+      toast.success('Đã thêm vào danh sách phiếu thu', { position: 'top-right', autoClose: 3000 });
+    }
 
-    // Lưu vào draft state thay vì API
-    setDraftReceipts(prev => [...prev, data]);
     setShowReceiptForm(false);
     setSelectedReceiptCustomer(null);
     e.currentTarget.reset();
-    toast.success('Đã thêm vào danh sách phiếu thu (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
   };
 
   const handleDepositSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get('amount'));
+    const depositDate = formData.get('depositDate') as string;
+    const depositTime = formData.get('depositTime') as string || undefined;
+    const receiverName = formData.get('receiverName') as string || undefined;
+    const notes = formData.get('notes') as string || undefined;
+    const paymentMethod = formData.get('paymentMethod') as string || 'CASH';
 
-    const data: CashDepositDto & { id: string } = {
-      id: `draft_${Date.now()}`, // Temporary ID
-      storeId: user?.storeId || report?.shift.storeId || 0,
-      shiftId: Number(shiftId),
-      amount,
-      depositDate: formData.get('depositDate') as string,
-      depositTime: formData.get('depositTime') as string || undefined,
-      receiverName: formData.get('receiverName') as string || undefined,
-      notes: formData.get('notes') as string || undefined,
-      paymentMethod: formData.get('paymentMethod') as string || 'CASH',
-    };
+    if (editingDepositId) {
+      setDraftDeposits(prev => prev.map(item => {
+        if (item.id === editingDepositId) {
+          return {
+            ...item,
+            amount,
+            depositDate,
+            depositTime,
+            receiverName,
+            notes,
+            paymentMethod
+          };
+        }
+        return item;
+      }));
+      setEditingDepositId(null);
+      toast.success('Đã cập nhật phiếu nộp', { position: 'top-right', autoClose: 3000 });
+    } else {
+      const data: CashDepositDto & { id: string } = {
+        id: `draft_${Date.now()}`, // Temporary ID
+        storeId: user?.storeId || report?.shift.storeId || 0,
+        shiftId: Number(shiftId),
+        amount,
+        depositDate,
+        depositTime,
+        receiverName,
+        notes,
+        paymentMethod,
+      };
+      // Lưu vào draft state thay vì API
+      setDraftDeposits(prev => [...prev, data]);
+      toast.success('Đã thêm vào danh sách nộp tiền (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
+    }
 
-    // Lưu vào draft state thay vì API
-    setDraftDeposits(prev => [...prev, data]);
     setShowDepositForm(false);
     e.currentTarget.reset();
-    toast.success('Đã thêm vào danh sách nộp tiền (chưa lưu vào database)', { position: 'top-right', autoClose: 3000 });
+  };
+
+  const handleEditReceipt = (receipt: CreateReceiptDto & { id: string }) => {
+    setEditingReceiptId(receipt.id);
+    if (receipt.details && receipt.details.length > 0) {
+      setSelectedReceiptCustomer(receipt.details[0].customerId);
+    }
+    setShowReceiptForm(true);
+  };
+
+  const handleEditDeposit = (deposit: CashDepositDto & { id: string }) => {
+    setEditingDepositId(deposit.id);
+    setShowDepositForm(true);
   };
 
   const handleDeleteDebtSale = async (id: string) => {
@@ -564,6 +766,136 @@ const ShiftOperationsPage: React.FC = () => {
     const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu nộp này?', 'Xác nhận xóa');
     if (confirmed) {
       setDraftDeposits(prev => prev.filter(item => item.id !== id));
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
+    }
+  };
+
+  const handleImportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const docDate = formData.get('docDate') as string;
+    const supplierName = formData.get('supplierName') as string || undefined;
+    const invoiceNumber = formData.get('invoiceNumber') as string || undefined;
+    const notes = formData.get('notes') as string || undefined;
+
+    // Simple item handling for now - just one item per form submission or just header info
+    // Ideally we need a sub-form for items. For now let's just save the header info and maybe a total amount/quantity if needed.
+    // Or we can assume this is just for recording the document existence.
+
+    // Let's try to capture at least one item or a summary
+    const productId = formData.get('productId') ? Number(formData.get('productId')) : undefined;
+    const quantity = formData.get('quantity') ? Number(formData.get('quantity')) : 0;
+    const unitPrice = formData.get('unitPrice') ? Number(formData.get('unitPrice')) : 0;
+
+    if (quantity <= 0) {
+      toast.error('Số lượng phải lớn hơn 0', { position: 'top-right', autoClose: 3000 });
+      return;
+    }
+
+    const amount = quantity * unitPrice;
+
+    const newItem = {
+      id: `draft_${Date.now()}`,
+      docType: 'IMPORT',
+      docDate,
+      supplierName,
+      invoiceNumber,
+      notes,
+      items: productId ? [{ productId, quantity, unitPrice, amount }] : [],
+      totalAmount: amount
+    };
+
+    setDraftImports(prev => [...prev, newItem]);
+    toast.success('Đã thêm phiếu nhập hàng', { position: 'top-right', autoClose: 3000 });
+    setShowImportForm(false);
+    e.currentTarget.reset();
+  };
+
+  const handleExportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const docDate = formData.get('docDate') as string;
+    const receiverName = formData.get('receiverName') as string || undefined; // Reusing supplierName field or similar
+    const notes = formData.get('notes') as string || undefined;
+
+    const productId = formData.get('productId') ? Number(formData.get('productId')) : undefined;
+    const quantity = formData.get('quantity') ? Number(formData.get('quantity')) : 0;
+    const unitPrice = formData.get('unitPrice') ? Number(formData.get('unitPrice')) : 0;
+
+    if (quantity <= 0) {
+      toast.error('Số lượng phải lớn hơn 0', { position: 'top-right', autoClose: 3000 });
+      return;
+    }
+
+    const amount = quantity * unitPrice;
+
+    const newItem = {
+      id: `draft_${Date.now()}`,
+      docType: 'EXPORT',
+      docDate,
+      supplierName: receiverName, // Map to supplierName for storage consistency or add new field
+      notes,
+      items: productId ? [{ productId, quantity, unitPrice, amount }] : [],
+      totalAmount: amount
+    };
+
+    setDraftExports(prev => [...prev, newItem]);
+    toast.success('Đã thêm phiếu xuất hàng', { position: 'top-right', autoClose: 3000 });
+    setShowExportForm(false);
+    e.currentTarget.reset();
+  };
+
+  const handleDeleteImport = async (id: string) => {
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu nhập này?', 'Xác nhận xóa');
+    if (confirmed) {
+      setDraftImports(prev => prev.filter(item => item.id !== id));
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
+    }
+  };
+
+  const handleDeleteExport = async (id: string) => {
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu xuất này?', 'Xác nhận xóa');
+    if (confirmed) {
+      setDraftExports(prev => prev.filter(item => item.id !== id));
+      toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
+    }
+  };
+
+  const handleInventorySubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const productId = Number(formData.get('productId'));
+    const systemQuantity = Number(formData.get('systemQuantity'));
+    const actualQuantity = Number(formData.get('actualQuantity'));
+    const notes = formData.get('notes') as string || undefined;
+
+    if (actualQuantity <= 0) {
+      toast.error('Số lượng thực tế phải lớn hơn 0', { position: 'top-right', autoClose: 3000 });
+      return;
+    }
+
+    const difference = actualQuantity - systemQuantity;
+
+    const newItem = {
+      id: `draft_${Date.now()}`,
+      productId,
+      systemQuantity,
+      actualQuantity,
+      difference,
+      notes,
+      checkDate: dayjs().format('YYYY-MM-DD HH:mm:ss')
+    };
+
+    setDraftInventoryChecks(prev => [...prev, newItem]);
+    toast.success('Đã thêm phiếu kiểm kê', { position: 'top-right', autoClose: 3000 });
+    setShowInventoryForm(false);
+    e.currentTarget.reset();
+  };
+
+  const handleDeleteInventory = async (id: string) => {
+    const confirmed = await showConfirm('Bạn có chắc chắn muốn xóa phiếu kiểm kê này?', 'Xác nhận xóa');
+    if (confirmed) {
+      setDraftInventoryChecks(prev => prev.filter(item => item.id !== id));
       toast.success('Đã xóa khỏi danh sách', { position: 'top-right', autoClose: 3000 });
     }
   };
@@ -758,7 +1090,7 @@ const ShiftOperationsPage: React.FC = () => {
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex">
+          <nav className="-mb-px flex overflow-x-auto">
             <button
               onClick={async () => {
                 if (activeTab !== 'pump' || !hasUnsavedChanges) {
@@ -772,13 +1104,13 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab('pump');
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'pump'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Nhập số liệu vòi bơm
+              B1 - Vòi bơm
             </button>
             <button
               onClick={async () => {
@@ -793,18 +1125,18 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab('debt');
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === 'debt'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Bán công nợ
+              B2 - Bán hàng
             </button>
             <button
               onClick={async () => {
-                if (activeTab !== 'cash' || !hasUnsavedChanges) {
-                  setActiveTab('cash');
+                if (activeTab !== 'receipt' || !hasUnsavedChanges) {
+                  setActiveTab('receipt');
                   return;
                 }
                 const confirmed = await showConfirm(
@@ -812,16 +1144,101 @@ const ShiftOperationsPage: React.FC = () => {
                   'Xác nhận chuyển tab',
                   'warning'
                 );
-                if (confirmed) setActiveTab('cash');
+                if (confirmed) setActiveTab('receipt');
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'cash'
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'receipt'
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
             >
-              Phiếu thu/nộp tiền
+              B3 - Thu tiền
             </button>
+            <button
+              onClick={async () => {
+                if (activeTab !== 'deposit' || !hasUnsavedChanges) {
+                  setActiveTab('deposit');
+                  return;
+                }
+                const confirmed = await showConfirm(
+                  'Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.',
+                  'Xác nhận chuyển tab',
+                  'warning'
+                );
+                if (confirmed) setActiveTab('deposit');
+              }}
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'deposit'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              B4 - Nộp tiền
+            </button>
+            <button
+              onClick={async () => {
+                if (activeTab !== 'import' || !hasUnsavedChanges) {
+                  setActiveTab('import');
+                  return;
+                }
+                const confirmed = await showConfirm(
+                  'Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.',
+                  'Xác nhận chuyển tab',
+                  'warning'
+                );
+                if (confirmed) setActiveTab('import');
+              }}
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'import'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              B5 - Nhập kho
+            </button>
+            <button
+              onClick={async () => {
+                if (activeTab !== 'export' || !hasUnsavedChanges) {
+                  setActiveTab('export');
+                  return;
+                }
+                const confirmed = await showConfirm(
+                  'Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.',
+                  'Xác nhận chuyển tab',
+                  'warning'
+                );
+                if (confirmed) setActiveTab('export');
+              }}
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'export'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              B6 - Xuất kho
+            </button>
+            <button
+              onClick={async () => {
+                if (activeTab !== 'inventory' || !hasUnsavedChanges) {
+                  setActiveTab('inventory');
+                  return;
+                }
+                const confirmed = await showConfirm(
+                  'Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.',
+                  'Xác nhận chuyển tab',
+                  'warning'
+                );
+                if (confirmed) setActiveTab('inventory');
+              }}
+              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                activeTab === 'inventory'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              B7 - Kiểm kê
+            </button>
+
           </nav>
         </div>
 
@@ -911,6 +1328,14 @@ const ShiftOperationsPage: React.FC = () => {
                                 min="0"
                                 value={reading.endValue}
                                 onChange={(e) => handlePumpReadingChange(pump.id, 'endValue', e.target.value)}
+                                onBlur={() => {
+                                  if (reading.endValue < reading.startValue && reading.endValue > 0) {
+                                    toast.error(`Số cuối (${reading.endValue}) không được nhỏ hơn số đầu (${reading.startValue})!`, {
+                                      position: 'top-right',
+                                      autoClose: 3000,
+                                    });
+                                  }
+                                }}
                                 onKeyDown={(e) => {
                                   // Chặn ký tự âm
                                   if (e.key === '-' || e.key === 'e' || e.key === 'E') {
@@ -1060,15 +1485,129 @@ const ShiftOperationsPage: React.FC = () => {
 
           {/* Tab 2: Debt Sales */}
           {activeTab === 'debt' && (
-            <div>
-              {isShiftOpen && (
-                <div className="mb-4">
-                  <button
-                    onClick={() => {
-                      setShowDebtSaleForm(!showDebtSaleForm);
-                      if (!showDebtSaleForm) {
-                        setDebtSaleFormPrice(0);
-                        setSelectedDebtCustomer(null);
+            <div className="space-y-6">
+              {/* Retail Responsibility Section */}
+              <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-sm mb-4">
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người chịu trách nhiệm doanh thu bán lẻ</h3>
+                <p className="text-sm text-gray-600 mb-3">
+                  Chọn nhân viên/cửa hàng trưởng chịu trách nhiệm thu tiền bán lẻ. Lượng bán lẻ sẽ được ghi nhận là công nợ của người này.
+                </p>
+                <div className="max-w-md">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nhân viên phụ trách <span className="text-red-500">*</span>
+                  </label>
+                  <SearchableSelect
+                    options={storeCustomers
+                      ?.filter((c: any) => c.type === 'INTERNAL')
+                      .map((customer: any) => ({
+                        value: customer.id,
+                        label: `${customer.code} - ${customer.name}`
+                      })) || []}
+                    value={retailCustomerId}
+                    onChange={(value) => setRetailCustomerId(value as number)}
+                    placeholder="-- Chọn nhân viên --"
+                    className="w-full"
+                  />
+                  {!retailCustomerId && Object.keys(declaredRetailQuantities).length > 0 && (
+                    <p className="mt-1 text-sm text-red-600">
+                      ⚠️ Vui lòng chọn người chịu trách nhiệm để ghi nhận công nợ bán lẻ.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Retail Quantity Verification Section */}
+              <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">⛽ Đối chiếu lượng hàng bán</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 text-xs uppercase text-gray-500">
+                        <th className="px-4 py-2 text-left">Sản phẩm</th>
+                        <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
+                        <th className="px-4 py-2 text-right">Bán nợ (2)</th>
+                        <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (3) *</th>
+                        <th className="px-4 py-2 text-right">Tổng bán (2+3)</th>
+                        <th className="px-4 py-2 text-right">Chênh lệch</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {(() => {
+                        // Get unique products from pumps
+                        const productIds = Array.from(new Set(Object.values(pumpReadings).map(r => r.productId)));
+
+                        return productIds.map(productId => {
+                          const product = products?.find(p => p.id === productId);
+
+                          // 1. Total Pump Quantity
+                          const pumpQty = Object.values(pumpReadings)
+                            .filter(r => r.productId === productId)
+                            .reduce((sum, r) => sum + calculateQuantity(r), 0);
+
+                          // 2. Total Debt Quantity
+                          const debtQty = draftDebtSales
+                            .filter(s => s.productId === productId)
+                            .reduce((sum, s) => sum + s.quantity, 0);
+
+                          // 3. Declared Retail Quantity
+                          const declaredQty = declaredRetailQuantities[productId] ?? 0;
+
+                          // Total Declared
+                          const totalDeclared = debtQty + declaredQty;
+
+                          // Difference
+                          const diff = pumpQty - totalDeclared;
+                          const isMatch = Math.abs(diff) < 0.1; // Allow small tolerance
+
+                          return (
+                            <tr key={productId} className={!isMatch ? 'bg-red-50' : ''}>
+                              <td className="px-4 py-3 font-medium text-gray-900">{product?.name || `ID: ${productId}`}</td>
+                              <td className="px-4 py-3 text-right font-bold text-blue-600">{pumpQty.toFixed(3)}</td>
+                              <td className="px-4 py-3 text-right text-gray-600">{debtQty.toFixed(3)}</td>
+                              <td className="px-4 py-3 text-right">
+                                <input
+                                  type="number"
+                                  step="0.001"
+                                  value={declaredRetailQuantities[productId] ?? ''}
+                                  onChange={(e) => {
+                                    const val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                                    setDeclaredRetailQuantities(prev => ({
+                                      ...prev,
+                                      [productId]: val
+                                    }));
+                                  }}
+                                  className={`w-full px-2 py-1 text-right border rounded focus:ring-2 focus:ring-blue-500 ${
+                                    !isMatch ? 'border-red-300 bg-white' : 'border-gray-300'
+                                  }`}
+                                  placeholder="0.000"
+                                />
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium">{totalDeclared.toFixed(3)}</td>
+                              <td className={`px-4 py-3 text-right font-bold ${isMatch ? 'text-green-600' : 'text-red-600'}`}>
+                                {diff.toFixed(3)}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-gray-500 mt-2 italic">
+                  * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu với tổng lượng bơm.
+                </p>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Danh sách bán nợ</h3>
+                {isShiftOpen && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => {
+                        setShowDebtSaleForm(!showDebtSaleForm);
+                        if (!showDebtSaleForm) {
+                          setDebtSaleFormPrice(0);
+                          setSelectedDebtCustomer(null);
                         setSelectedDebtProduct(null);
                       }
                     }}
@@ -1217,10 +1756,11 @@ const ShiftOperationsPage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+          </div>
           )}
 
-          {/* Tab 3: Cash Management (Thu & Nộp tiền) */}
-          {activeTab === 'cash' && (
+          {/* Tab 3: Receipts (Phiếu Thu) */}
+          {activeTab === 'receipt' && (
             <div className="space-y-6">
               {/* Section 1: Phiếu Thu Tiền */}
               <div className="border border-gray-200 rounded-lg p-4">
@@ -1239,7 +1779,12 @@ const ShiftOperationsPage: React.FC = () => {
                 )}
 
                 {showReceiptForm && (
-                  <form data-form="receipt" onSubmit={handleReceiptSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <form
+                    key={editingReceiptId || 'new'}
+                    data-form="receipt"
+                    onSubmit={handleReceiptSubmit}
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
                       <SearchableSelect
@@ -1254,29 +1799,50 @@ const ShiftOperationsPage: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền thu (₫) *</label>
-                      <input type="number" name="amount" step="1" min="0" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: 5000000" />
+                      <input
+                        type="number"
+                        name="amount"
+                        step="1"
+                        min="0"
+                        required
+                        defaultValue={editingReceiptId ? draftReceipts.find(r => r.id === editingReceiptId)?.amount : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="VD: 5000000"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
-                      <select name="paymentMethod" defaultValue="CASH" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                      <select
+                        name="paymentMethod"
+                        defaultValue={editingReceiptId ? draftReceipts.find(r => r.id === editingReceiptId)?.paymentMethod : 'CASH'}
+                        required
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      >
                         <option value="CASH">💵 Tiền mặt</option>
                         <option value="BANK_TRANSFER">🏦 Chuyển khoản</option>
                       </select>
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                      <input type="text" name="notes" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: Thu tiền hàng tháng 12" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <input
+                        type="text"
+                        name="notes"
+                        defaultValue={editingReceiptId ? draftReceipts.find(r => r.id === editingReceiptId)?.notes : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="VD: Thu tiền hàng tháng 12"
+                      />
                     </div>
 
                     <div className="md:col-span-2 flex justify-end space-x-3">
                       <button type="button" onClick={() => {
                         setShowReceiptForm(false);
                         setSelectedReceiptCustomer(null);
+                        setEditingReceiptId(null);
                       }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Hủy</button>
                       <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
-                        Thêm vào danh sách
+                        {editingReceiptId ? 'Cập nhật' : 'Thêm vào danh sách'}
                       </button>
                     </div>
                   </form>
@@ -1287,8 +1853,9 @@ const ShiftOperationsPage: React.FC = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -1304,18 +1871,21 @@ const ShiftOperationsPage: React.FC = () => {
                             <tr key={receipt.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">Chưa lưu</td>
                               <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || '-'}</td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">{Number(receipt.amount).toLocaleString('vi-VN')} ₫</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
-                                {receipt.notes || '-'}
-                                <button onClick={() => handleDeleteReceipt(receipt.id)} className="ml-4 text-red-600 hover:text-red-900" type="button">
-                                  <TrashIcon className="h-4 w-4 inline" />
+                              <td className="px-6 py-4 text-right text-sm font-medium">
+                                <button onClick={() => handleEditReceipt(receipt)} className="text-indigo-600 hover:text-indigo-900 mr-4" type="button">
+                                  <PencilIcon className="h-5 w-5 inline" />
+                                </button>
+                                <button onClick={() => handleDeleteReceipt(receipt.id)} className="text-red-600 hover:text-red-900" type="button">
+                                  <TrashIcon className="h-5 w-5 inline" />
                                 </button>
                               </td>
                             </tr>
                           );
                         })
                       ) : (
-                        <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu thu tiền </td></tr>
+                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu thu tiền </td></tr>
                       )
                     ) : (
                       // Data từ report khi ca đã chốt
@@ -1332,19 +1902,25 @@ const ShiftOperationsPage: React.FC = () => {
                             <tr key={receipt.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">{dayjs(receipt.createdAt).format('DD/MM/YYYY HH:mm')}</td>
                               <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">{Number(receipt.amount).toLocaleString('vi-VN')} ₫</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || '-'}</td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">{Number(receipt.amount).toLocaleString('vi-VN')} ₫</td>
+                              <td className="px-6 py-4 text-sm text-gray-500"></td>
                             </tr>
                           );
                         })
                       ) : (
-                        <tr><td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500">Không có phiếu thu tiền</td></tr>
+                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Không có phiếu thu tiền</td></tr>
                       )
                     )}
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
 
+          {/* Tab 4: Deposits (Phiếu Nộp) */}
+          {activeTab === 'deposit' && (
+            <div className="space-y-6">
               {/* Section 2: Phiếu Nộp Tiền */}
               <div className="border border-red-200 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Phiếu Nộp Tiền (Về công ty)</h3>
@@ -1362,25 +1938,55 @@ const ShiftOperationsPage: React.FC = () => {
                 )}
 
                 {showDepositForm && (
-                  <form data-form="deposit" onSubmit={handleDepositSubmit} className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <form
+                    key={editingDepositId || 'new'}
+                    data-form="deposit"
+                    onSubmit={handleDepositSubmit}
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền (₫) *</label>
-                      <input type="number" name="amount" step="1" min="0" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: 50000000" />
+                      <input
+                        type="number"
+                        name="amount"
+                        step="1"
+                        min="0"
+                        required
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.amount : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="VD: 50000000"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nộp *</label>
-                      <input type="date" name="depositDate" required defaultValue={dayjs().format('YYYY-MM-DD')} className="block w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input
+                        type="date"
+                        name="depositDate"
+                        required
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.depositDate : dayjs().format('YYYY-MM-DD')}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Giờ nộp</label>
-                      <input type="time" name="depositTime" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                      <input
+                        type="time"
+                        name="depositTime"
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.depositTime : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
                     </div>
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
-                      <select name="paymentMethod" defaultValue="CASH" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                      <select
+                        name="paymentMethod"
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.paymentMethod : 'CASH'}
+                        required
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      >
                         <option value="CASH">💵 Tiền mặt</option>
                         <option value="BANK_TRANSFER">🏦 Chuyển khoản</option>
                       </select>
@@ -1388,18 +1994,32 @@ const ShiftOperationsPage: React.FC = () => {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Người nhận</label>
-                      <input type="text" name="receiverName" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="Tên người nhận tiền" />
+                      <input
+                        type="text"
+                        name="receiverName"
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.receiverName : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Tên người nhận tiền"
+                      />
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                      <input type="text" name="notes" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" />
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <input
+                        type="text"
+                        name="notes"
+                        defaultValue={editingDepositId ? draftDeposits.find(d => d.id === editingDepositId)?.notes : ''}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
                     </div>
 
                     <div className="md:col-span-2 flex justify-end space-x-3">
-                      <button type="button" onClick={() => setShowDepositForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Hủy</button>
+                      <button type="button" onClick={() => {
+                        setShowDepositForm(false);
+                        setEditingDepositId(null);
+                      }} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">Hủy</button>
                       <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                        Thêm vào danh sách
+                        {editingDepositId ? 'Cập nhật' : 'Thêm vào danh sách'}
                       </button>
                     </div>
                   </form>
@@ -1410,9 +2030,10 @@ const ShiftOperationsPage: React.FC = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày nộp</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giờ</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -1423,18 +2044,21 @@ const ShiftOperationsPage: React.FC = () => {
                           <tr key={deposit.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">{dayjs(deposit.depositDate).format('DD/MM/YYYY')}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{Number(deposit.amount).toLocaleString('vi-VN')} ₫</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              {deposit.notes || '-'}
-                              <button onClick={() => handleDeleteDeposit(deposit.id)} className="ml-4 text-red-600 hover:text-red-900" type="button">
-                                <TrashIcon className="h-4 w-4 inline" />
+                            <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{Number(deposit.amount).toLocaleString('vi-VN')} ₫</td>
+                            <td className="px-6 py-4 text-right text-sm font-medium">
+                              <button onClick={() => handleEditDeposit(deposit)} className="text-indigo-600 hover:text-indigo-900 mr-4" type="button">
+                                <PencilIcon className="h-5 w-5 inline" />
+                              </button>
+                              <button onClick={() => handleDeleteDeposit(deposit.id)} className="text-red-600 hover:text-red-900" type="button">
+                                <TrashIcon className="h-5 w-5 inline" />
                               </button>
                             </td>
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nộp tiền </td></tr>
+                        <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nộp tiền </td></tr>
                       )
                     ) : (
                       // Data từ report khi ca đã chốt
@@ -1443,14 +2067,405 @@ const ShiftOperationsPage: React.FC = () => {
                           <tr key={deposit.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">{dayjs(deposit.depositDate).format('DD/MM/YYYY')}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || '-'}</td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{Number(deposit.amount).toLocaleString('vi-VN')} ₫</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || '-'}</td>
                             <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || '-'}</td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">{Number(deposit.amount).toLocaleString('vi-VN')} ₫</td>
+                            <td className="px-6 py-4 text-sm text-gray-500"></td>
                           </tr>
                         ))
                       ) : (
-                        <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Không có phiếu nộp tiền</td></tr>
+                        <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">Không có phiếu nộp tiền</td></tr>
                       )
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 5: Imports (Phiếu Nhập Hàng) */}
+          {activeTab === 'import' && (
+            <div className="space-y-6">
+              <div className="border border-blue-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Hàng</h3>
+
+                {isShiftOpen && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowImportForm(!showImportForm)}
+                      className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Tạo phiếu nhập
+                    </button>
+                  </div>
+                )}
+
+                {showImportForm && (
+                  <form
+                    data-form="import"
+                    onSubmit={handleImportSubmit}
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhập *</label>
+                      <input
+                        type="date"
+                        name="docDate"
+                        required
+                        defaultValue={dayjs().format('YYYY-MM-DD')}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
+                      <input
+                        type="text"
+                        name="supplierName"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Tên nhà cung cấp"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Số hóa đơn</label>
+                      <input
+                        type="text"
+                        name="invoiceNumber"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Số hóa đơn / chứng từ"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                      <input
+                        type="text"
+                        name="notes"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Ghi chú thêm..."
+                      />
+                    </div>
+
+                    {/* Simple Item Entry for now */}
+                    <div className="md:col-span-2 border-t pt-4 mt-2">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Chi tiết hàng hóa (Nhập nhanh)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Sản phẩm</label>
+                            <select name="productId" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                              <option value="">-- Chọn sản phẩm --</option>
+                              {products?.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                         </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Số lượng</label>
+                            <input type="number" name="quantity" step="0.01" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00" />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Đơn giá</label>
+                            <input type="number" name="unitPrice" step="1" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0" />
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 flex justify-end space-x-3 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowImportForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        Thêm phiếu nhập
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <table className="w-full border rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số HĐ</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {draftImports.length > 0 ? (
+                      draftImports.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4 text-sm text-gray-900">{dayjs(item.docDate).format('DD/MM/YYYY')}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.invoiceNumber || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">{Number(item.totalAmount || 0).toLocaleString('vi-VN')} ₫</td>
+                          <td className="px-6 py-4 text-right text-sm font-medium">
+                            <button onClick={() => handleDeleteImport(item.id)} className="text-red-600 hover:text-red-900" type="button">
+                              <TrashIcon className="h-5 w-5 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nhập hàng</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 6: Exports (Phiếu Xuất Hàng) */}
+          {activeTab === 'export' && (
+            <div className="space-y-6">
+              <div className="border border-orange-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Phiếu Xuất Hàng</h3>
+
+                {isShiftOpen && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowExportForm(!showExportForm)}
+                      className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Tạo phiếu xuất
+                    </button>
+                  </div>
+                )}
+
+                {showExportForm && (
+                  <form
+                    data-form="export"
+                    onSubmit={handleExportSubmit}
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày xuất *</label>
+                      <input
+                        type="date"
+                        name="docDate"
+                        required
+                        defaultValue={dayjs().format('YYYY-MM-DD')}
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Người nhận / Đơn vị</label>
+                      <input
+                        type="text"
+                        name="receiverName"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Tên người nhận"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                      <input
+                        type="text"
+                        name="notes"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Lý do xuất..."
+                      />
+                    </div>
+
+                    {/* Simple Item Entry for now */}
+                    <div className="md:col-span-2 border-t pt-4 mt-2">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Chi tiết hàng hóa (Xuất nhanh)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Sản phẩm</label>
+                            <select name="productId" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                              <option value="">-- Chọn sản phẩm --</option>
+                              {products?.map(p => (
+                                <option key={p.id} value={p.id}>{p.name}</option>
+                              ))}
+                            </select>
+                         </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Số lượng</label>
+                            <input type="number" name="quantity" step="0.01" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00" />
+                         </div>
+                         <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">Đơn giá (nếu có)</label>
+                            <input type="number" name="unitPrice" step="1" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0" />
+                         </div>
+                      </div>
+                    </div>
+
+                    <div className="md:col-span-2 flex justify-end space-x-3 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowExportForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                      >
+                        Thêm phiếu xuất
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <table className="w-full border rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {draftExports.length > 0 ? (
+                      draftExports.map((item) => (
+                        <tr key={item.id}>
+                          <td className="px-6 py-4 text-sm text-gray-900">{dayjs(item.docDate).format('DD/MM/YYYY')}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{item.notes || '-'}</td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">{Number(item.totalAmount || 0).toLocaleString('vi-VN')} ₫</td>
+                          <td className="px-6 py-4 text-right text-sm font-medium">
+                            <button onClick={() => handleDeleteExport(item.id)} className="text-red-600 hover:text-red-900" type="button">
+                              <TrashIcon className="h-5 w-5 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu xuất hàng</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 7: Inventory (Kiểm kê) */}
+          {activeTab === 'inventory' && (
+            <div className="space-y-6">
+              <div className="border border-purple-200 rounded-lg p-4">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Phiếu Kiểm Kê</h3>
+
+                {isShiftOpen && (
+                  <div className="mb-4">
+                    <button
+                      onClick={() => setShowInventoryForm(!showInventoryForm)}
+                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    >
+                      <PlusIcon className="h-5 w-5 mr-2" />
+                      Tạo phiếu kiểm kê
+                    </button>
+                  </div>
+                )}
+
+                {showInventoryForm && (
+                  <form
+                    data-form="inventory"
+                    onSubmit={handleInventorySubmit}
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                  >
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm *</label>
+                      <select name="productId" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg">
+                        <option value="">-- Chọn sản phẩm --</option>
+                        {products?.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tồn kho hệ thống</label>
+                      <input
+                        type="number"
+                        name="systemQuantity"
+                        step="0.01"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tồn kho thực tế *</label>
+                      <input
+                        type="number"
+                        name="actualQuantity"
+                        step="0.01"
+                        required
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="0.00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                      <input
+                        type="text"
+                        name="notes"
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                        placeholder="Ghi chú thêm..."
+                      />
+                    </div>
+
+                    <div className="md:col-span-2 flex justify-end space-x-3 mt-4">
+                      <button
+                        type="button"
+                        onClick={() => setShowInventoryForm(false)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      >
+                        Hủy
+                      </button>
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                      >
+                        Lưu phiếu kiểm kê
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <table className="w-full border rounded-lg">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tồn hệ thống</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thực tế</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chênh lệch</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {draftInventoryChecks.length > 0 ? (
+                      draftInventoryChecks.map((item) => {
+                        const product = products?.find(p => p.id === item.productId);
+                        return (
+                          <tr key={item.id}>
+                            <td className="px-6 py-4 text-sm text-gray-900">{product?.name || 'N/A'}</td>
+                            <td className="px-6 py-4 text-sm text-right text-gray-900">{Number(item.systemQuantity || 0).toLocaleString('vi-VN')}</td>
+                            <td className="px-6 py-4 text-sm text-right text-gray-900">{Number(item.actualQuantity || 0).toLocaleString('vi-VN')}</td>
+                            <td className={`px-6 py-4 text-sm text-right font-semibold ${item.difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                              {Number(item.difference || 0).toLocaleString('vi-VN')}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{item.notes || '-'}</td>
+                            <td className="px-6 py-4 text-right text-sm font-medium">
+                              <button onClick={() => handleDeleteInventory(item.id)} className="text-red-600 hover:text-red-900" type="button">
+                                <TrashIcon className="h-5 w-5 inline" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr><td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu kiểm kê</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1465,7 +2480,7 @@ const ShiftOperationsPage: React.FC = () => {
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg shadow p-6">
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <p className="text-sm text-yellow-700">
-              <strong>⚠️ Lưu ý:</strong> Các số liệu dưới đây là dữ liệu DRAFT (chưa lưu vào database).
+              <strong>⚠️ Lưu ý:</strong> Kiểm tra lại số cột bơm và thông tin các phiếu truớc khi chốt ca.
               Bấm "Chốt ca" để lưu toàn bộ dữ liệu.
             </p>
           </div>

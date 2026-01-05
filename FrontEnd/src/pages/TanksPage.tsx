@@ -13,7 +13,6 @@ const TanksPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStoreId, setFilterStoreId] = useState<number | 'all'>('all');
 
-  // State cho SearchableSelect
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 

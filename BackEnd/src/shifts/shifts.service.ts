@@ -396,7 +396,16 @@ export class ShiftsService {
       }
 
       // 7. Đóng ca
-      shift.closedAt = new Date();
+      if (closeShiftDto.closedAt) {
+        shift.closedAt = new Date(closeShiftDto.closedAt);
+        // Validate closedAt > openedAt
+        if (shift.openedAt && shift.closedAt < shift.openedAt) {
+           throw new BadRequestException('Thời gian đóng ca không thể trước thời gian mở ca');
+        }
+      } else {
+        shift.closedAt = new Date();
+      }
+
       shift.status = 'CLOSED';
       const updatedShift = await manager.save(shift);
 

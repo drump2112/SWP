@@ -1,3 +1,29 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Giảm kích thước tiêu đề */
+  h1 {
+    @apply text-2xl !important;
+  }
+  h2 {
+    @apply text-xl !important;
+  }
+  h3 {
+    @apply text-base !important;
+  }
+
+  /* Tăng kích thước font trong bảng */
+  th {
+    @apply text-sm !important;
+  }
+  td {
+    @apply text-base !important;
+  }
+
+  /* Tăng padding cho bảng để thoáng hơn */
+  td, th {
+    @apply py-4 px-4 !important;
+  }
+}

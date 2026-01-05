@@ -113,7 +113,9 @@ export class CustomersService {
         .where('cs.store_id = :storeId', { storeId })
         .getMany();
     }
-    return this.customerRepository.find();
+    return this.customerRepository.find({
+      relations: ['customerStores', 'customerStores.store'],
+    });
   }
 
   async findOne(id: number): Promise<Customer> {
@@ -125,9 +127,25 @@ export class CustomersService {
   }
 
   async update(id: number, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
+    const { storeId, ...customerData } = updateCustomerDto;
     const customer = await this.findOne(id);
-    Object.assign(customer, updateCustomerDto);
-    return this.customerRepository.save(customer);
+    Object.assign(customer, customerData);
+    const savedCustomer = await this.customerRepository.save(customer);
+
+    if (storeId) {
+      // Update store association
+      // First, remove all existing associations for this customer
+      await this.customerStoreRepository.delete({ customerId: id });
+
+      // Then create new association
+      const customerStore = this.customerStoreRepository.create({
+        customerId: id,
+        storeId: storeId,
+      });
+      await this.customerStoreRepository.save(customerStore);
+    }
+
+    return savedCustomer;
   }
 
   async remove(id: number): Promise<void> {
@@ -220,6 +238,55 @@ export class CustomersService {
     };
   }
 
+  async getAllCreditStatus(storeId?: number) {
+    // 1. Lấy danh sách khách hàng (có thể filter theo store nếu cần thiết,
+    // nhưng hiện tại customer là global, chỉ debt là theo store)
+    // Tuy nhiên, để tính debt chính xác theo store, ta cần join với debt_ledger
+
+    const query = this.customerRepository.createQueryBuilder('c')
+      .select([
+        'c.id as "customerId"',
+        'c.name as "customerName"',
+        'c.code as "customerCode"',
+        'c.type as "customerType"',
+        'c.credit_limit as "creditLimit"'
+      ])
+      .addSelect(subQuery => {
+        return subQuery
+          .select('COALESCE(SUM(dl.debit - dl.credit), 0)')
+          .from(DebtLedger, 'dl')
+          .where('dl.customer_id = c.id')
+          .andWhere(storeId ? 'dl.store_id = :storeId' : '1=1', { storeId });
+      }, 'currentDebt');
+
+    // Nếu có storeId, có thể muốn chỉ lấy những khách hàng đã từng giao dịch ở store đó?
+    // Hoặc lấy tất cả khách hàng nhưng debt chỉ tính ở store đó.
+    // Ở đây ta lấy tất cả khách hàng.
+
+    const results = await query.getRawMany();
+
+    return results.map(row => {
+      const creditLimit = Number(row.creditLimit || 0);
+      const currentDebt = Number(row.currentDebt || 0);
+      const availableCredit = creditLimit - currentDebt;
+      const creditUsagePercent = creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
+
+      return {
+        customerId: row.customerId,
+        customerName: row.customerName,
+        customerCode: row.customerCode,
+        customerType: row.customerType,
+        storeId,
+        creditLimit,
+        currentDebt,
+        availableCredit,
+        creditUsagePercent: Math.round(creditUsagePercent * 100) / 100,
+        isOverLimit: currentDebt > creditLimit,
+        warningLevel: this.getCreditWarningLevel(creditUsagePercent),
+      };
+    });
+  }
+
   async getCreditStatus(customerId: number, storeId?: number) {
     // Get customer info including credit limit
     const customer = await this.findOne(customerId);
@@ -236,6 +303,7 @@ export class CustomersService {
       customerId,
       customerName: customer.name,
       customerCode: customer.code,
+      customerType: customer.type,
       storeId,
       creditLimit,
       currentDebt: balance,

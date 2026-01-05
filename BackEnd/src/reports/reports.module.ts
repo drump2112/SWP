@@ -10,6 +10,7 @@ import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
+import { PumpReading } from '../entities/pump-reading.entity';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 
@@ -26,6 +27,7 @@ import { ReportsController } from './reports.controller';
       ShiftDebtSale,
       Receipt,
       CashDeposit,
+      PumpReading,
     ]),
   ],
   controllers: [ReportsController],

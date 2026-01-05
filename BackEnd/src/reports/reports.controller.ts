@@ -49,18 +49,60 @@ export class ReportsController {
   }
 
   @Get('sales')
-  @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesReport(
+    @CurrentUser() user: any,
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
     @Query('storeIds') storeIds?: string,
     @Query('productId') productId?: string,
   ) {
+    // Nếu user là STORE, tự động lấy storeId của user
+    let effectiveStoreIds: number[] | undefined;
+
+    if (user.roleCode === 'STORE') {
+      effectiveStoreIds = [user.storeId];
+    } else if (storeIds) {
+      effectiveStoreIds = storeIds.split(',').map(Number);
+    }
+
     return this.reportsService.getSalesReport(
       new Date(fromDate),
       new Date(toDate),
-      storeIds ? storeIds.split(',').map(Number) : undefined,
+      effectiveStoreIds,
       productId ? +productId : undefined,
+    );
+  }
+
+  @Get('sales/by-pump')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByPumpReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+    return this.reportsService.getSalesByPumpReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
+    );
+  }
+
+  @Get('sales/by-product')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByProductReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+    return this.reportsService.getSalesByProductReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
     );
   }
 

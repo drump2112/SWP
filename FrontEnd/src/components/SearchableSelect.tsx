@@ -87,7 +87,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       borderRadius: '0.5rem',
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       marginTop: '4px',
-      zIndex: 50,
+      zIndex: 9999, // Increased z-index to appear above modals
     }),
     menuList: (provided) => ({
       ...provided,
@@ -161,7 +161,27 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         noOptionsMessage={() => 'Không tìm thấy kết quả'}
         loadingMessage={() => 'Đang tải...'}
         menuPortalTarget={document.body}
+        styles={{
+          ...customStyles,
+          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+        }}
       />
+      {required && (
+        <input
+          tabIndex={-1}
+          autoComplete="off"
+          style={{
+            opacity: 0,
+            width: '100%',
+            height: 1,
+            position: 'absolute',
+            bottom: 0,
+          }}
+          value={value ? (Array.isArray(value) ? (value.length ? 'valid' : '') : value) : ''}
+          onChange={() => {}}
+          required={true}
+        />
+      )}
     </div>
   );
 };

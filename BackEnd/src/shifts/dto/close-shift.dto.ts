@@ -64,4 +64,8 @@ export class CloseShiftDto {
   @ValidateNested({ each: true })
   @Type(() => ExpenseDto)
   expenses?: ExpenseDto[];
+
+  @IsOptional()
+  @IsDateString()
+  closedAt?: string;
 }
