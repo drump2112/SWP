@@ -4,6 +4,7 @@ import { InventoryDocument } from '../entities/inventory-document.entity';
 import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { InventoryLedger } from '../entities/inventory-ledger.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { Tank } from '../entities/tank.entity';
 import { InventoryService } from './inventory.service';
 import { InventoryController } from './inventory.controller';
 
@@ -14,6 +15,7 @@ import { InventoryController } from './inventory.controller';
       InventoryDocumentItem,
       InventoryLedger,
       Warehouse,
+      Tank,
     ]),
   ],
   controllers: [InventoryController],

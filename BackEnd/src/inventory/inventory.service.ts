@@ -5,6 +5,7 @@ import { InventoryDocument } from '../entities/inventory-document.entity';
 import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { InventoryLedger } from '../entities/inventory-ledger.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { Tank } from '../entities/tank.entity';
 import { CreateInventoryDocumentDto } from './dto/create-inventory-document.dto';
 
 @Injectable()
@@ -18,17 +19,44 @@ export class InventoryService {
     private inventoryLedgerRepository: Repository<InventoryLedger>,
     @InjectRepository(Warehouse)
     private warehouseRepository: Repository<Warehouse>,
+    @InjectRepository(Tank)
+    private tankRepository: Repository<Tank>,
     private dataSource: DataSource,
   ) {}
 
   async createDocument(createDto: CreateInventoryDocumentDto) {
+    let warehouseId = createDto.warehouseId;
+    if (!warehouseId && createDto.storeId) {
+      const warehouse = await this.warehouseRepository.findOne({
+        where: { storeId: createDto.storeId },
+      });
+      if (warehouse) {
+        warehouseId = warehouse.id;
+      } else {
+        // Auto create warehouse for store if not exists
+        const newWarehouse = this.warehouseRepository.create({
+          storeId: createDto.storeId,
+          type: 'STORE',
+        });
+        const savedWarehouse = await this.warehouseRepository.save(newWarehouse);
+        warehouseId = savedWarehouse.id;
+      }
+    }
+
+    if (!warehouseId) {
+      throw new Error('Warehouse ID or Store ID is required');
+    }
+
     return this.dataSource.transaction(async (manager) => {
       // 1. Tạo document
       const document = manager.create(InventoryDocument, {
-        warehouseId: createDto.warehouseId,
+        warehouseId: warehouseId,
         docType: createDto.docType,
         docDate: new Date(createDto.docDate),
         status: 'COMPLETED',
+        supplierName: createDto.supplierName,
+        invoiceNumber: createDto.invoiceNumber,
+        licensePlate: createDto.licensePlate,
       });
       const savedDocument = await manager.save(InventoryDocument, document);
 
@@ -39,20 +67,35 @@ export class InventoryService {
           productId: item.productId,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
+          tankId: item.tankId,
         });
         await manager.save(InventoryDocumentItem, docItem);
 
         // Ghi inventory ledger
         const isInbound = ['IMPORT', 'TRANSFER_IN'].includes(createDto.docType);
         const ledger = manager.create(InventoryLedger, {
-          warehouseId: createDto.warehouseId,
+          warehouseId: warehouseId,
           productId: item.productId,
           refType: createDto.docType,
           refId: savedDocument.id,
           quantityIn: isInbound ? item.quantity : 0,
           quantityOut: isInbound ? 0 : item.quantity,
+          tankId: item.tankId,
         });
         await manager.save(InventoryLedger, ledger);
+
+        // Update Tank Stock if tankId is present
+        if (item.tankId) {
+          const tank = await manager.findOne(Tank, { where: { id: item.tankId } });
+          if (tank) {
+            if (isInbound) {
+              tank.currentStock = Number(tank.currentStock) + Number(item.quantity);
+            } else {
+              tank.currentStock = Number(tank.currentStock) - Number(item.quantity);
+            }
+            await manager.save(Tank, tank);
+          }
+        }
       }
 
       return savedDocument;

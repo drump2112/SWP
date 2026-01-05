@@ -18,7 +18,9 @@ import StoreDetailPage from './pages/StoreDetailPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerCreditPage from './pages/CustomerCreditPage';
 import DebtReportPage from './pages/DebtReportPage';
+import SalesReportPage from './pages/SalesReportPage';
 import CashReportPage from './pages/CashReportPage';
+import InventoryImportPage from './pages/InventoryImportPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +44,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <DashboardPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inventory/import"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <InventoryImportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
@@ -162,6 +174,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <DebtReportPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/sales"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SalesReportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

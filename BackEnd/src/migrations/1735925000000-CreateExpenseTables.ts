@@ -106,52 +106,68 @@ export class CreateExpenseTables1735925000000 implements MigrationInterface {
 
     // 3. Tạo indexes
     await queryRunner.query(
-      `CREATE INDEX idx_expenses_store ON expenses (store_id, created_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_expenses_store ON expenses (store_id, created_at)`,
     );
     await queryRunner.query(
-      `CREATE INDEX idx_expenses_shift ON expenses (shift_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_expenses_shift ON expenses (shift_id)`,
     );
 
     // 4. Tạo foreign keys
-    await queryRunner.createForeignKey(
-      'expenses',
-      new TableForeignKey({
-        columnNames: ['store_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'stores',
-        onDelete: 'RESTRICT',
-      }),
-    );
+    const expensesTable = await queryRunner.getTable('expenses');
 
-    await queryRunner.createForeignKey(
-      'expenses',
-      new TableForeignKey({
-        columnNames: ['shift_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'shifts',
-        onDelete: 'SET NULL',
-      }),
-    );
+    if (expensesTable) {
+        const storeFk = expensesTable.foreignKeys.find(fk => fk.columnNames.indexOf('store_id') !== -1);
+        if (!storeFk) {
+            await queryRunner.createForeignKey(
+              'expenses',
+              new TableForeignKey({
+                columnNames: ['store_id'],
+                referencedColumnNames: ['id'],
+                referencedTableName: 'stores',
+                onDelete: 'RESTRICT',
+              }),
+            );
+        }
 
-    await queryRunner.createForeignKey(
-      'expenses',
-      new TableForeignKey({
-        columnNames: ['expense_category_id'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'expense_categories',
-        onDelete: 'RESTRICT',
-      }),
-    );
+        const shiftFk = expensesTable.foreignKeys.find(fk => fk.columnNames.indexOf('shift_id') !== -1);
+        if (!shiftFk) {
+            await queryRunner.createForeignKey(
+              'expenses',
+              new TableForeignKey({
+                columnNames: ['shift_id'],
+                referencedColumnNames: ['id'],
+                referencedTableName: 'shifts',
+                onDelete: 'SET NULL',
+              }),
+            );
+        }
 
-    await queryRunner.createForeignKey(
-      'expenses',
-      new TableForeignKey({
-        columnNames: ['created_by'],
-        referencedColumnNames: ['id'],
-        referencedTableName: 'users',
-        onDelete: 'SET NULL',
-      }),
-    );
+        const categoryFk = expensesTable.foreignKeys.find(fk => fk.columnNames.indexOf('expense_category_id') !== -1);
+        if (!categoryFk) {
+            await queryRunner.createForeignKey(
+              'expenses',
+              new TableForeignKey({
+                columnNames: ['expense_category_id'],
+                referencedColumnNames: ['id'],
+                referencedTableName: 'expense_categories',
+                onDelete: 'RESTRICT',
+              }),
+            );
+        }
+
+        const userFk = expensesTable.foreignKeys.find(fk => fk.columnNames.indexOf('created_by') !== -1);
+        if (!userFk) {
+            await queryRunner.createForeignKey(
+              'expenses',
+              new TableForeignKey({
+                columnNames: ['created_by'],
+                referencedColumnNames: ['id'],
+                referencedTableName: 'users',
+                onDelete: 'SET NULL',
+              }),
+            );
+        }
+    }
 
     // 5. Insert dữ liệu mẫu cho expense_categories
     await queryRunner.query(`
@@ -160,6 +176,7 @@ export class CreateExpenseTables1735925000000 implements MigrationInterface {
       ('641', 'Chi phí bán hàng', 'Chi phí phát sinh trong quá trình tiêu thụ sản phẩm'),
       ('627', 'Chi phí dịch vụ mua ngoài', 'Chi phí dịch vụ thuê ngoài'),
       ('811', 'Chi phí khác', 'Các khoản chi phí khác')
+      ON CONFLICT (code) DO NOTHING
     `);
   }
 

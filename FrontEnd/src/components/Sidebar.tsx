@@ -68,8 +68,9 @@ const navigation: NavItem[] = [
     name: 'Quản lý kho',
     href: '/inventory',
     icon: CircleStackIcon,
-    roles: ['ADMIN', 'DIRECTOR'],
+    roles: ['ADMIN', 'DIRECTOR', 'STORE'],
     children: [
+      { name: 'Nhập kho', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE'] },
       { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],

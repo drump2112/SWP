@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { InventoryDocument } from './inventory-document.entity';
 import { Product } from './product.entity';
+import { Tank } from './tank.entity';
 
 @Entity('inventory_document_items')
 export class InventoryDocumentItem {
@@ -18,6 +19,9 @@ export class InventoryDocumentItem {
 
   @Column({ name: 'product_id', nullable: true })
   productId: number;
+
+  @Column({ name: 'tank_id', nullable: true })
+  tankId: number;
 
   @Column({
     type: 'decimal',
@@ -46,4 +50,8 @@ export class InventoryDocumentItem {
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @ManyToOne(() => Tank)
+  @JoinColumn({ name: 'tank_id' })
+  tank: Tank;
 }

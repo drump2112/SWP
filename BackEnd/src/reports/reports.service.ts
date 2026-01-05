@@ -322,7 +322,7 @@ export class ReportsService {
   // ==================== CÁC BÁO CÁO KHÁC ====================
 
   // Báo cáo doanh thu theo cửa hàng
-  async getSalesReport(fromDate: Date, toDate: Date, storeId?: number) {
+  async getSalesReport(fromDate: Date, toDate: Date, storeIds?: number[], productId?: number) {
     const query = this.saleRepository
       .createQueryBuilder('s')
       .leftJoin('s.shift', 'shift')
@@ -341,8 +341,12 @@ export class ReportsService {
       .addGroupBy('product.id')
       .addGroupBy('product.name');
 
-    if (storeId) {
-      query.andWhere('s.store_id = :storeId', { storeId });
+    if (storeIds && storeIds.length > 0) {
+      query.andWhere('s.store_id IN (:...storeIds)', { storeIds });
+    }
+
+    if (productId) {
+      query.andWhere('s.product_id = :productId', { productId });
     }
 
     return query.getRawMany();

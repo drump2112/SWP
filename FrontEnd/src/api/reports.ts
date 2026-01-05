@@ -112,7 +112,39 @@ export interface CashReportData {
   }>;
 }
 
+export interface SalesReportParams {
+  fromDate: string;
+  toDate: string;
+  storeIds?: number[];
+  productId?: number;
+}
+
+export interface SalesReportItem {
+  storeId: number;
+  storeName: string;
+  productId: number;
+  productName: string;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
 export const reportsApi = {
+  // Báo cáo doanh thu bán hàng
+  getSalesReport: async (params: SalesReportParams): Promise<SalesReportItem[]> => {
+    const queryParams: any = {
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+    };
+    if (params.storeIds && params.storeIds.length > 0) {
+      queryParams.storeIds = params.storeIds.join(',');
+    }
+    if (params.productId) {
+      queryParams.productId = params.productId;
+    }
+    const { data } = await api.get('/reports/sales', { params: queryParams });
+    return data;
+  },
+
   // Báo cáo công nợ
   getDebtReport: async (params: DebtReportParams): Promise<DebtReportItem[]> => {
     const { data } = await api.get('/reports/debt', { params });

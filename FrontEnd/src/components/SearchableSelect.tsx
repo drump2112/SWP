@@ -1,5 +1,5 @@
 import React from 'react';
-import Select from 'react-select';
+import Select, { type MultiValue, type SingleValue } from 'react-select';
 import type { StylesConfig, GroupBase } from 'react-select';
 
 interface Option {
@@ -9,12 +9,13 @@ interface Option {
 
 interface SearchableSelectProps {
   options: Option[];
-  value?: string | number | null;
-  onChange: (value: string | number | null) => void;
+  value?: string | number | null | (string | number)[];
+  onChange: (value: string | number | null | (string | number)[]) => void;
   placeholder?: string;
   className?: string;
   isDisabled?: boolean;
   isClearable?: boolean;
+  isMulti?: boolean;
   name?: string;
   required?: boolean;
 }
@@ -27,12 +28,34 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   className = '',
   isDisabled = false,
   isClearable = false,
+  isMulti = false,
   name,
   required = false,
 }) => {
-  const selectedOption = options.find((opt) => opt.value === value) || null;
+  // Handle value for both single and multi select
+  const getValue = () => {
+    if (isMulti) {
+      if (Array.isArray(value)) {
+        return options.filter((opt) => value.includes(opt.value));
+      }
+      return [];
+    }
+    return options.find((opt) => opt.value === value) || null;
+  };
 
-  const customStyles: StylesConfig<Option, false, GroupBase<Option>> = {
+  const handleChange = (
+    newValue: SingleValue<Option> | MultiValue<Option>
+  ) => {
+    if (isMulti) {
+      const multiValue = newValue as MultiValue<Option>;
+      onChange(multiValue.map((opt) => opt.value));
+    } else {
+      const singleValue = newValue as SingleValue<Option>;
+      onChange(singleValue ? singleValue.value : null);
+    }
+  };
+
+  const customStyles: StylesConfig<Option, boolean, GroupBase<Option>> = {
     control: (provided, state) => ({
       ...provided,
       minHeight: '42px',
@@ -64,6 +87,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       borderRadius: '0.5rem',
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       marginTop: '4px',
+      zIndex: 50,
     }),
     menuList: (provided) => ({
       ...provided,
@@ -86,6 +110,24 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       color: '#1f2937',
       fontSize: '0.875rem',
     }),
+    multiValue: (provided) => ({
+      ...provided,
+      backgroundColor: '#eff6ff',
+      borderRadius: '0.375rem',
+    }),
+    multiValueLabel: (provided) => ({
+      ...provided,
+      color: '#1d4ed8',
+      fontSize: '0.875rem',
+    }),
+    multiValueRemove: (provided) => ({
+      ...provided,
+      color: '#1d4ed8',
+      ':hover': {
+        backgroundColor: '#dbeafe',
+        color: '#1e40af',
+      },
+    }),
     dropdownIndicator: (provided) => ({
       ...provided,
       color: '#6b7280',
@@ -105,18 +147,20 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   return (
     <div className={className}>
       <Select
-        name={name}
+        value={getValue()}
+        onChange={handleChange}
         options={options}
-        value={selectedOption}
-        onChange={(option) => onChange(option ? option.value : null)}
         placeholder={placeholder}
         isDisabled={isDisabled}
         isClearable={isClearable}
+        isMulti={isMulti}
         isSearchable
         styles={customStyles}
+        name={name}
+        required={required}
         noOptionsMessage={() => 'Không tìm thấy kết quả'}
         loadingMessage={() => 'Đang tải...'}
-        required={required}
+        menuPortalTarget={document.body}
       />
     </div>
   );

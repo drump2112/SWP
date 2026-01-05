@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class InventoryItemDto {
@@ -10,12 +10,20 @@ class InventoryItemDto {
 
   @IsNotEmpty()
   unitPrice: number;
+
+  @IsInt()
+  @IsOptional()
+  tankId?: number;
 }
 
 export class CreateInventoryDocumentDto {
   @IsInt()
-  @IsNotEmpty()
-  warehouseId: number;
+  @IsOptional()
+  warehouseId?: number;
+
+  @IsInt()
+  @IsOptional()
+  storeId?: number;
 
   @IsString()
   @IsNotEmpty()
@@ -24,6 +32,18 @@ export class CreateInventoryDocumentDto {
   @IsDateString()
   @IsNotEmpty()
   docDate: string;
+
+  @IsString()
+  @IsOptional()
+  supplierName?: string;
+
+  @IsString()
+  @IsOptional()
+  invoiceNumber?: string;
+
+  @IsString()
+  @IsOptional()
+  licensePlate?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

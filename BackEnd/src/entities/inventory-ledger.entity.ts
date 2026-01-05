@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Warehouse } from './warehouse.entity';
 import { Product } from './product.entity';
+import { Tank } from './tank.entity';
 
 @Entity('inventory_ledger')
 @Index('idx_inventory_ledger_lookup', ['warehouseId', 'productId', 'createdAt'])
@@ -21,6 +22,9 @@ export class InventoryLedger {
 
   @Column({ name: 'product_id' })
   productId: number;
+
+  @Column({ name: 'tank_id', nullable: true })
+  tankId: number;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
   refType: string;
@@ -56,4 +60,8 @@ export class InventoryLedger {
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'product_id' })
   product: Product;
+
+  @ManyToOne(() => Tank)
+  @JoinColumn({ name: 'tank_id' })
+  tank: Tank;
 }

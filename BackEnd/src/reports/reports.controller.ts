@@ -53,12 +53,14 @@ export class ReportsController {
   getSalesReport(
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
-    @Query('storeId') storeId?: string,
+    @Query('storeIds') storeIds?: string,
+    @Query('productId') productId?: string,
   ) {
     return this.reportsService.getSalesReport(
       new Date(fromDate),
       new Date(toDate),
-      storeId ? +storeId : undefined,
+      storeIds ? storeIds.split(',').map(Number) : undefined,
+      productId ? +productId : undefined,
     );
   }
 

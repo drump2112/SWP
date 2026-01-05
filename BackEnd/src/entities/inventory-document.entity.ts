@@ -30,6 +30,15 @@ export class InventoryDocument {
   @Column({ length: 20, nullable: true })
   status: string;
 
+  @Column({ name: 'supplier_name', length: 255, nullable: true })
+  supplierName: string;
+
+  @Column({ name: 'invoice_number', length: 50, nullable: true })
+  invoiceNumber: string;
+
+  @Column({ name: 'license_plate', length: 20, nullable: true })
+  licensePlate: string;
+
   @ManyToOne(() => Warehouse)
   @JoinColumn({ name: 'warehouse_id' })
   warehouse: Warehouse;
