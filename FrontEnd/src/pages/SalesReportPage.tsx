@@ -189,6 +189,9 @@ const SalesReportPage: React.FC = () => {
                         </th>
                       )}
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Đơn giá
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Số lượng (Lít)
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -205,10 +208,13 @@ const SalesReportPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {item.productName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-mono">
+                          {formatCurrency(Number(item.unitPrice))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
                           {formatNumber(Number(item.totalQuantity))}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold font-mono">
                           {formatCurrency(Number(item.totalAmount))}
                         </td>
                       </tr>
@@ -219,10 +225,13 @@ const SalesReportPage: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                           {item.productName}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-mono">
+                          {formatCurrency(Number(item.unitPrice))}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
                           {formatNumber(Number(item.totalQuantity))}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold font-mono">
                           {formatCurrency(Number(item.totalAmount))}
                         </td>
                       </tr>
@@ -230,17 +239,17 @@ const SalesReportPage: React.FC = () => {
 
                     {/* Summary Row */}
                     <tr className="bg-gray-50 font-bold">
-                      <td colSpan={reportType === 'pump' ? 2 : 1} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                      <td colSpan={reportType === 'pump' ? 3 : 2} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                         Tổng cộng:
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
                         {formatNumber(
                           (reportType === 'pump' ? pumpReport : productReport)?.reduce(
                             (sum, item) => sum + Number(item.totalQuantity), 0
                           ) || 0
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-mono">
                         {formatCurrency(
                           (reportType === 'pump' ? pumpReport : productReport)?.reduce(
                             (sum, item) => sum + Number(item.totalAmount), 0

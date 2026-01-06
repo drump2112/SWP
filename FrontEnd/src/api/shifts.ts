@@ -7,12 +7,24 @@ export interface PumpReadingDto {
   endValue: number;
 }
 
+export interface InventoryImportDto {
+  docDate: string;
+  supplierName?: string;
+  invoiceNumber?: string;
+  licensePlate: string;
+  driverName?: string;
+  productId: number;
+  quantity: number;
+  notes?: string;
+}
+
 export interface CloseShiftDto {
   shiftId: number;
   pumpReadings: PumpReadingDto[];
   debtSales?: ShiftDebtSaleDto[];
   receipts?: CreateReceiptDto[];
   deposits?: CashDepositDto[];
+  inventoryImports?: InventoryImportDto[];
   closedAt?: string;
 }
 

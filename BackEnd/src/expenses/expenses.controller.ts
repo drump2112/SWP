@@ -57,4 +57,11 @@ export class ExpensesController {
     await this.expensesService.deleteExpense(+id);
     return { message: 'Đã xóa chi phí' };
   }
+
+
+  @Delete(':id')
+  async delete2(@Param('id') id: string) {
+    await this.expensesService.deleteExpense(+id);
+    return { message: 'Đã xóa chi phí' };
+  }
 }

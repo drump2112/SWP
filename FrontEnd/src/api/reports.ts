@@ -133,6 +133,7 @@ export interface SalesByPumpItem {
   pumpCode: string;
   pumpName: string;
   productName: string;
+  unitPrice: number;
   totalQuantity: number;
   totalAmount: number;
 }
@@ -140,6 +141,7 @@ export interface SalesByPumpItem {
 export interface SalesByProductItem {
   productId: number;
   productName: string;
+  unitPrice: number;
   totalQuantity: number;
   totalAmount: number;
 }

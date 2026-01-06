@@ -14,6 +14,7 @@ import { CashLedger } from '../entities/cash-ledger.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { Expense } from '../entities/expense.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
@@ -47,6 +48,8 @@ export class ShiftsService {
     private receiptDetailRepository: Repository<ReceiptDetail>,
     @InjectRepository(Expense)
     private expenseRepository: Repository<Expense>,
+    @InjectRepository(Warehouse)
+    private warehouseRepository: Repository<Warehouse>,
     private dataSource: DataSource,
   ) {}
 
@@ -170,7 +173,8 @@ export class ShiftsService {
         .values(pumpReadingsData)
         .execute();
 
-      // 2. Tạo sales từ pump readings (đã có giá từ priceMap ở trên)
+      // 2. ✅ Tạo sales từ pump readings - ĐÂY LÀ BÁN LẺ (customerId = null)
+      // Bán lẻ = Thu tiền mặt ngay, KHÔNG ghi công nợ
       const salesData = pumpReadingsData.map(reading => {
         const unitPrice = priceMap.get(reading.productId)!; // Safe after validation
         return {
@@ -180,7 +184,7 @@ export class ShiftsService {
           quantity: reading.quantity,
           unitPrice,
           amount: reading.quantity * unitPrice,
-          customerId: undefined, // Bán lẻ
+          customerId: undefined, // ✅ NULL = Bán lẻ (không phải công nợ)
         };
       });
 
@@ -193,38 +197,42 @@ export class ShiftsService {
           .execute();
       }
 
-      // 4. Cập nhật tồn kho BỂ CHỨA (tanks) thay vì warehouse
-      // Lấy thông tin pumps để biết tank_id
-      const pumpCodes = closeShiftDto.pumpReadings.map(r => r.pumpCode);
-      const pumps = await manager
-        .createQueryBuilder('pumps', 'p')
-        .where('p.pump_code IN (:...pumpCodes)', { pumpCodes })
-        .andWhere('p.store_id = :storeId', { storeId: shift.storeId })
-        .getMany();
+      // 4. ✅ GHI VÀO INVENTORY LEDGER theo cửa hàng (không theo bồn bể)
+      // Lấy warehouse của cửa hàng
+      const warehouse = await manager.findOne(Warehouse, {
+        where: { storeId: shift.storeId, type: 'STORE' },
+      });
 
-      const pumpMap = new Map(pumps.map(p => [p.pumpCode, p]));
-
-      // Cập nhật currentStock cho từng tank
-      for (const reading of pumpReadingsData) {
-        const pump = pumpMap.get(reading.pumpCode);
-        if (pump && pump.tankId) {
-          // Giảm tồn kho bể
-          await manager
-            .createQueryBuilder()
-            .update('tanks')
-            .set({
-              currentStock: () => `current_stock - ${reading.quantity}`,
-            })
-            .where('id = :tankId', { tankId: pump.tankId })
-            .execute();
-
-          console.log(`📉 Tank ${pump.tankId}: Giảm ${reading.quantity} lít`);
-        } else {
-          console.warn(`⚠️ Pump ${reading.pumpCode} không có tankId, bỏ qua cập nhật tồn kho`);
-        }
+      if (!warehouse) {
+        throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
       }
 
-      // 5. ⚠️ GHI SỔ QUỸ: Thu tiền bán lẻ
+      // Ghi xuất kho vào InventoryLedger cho từng pump reading
+      // Gom theo productId để giảm số lượng record
+      const productSales = new Map<number, number>();
+      for (const reading of pumpReadingsData) {
+        const current = productSales.get(reading.productId) || 0;
+        productSales.set(reading.productId, current + reading.quantity);
+      }
+
+      // Ghi xuất kho theo sản phẩm
+      for (const [productId, totalQuantity] of productSales.entries()) {
+        await manager.save(InventoryLedger, {
+          warehouseId: warehouse.id,
+          productId: productId,
+          tankId: null, // Quản lý theo cửa hàng, không theo bể
+          refType: 'SHIFT_SALE',
+          refId: shift.id,
+          quantityIn: 0,
+          quantityOut: totalQuantity,
+        });
+
+        console.log(`📉 Warehouse ${warehouse.id}: Ghi xuất ${totalQuantity} lít sản phẩm ${productId} (Shift ${shift.id})`);
+      }
+
+      // 5. ✅ GHI SỔ QUỸ: Thu tiền bán lẻ (QUAN TRỌNG!)
+      // Bán lẻ = Thu tiền mặt ngay → Ghi cashIn vào cash_ledger
+      // KHÔNG ghi debt_ledger vì không phải công nợ
       // NOTE: Logic hiện tại giả định TOÀN BỘ bán lẻ là tiền mặt
       // Trong thực tế, cần phân biệt: tiền mặt / thẻ / ví điện tử
       // TODO: Thêm payment_method cho mỗi sale hoặc thêm field cash_amount vào CloseShiftDto
@@ -235,14 +243,16 @@ export class ShiftsService {
           storeId: shift.storeId,
           refType: 'SHIFT_CLOSE',
           refId: shift.id,
-          cashIn: totalRetailAmount,
+          cashIn: totalRetailAmount,  // ✅ Thu tiền vào quỹ
           cashOut: 0,
           notes: 'Thu tiền bán lẻ (giả định toàn bộ là tiền mặt)',
         });
       }
 
       // 6. Xử lý DRAFT DATA: Debt Sales, Receipts, Deposits
-      // 6.1. Xử lý Debt Sales (bán công nợ)
+      // 6.1. ✅ Xử lý Debt Sales (bán công nợ - KHÁC VỚI BÁN LẺ!)
+      // Frontend chỉ gửi debt sales cho khách hàng thực sự mua nợ
+      // KHÔNG bao gồm bán lẻ (đã xử lý ở bước 5)
       if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
         for (const debtSale of closeShiftDto.debtSales) {
           const totalAmount = debtSale.quantity * debtSale.unitPrice;
@@ -258,7 +268,8 @@ export class ShiftsService {
             notes: debtSale.notes,
           });
 
-          // Ghi công nợ (debit customer)
+          // ✅ Ghi công nợ (debit customer - PHÁT SINH NỢ)
+          // Chỉ dành cho bán công nợ, KHÔNG dùng cho bán lẻ
           await manager.save(DebtLedger, {
             customerId: debtSale.customerId,
             storeId: shift.storeId,
@@ -269,9 +280,11 @@ export class ShiftsService {
             notes: debtSale.notes || 'Bán công nợ',
           });
 
-          // NOTE: Bán công nợ KHÔNG giảm tồn kho bể
-          // Vì đã tính trong pump readings rồi
-          // (công nợ chỉ là phân loại doanh thu, không phải xuất kho riêng)
+          // NOTE: Bán công nợ KHÔNG giảm tồn kho bể, KHÔNG ghi cash_ledger
+          // Vì đã tính trong pump readings rồi (bước 4)
+          // Công nợ chỉ là PHÂN LOẠI doanh thu: Bán lẻ vs Bán nợ
+          // - Bán lẻ → cashIn (bước 5)
+          // - Bán nợ → debit customer (không ảnh hưởng cash)
 
           // Ghi sales (để tracking)
           await manager.save(Sale, {
@@ -333,7 +346,9 @@ export class ShiftsService {
         }
       }
 
-      // 6.3. Xử lý Deposits (nộp tiền về công ty)
+      // 6.3. ✅ Xử lý Deposits (nộp tiền về công ty)
+      // Tiền rời khỏi quỹ cửa hàng → cashOut
+      // KHÔNG liên quan đến công nợ khách hàng
       if (closeShiftDto.deposits && closeShiftDto.deposits.length > 0) {
         for (const deposit of closeShiftDto.deposits) {
           // Lưu deposit record
@@ -348,7 +363,9 @@ export class ShiftsService {
             notes: deposit.notes,
           });
 
-          // Ghi sổ quỹ (chỉ nếu nộp tiền mặt)
+          // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
+          // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
+          // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
           if (depositRecord.paymentMethod === 'CASH') {
             await manager.save(CashLedger, {
               storeId: deposit.storeId,
@@ -395,6 +412,33 @@ export class ShiftsService {
         }
       }
 
+      // 6.5. ✅ Xử lý Inventory Imports (nhập kho từ xe téc)
+      if (closeShiftDto.inventoryImports && closeShiftDto.inventoryImports.length > 0) {
+        // Lấy warehouse của cửa hàng
+        const warehouse = await manager.findOne(Warehouse, {
+          where: { storeId: shift.storeId, type: 'STORE' },
+        });
+
+        if (!warehouse) {
+          throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
+        }
+
+        for (const importData of closeShiftDto.inventoryImports) {
+          // Ghi vào InventoryLedger (tăng tồn kho)
+          await manager.save(InventoryLedger, {
+            warehouseId: warehouse.id,
+            productId: importData.productId,
+            tankId: null, // Nhập kho chung, chưa phân bổ vào bể cụ thể
+            refType: 'TRUCK_IMPORT',
+            refId: shift.id,
+            quantityIn: importData.quantity,
+            quantityOut: 0,
+          });
+
+          console.log(`📈 Warehouse ${warehouse.id}: Ghi nhập ${importData.quantity} lít sản phẩm ${importData.productId} từ xe ${importData.licensePlate} (Shift ${shift.id})`);
+        }
+      }
+
       // 7. Đóng ca
       if (closeShiftDto.closedAt) {
         shift.closedAt = new Date(closeShiftDto.closedAt);
@@ -424,36 +468,140 @@ export class ShiftsService {
   }
 
   async reopenShift(shiftId: number, user: any): Promise<Shift> {
-    const shift = await this.shiftRepository.findOne({
-      where: { id: shiftId },
+    return this.dataSource.transaction(async (manager) => {
+      const shift = await manager.findOne(Shift, {
+        where: { id: shiftId },
+      });
+
+      if (!shift) {
+        throw new NotFoundException('Shift not found');
+      }
+
+      if (shift.status !== 'CLOSED') {
+        throw new BadRequestException('Shift is not closed');
+      }
+
+      // ⚠️ CRITICAL CHECK: Nếu đã có payment cho debt sales từ ca này
+      const debtSales = await manager.find(ShiftDebtSale, {
+        where: { shiftId },
+        relations: ['customer'],
+      });
+
+      for (const debtSale of debtSales) {
+        const debtSaleEntry = await manager.findOne(DebtLedger, {
+          where: {
+            customerId: debtSale.customerId,
+            refType: 'DEBT_SALE',
+            refId: debtSale.id,
+          },
+        });
+
+        if (debtSaleEntry) {
+          const paymentsAfterSale = await manager
+            .createQueryBuilder(DebtLedger, 'dl')
+            .where('dl.customerId = :customerId', { customerId: debtSale.customerId })
+            .andWhere('dl.refType = :refType', { refType: 'PAYMENT' })
+            .andWhere('dl.createdAt > :saleTime', { saleTime: debtSaleEntry.createdAt })
+            .getCount();
+
+          if (paymentsAfterSale > 0) {
+            throw new BadRequestException(
+              `❌ KHÔNG THỂ MỞ LẠI CA!\n` +
+              `Khách hàng "${debtSale.customer?.name}" đã thanh toán công nợ từ ca này.\n` +
+              `Nếu sửa số tiền bán sẽ gây lỗi số dư công nợ.\n\n` +
+              `Giải pháp:\n` +
+              `1. Tạo bút toán điều chỉnh công nợ (ghi chú rõ lý do)\n` +
+              `2. Hoặc hoàn tiền cho khách nếu bán sai số tiền cao hơn\n` +
+              `3. Liên hệ kế toán trưởng để xử lý thủ công`
+            );
+          }
+        }
+      }
+
+      const oldData = { ...shift };
+
+      // 🔄 SOFT DELETE STRATEGY:
+      // Đánh dấu dữ liệu cũ là "đã bị thay thế" thay vì xóa hẳn
+
+      // 1. Đánh dấu inventory_ledger entries của ca này là superseded
+      await manager
+        .createQueryBuilder()
+        .update('inventory_ledger')
+        .set({
+          supersededByShiftId: () => 'NULL', // Sẽ update sau khi tạo ca mới
+          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+        })
+        .where('ref_type = :refType', { refType: 'SHIFT_SALE' })
+        .andWhere('ref_id = :refId', { refId: shiftId })
+        .execute();
+
+      // 2. Đánh dấu cash_ledger entries
+      await manager
+        .createQueryBuilder()
+        .update('cash_ledger')
+        .set({
+          supersededByShiftId: () => 'NULL',
+          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+        })
+        .where('ref_type = :refType', { refType: 'SHIFT_CLOSE' })
+        .andWhere('ref_id = :refId', { refId: shiftId })
+        .execute();
+
+      // 3. Đánh dấu debt_ledger entries (bán công nợ)
+      const debtSaleIds = debtSales.map(ds => ds.id);
+      if (debtSaleIds.length > 0) {
+        await manager
+          .createQueryBuilder()
+          .update('debt_ledger')
+          .set({
+            supersededByShiftId: () => 'NULL',
+            notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+          })
+          .where('ref_type = :refType', { refType: 'DEBT_SALE' })
+          .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
+          .execute();
+      }
+
+      // 4. Đánh dấu pump_readings (không xóa để audit)
+      await manager
+        .createQueryBuilder()
+        .update('pump_readings')
+        .set({ supersededByShiftId: () => 'NULL' })
+        .where('shift_id = :shiftId', { shiftId })
+        .execute();
+
+      // 5. Đánh dấu sales
+      await manager
+        .createQueryBuilder()
+        .update('sales')
+        .set({ supersededByShiftId: () => 'NULL' })
+        .where('shift_id = :shiftId', { shiftId })
+        .execute();
+
+      console.log(`🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
+
+      // 6. Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
+      shift.status = 'OPEN';
+      shift.closedAt = null;
+      const reopenedShift = await manager.save(Shift, shift);
+
+      // Ghi audit log
+      await manager.save(AuditLog, {
+        tableName: 'shifts',
+        recordId: shift.id,
+        action: 'REOPEN',
+        oldData: { status: oldData.status, closedAt: oldData.closedAt },
+        newData: {
+          status: 'OPEN',
+          closedAt: null,
+          note: 'Dữ liệu cũ được đánh dấu superseded, giữ nguyên timestamp'
+        },
+        changedBy: user?.id,
+      });
+
+      console.log(`✅ Shift ${shiftId} reopened. Old data marked as superseded.`);
+      return reopenedShift;
     });
-
-    if (!shift) {
-      throw new NotFoundException('Shift not found');
-    }
-
-    if (shift.status !== 'CLOSED') {
-      throw new BadRequestException('Shift is not closed');
-    }
-
-    const oldData = { ...shift };
-
-    // Mở lại ca
-    shift.status = 'ADJUSTED';
-    shift.closedAt = null;
-    const updatedShift = await this.shiftRepository.save(shift);
-
-    // Ghi audit log
-    await this.auditLogRepository.save({
-      tableName: 'shifts',
-      recordId: shift.id,
-      action: 'REOPEN',
-      oldData: { status: oldData.status, closedAt: oldData.closedAt },
-      newData: { status: 'ADJUSTED', closedAt: null },
-      changedBy: user?.id,
-    });
-
-    return updatedShift;
   }
 
   async findOne(id: number): Promise<Shift> {

@@ -2,7 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { customersApi, type CreditStatus } from '../api/customers';
 import { useAuth } from '../contexts/AuthContext';
-import { MagnifyingGlassIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon, CreditCardIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon, CreditCardIcon, FunnelIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import dayjs from 'dayjs';
+import { exportToExcel } from '../utils/excel';
 
 const CustomerCreditPage: React.FC = () => {
   const { user } = useAuth();
@@ -99,6 +101,23 @@ const CustomerCreditPage: React.FC = () => {
     }
   };
 
+  const handleExport = () => {
+    if (!filteredCustomers) return;
+
+    const data = filteredCustomers.map(item => ({
+      'Mã KH': item.customerCode,
+      'Tên khách hàng': item.customerName,
+      'Loại': item.customerType === 'INTERNAL' ? 'Nội bộ' : 'Khách hàng',
+      'Hạn mức': item.creditLimit,
+      'Công nợ hiện tại': item.currentDebt,
+      'Còn lại': item.availableCredit,
+      'Sử dụng (%)': item.creditUsagePercent,
+      'Trạng thái': item.warningLevel
+    }));
+
+    exportToExcel(data, `Han_muc_cong_no_${dayjs().format('YYYY-MM-DD')}`);
+  };
+
   if (loadingCreditStatus) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -110,14 +129,24 @@ const CustomerCreditPage: React.FC = () => {
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
-          <CreditCardIcon className="h-8 w-8 text-blue-600" />
-          Quản lý hạn mức công nợ
-        </h1>
-        <p className="mt-2 text-sm text-gray-600">
-          Theo dõi và quản lý hạn mức công nợ khách hàng
-        </p>
+      <div className="mb-6 flex justify-between items-end">
+        <div>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
+            <CreditCardIcon className="h-8 w-8 text-blue-600" />
+            Quản lý hạn mức công nợ
+          </h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Theo dõi và quản lý hạn mức công nợ khách hàng
+          </p>
+        </div>
+        <button
+          onClick={handleExport}
+          disabled={!filteredCustomers?.length}
+          className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+          Xuất Excel
+        </button>
       </div>
 
       {/* Dashboard Stats */}

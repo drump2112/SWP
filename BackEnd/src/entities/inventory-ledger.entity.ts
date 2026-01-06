@@ -24,7 +24,7 @@ export class InventoryLedger {
   productId: number;
 
   @Column({ name: 'tank_id', nullable: true })
-  tankId: number;
+  tankId?: number | null;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
   refType: string;
@@ -49,6 +49,9 @@ export class InventoryLedger {
     default: 0,
   })
   quantityOut: number;
+
+  @Column({ name: 'superseded_by_shift_id', type: 'int', nullable: true })
+  supersededByShiftId: number | null; // Nếu != NULL: dữ liệu này đã bị thay thế bởi ca khác
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

@@ -55,6 +55,22 @@ const ShiftManagementPage: React.FC = () => {
     },
   });
 
+  // Reopen shift mutation
+  const reopenShiftMutation = useMutation({
+    mutationFn: shiftsApi.reopenShift,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      showSuccess('Đã mở lại ca thành công!');
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || 'Mở lại ca thất bại');
+    },
+  });
+
+  const handleReopenShift = (shiftId: number) => {
+    reopenShiftMutation.mutate(shiftId);
+  };
+
   const handleCreateShift = () => {
     if (!user?.storeId) {
       showError('Không tìm thấy thông tin cửa hàng');
@@ -235,25 +251,40 @@ const ShiftManagementPage: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    {shift.status === 'OPEN' && (
-                      <button
-                        onClick={() => navigate(`/shifts/${shift.id}/operations`)}
-                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        title="Nhập số liệu và chốt ca"
-                      >
-                        <DocumentTextIcon className="h-5 w-5 mr-2" />
-                        Chốt ca
-                      </button>
-                    )}
-                    {shift.status === 'CLOSED' && (
-                      <button
-                        onClick={() => navigate(`/shifts/${shift.id}/operations`)}
-                        className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 bg-gray-50 hover:bg-gray-100"
-                      >
-                        <DocumentTextIcon className="h-4 w-4 mr-1" />
-                        Chi tiết
-                      </button>
-                    )}
+                    <div className="flex items-center justify-center gap-2">
+                      {shift.status === 'OPEN' && (
+                        <button
+                          onClick={() => navigate(`/shifts/${shift.id}/operations`)}
+                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          title="Nhập số liệu và chốt ca"
+                        >
+                          <DocumentTextIcon className="h-5 w-5 mr-2" />
+                          Chốt ca
+                        </button>
+                      )}
+                      {shift.status === 'CLOSED' && (
+                        <>
+                          <button
+                            onClick={() => navigate(`/shifts/${shift.id}/operations`)}
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-gray-700 bg-gray-50 hover:bg-gray-100"
+                          >
+                            <DocumentTextIcon className="h-4 w-4 mr-1" />
+                            Chi tiết
+                          </button>
+                          {(user?.roleCode === 'ADMIN' || user?.roleCode === 'SALES') && (
+                            <button
+                              onClick={() => handleReopenShift(shift.id)}
+                              disabled={reopenShiftMutation.isPending}
+                              className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Mở lại ca"
+                            >
+                              <ClockIcon className="h-4 w-4 mr-1" />
+                              Mở ca
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

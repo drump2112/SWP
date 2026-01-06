@@ -51,6 +51,22 @@ export interface CreditStatus {
   warningLevel: 'safe' | 'warning' | 'danger' | 'overlimit';
 }
 
+export interface ImportCustomersResponse {
+  success: number;
+  failed: number;
+  errors: Array<{
+    row: number;
+    data: any;
+    error: string;
+  }>;
+  imported: Array<{
+    row: number;
+    code: string;
+    name: string;
+    phone: string;
+  }>;
+}
+
 export const customersApi = {
   getAll: async (storeId?: number): Promise<Customer[]> => {
     const params = storeId ? { storeId } : {};
@@ -103,6 +119,18 @@ export const customersApi = {
 
   checkDuplicate: async (data: { name?: string; phone?: string; taxCode?: string }) => {
     const response = await api.post('/customers/check-duplicate', data);
+    return response.data;
+  },
+
+  importFromExcel: async (file: File, storeId?: number): Promise<ImportCustomersResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const params = storeId ? `?storeId=${storeId}` : '';
+    const response = await api.post(`/customers/import${params}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
     return response.data;
   },
 };

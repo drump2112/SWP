@@ -1,8 +1,9 @@
-import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested, IsOptional, IsPositive } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class InventoryItemDto {
   @IsInt()
+  @IsPositive()
   productId: number;
 
   @IsNotEmpty()

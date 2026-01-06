@@ -3,9 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { TanksController } from './tanks.controller';
 import { TanksService } from './tanks.service';
 import { Tank } from '../entities/tank.entity';
+import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Tank])],
+  imports: [
+    TypeOrmModule.forFeature([Tank]),
+    InventoryModule,
+  ],
   controllers: [TanksController],
   providers: [TanksService],
   exports: [TanksService],

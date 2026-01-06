@@ -1,4 +1,4 @@
-import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards, BadRequestException } from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -74,6 +74,29 @@ export class ReportsController {
     );
   }
 
+  @Get('sales/listing')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesListing(
+    @CurrentUser() user: any,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('storeIds') storeIds?: string,
+  ) {
+    let effectiveStoreIds: number[] | undefined;
+
+    if (user.roleCode === 'STORE') {
+      effectiveStoreIds = [user.storeId];
+    } else if (storeIds) {
+      effectiveStoreIds = storeIds.split(',').map(Number);
+    }
+
+    return this.reportsService.getSalesReport(
+      new Date(fromDate),
+      new Date(toDate),
+      effectiveStoreIds,
+    );
+  }
+
   @Get('sales/by-pump')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesByPumpReport(
@@ -83,6 +106,11 @@ export class ReportsController {
     @Query('toDate') toDate: string,
   ) {
     const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+
+    if (!effectiveStoreId) {
+      throw new BadRequestException('Store ID is required');
+    }
+
     return this.reportsService.getSalesByPumpReport(
       effectiveStoreId,
       new Date(fromDate),
@@ -119,6 +147,7 @@ export class ReportsController {
     @Query('storeId') storeId?: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('refType') refType?: string,
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
     const effectiveStoreId = user.roleCode === 'STORE'
@@ -148,5 +177,97 @@ export class ReportsController {
       new Date(fromDate),
       new Date(toDate),
     );
+  }
+
+  // ==================== INVENTORY IMPORT REPORTS ====================
+
+  /**
+   * GET /reports/inventory-import?warehouseId=1&storeId=1&fromDate=2024-01-01&toDate=2024-12-31&docType=IMPORT
+   * Báo cáo bảng kê nhập kho (In Bảng Kê Nhập)
+   * - Kế toán/Admin/Director: Xem tất cả kho
+   * - Cửa hàng (STORE): Chỉ xem nhập kho của cửa hàng mình
+   */
+  @Get('inventory-import')
+  @Roles('STORE', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getInventoryImportReport(
+    @CurrentUser() user: any,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('storeId') storeId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('docType') docType?: string,
+  ) {
+    // Nếu user là STORE, tự động lấy storeId của user
+    const effectiveStoreId = user.roleCode === 'STORE'
+      ? user.storeId
+      : (storeId ? +storeId : undefined);
+
+    return this.reportsService.getInventoryImportReport({
+      warehouseId: warehouseId ? +warehouseId : undefined,
+      storeId: effectiveStoreId,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+      docType,
+    });
+  }
+
+  /**
+   * GET /reports/inventory-import/:documentId
+   * Báo cáo chi tiết một phiếu nhập kho
+   */
+  @Get('inventory-import/:documentId')
+  @Roles('STORE', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getInventoryImportDocumentDetail(@Param('documentId') documentId: string) {
+    return this.reportsService.getInventoryImportDocumentDetail(+documentId);
+  }
+
+  /**
+   * GET /reports/inventory-import-summary/by-product?warehouseId=1&storeId=1&fromDate=2024-01-01&toDate=2024-12-31
+   * Báo cáo tổng hợp nhập kho theo mặt hàng
+   */
+  @Get('inventory-import-summary/by-product')
+  @Roles('ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getInventoryImportSummaryByProduct(
+    @CurrentUser() user: any,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('storeId') storeId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE'
+      ? user.storeId
+      : (storeId ? +storeId : undefined);
+
+    return this.reportsService.getInventoryImportSummaryByProduct({
+      warehouseId: warehouseId ? +warehouseId : undefined,
+      storeId: effectiveStoreId,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+    });
+  }
+
+  /**
+   * GET /reports/inventory-import-summary/by-supplier?warehouseId=1&storeId=1&fromDate=2024-01-01&toDate=2024-12-31
+   * Báo cáo tổng hợp nhập kho theo nhà cung cấp
+   */
+  @Get('inventory-import-summary/by-supplier')
+  @Roles('ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getInventoryImportSummaryBySupplier(
+    @CurrentUser() user: any,
+    @Query('warehouseId') warehouseId?: string,
+    @Query('storeId') storeId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE'
+      ? user.storeId
+      : (storeId ? +storeId : undefined);
+
+    return this.reportsService.getInventoryImportSummaryBySupplier({
+      warehouseId: warehouseId ? +warehouseId : undefined,
+      storeId: effectiveStoreId,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+    });
   }
 }

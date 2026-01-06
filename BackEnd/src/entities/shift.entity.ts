@@ -35,6 +35,15 @@ export class Shift {
   @Column({ length: 20, default: 'OPEN' })
   status: string; // OPEN, CLOSED, ADJUSTED
 
+  @Column({ name: 'version', type: 'int', default: 1 })
+  version: number; // Version của ca (mỗi lần reopen + close tăng lên 1)
+
+  @Column({ name: 'adjusted_from_shift_id', type: 'int', nullable: true })
+  adjustedFromShiftId: number | null; // ID của ca gốc (nếu là ca điều chỉnh)
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean; // false nếu đã bị supersede bởi version mới
+
   @ManyToOne(() => Store, (store) => store.shifts)
   @JoinColumn({ name: 'store_id' })
   store: Store;

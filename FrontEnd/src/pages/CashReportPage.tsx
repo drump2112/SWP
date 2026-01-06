@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
+import { exportToExcel } from '../utils/excel';
 
 const CashReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -38,8 +39,20 @@ const CashReportPage: React.FC = () => {
   });
 
   const handleExportExcel = () => {
-    // TODO: Implement Excel export
-    alert('Chức năng xuất Excel đang phát triển');
+    if (!report?.ledgers) return;
+
+    const data = report.ledgers.map((item: any, index: number) => ({
+      'STT': index + 1,
+      'Ngày': dayjs(item.date).format('DD/MM/YYYY'),
+      'Loại chứng từ': getRefTypeLabel(item.refType),
+      'Mã phiếu': item.refId ? `PC${item.refId}` : '', // Giả lập mã phiếu
+      'Diễn giải': item.details?.notes || item.notes || '',
+      'Thu': item.cashIn,
+      'Chi': item.cashOut,
+      'Tồn': item.balance
+    }));
+
+    exportToExcel(data, `So_quy_tien_mat_${filters.fromDate}_${filters.toDate}`);
   };
 
   const handleExportPDF = () => {
@@ -144,6 +157,27 @@ const CashReportPage: React.FC = () => {
               onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
               className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Loại chứng từ
+            </label>
+            <select
+              value={filters.refType || ''}
+              onChange={(e) => setFilters({ ...filters, refType: e.target.value || undefined })}
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+            >
+              <option value="">Tất cả</option>
+              <option value="RECEIPT">Phiếu thu</option>
+              <option value="DEPOSIT">Phiếu nộp</option>
+              <option value="EXPENSE">Chi phí</option>
+              <option value="ADJUST">Điều chỉnh</option>
+              <option value="SHIFT_CLOSE">Chốt ca</option>
+              <option value="SHIFT_OPEN">Mở ca</option>
+              <option value="SALE">Bán hàng</option>
+              <option value="PAYMENT">Thu tiền</option>
+            </select>
           </div>
         </div>
 

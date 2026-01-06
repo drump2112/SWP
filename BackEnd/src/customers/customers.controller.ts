@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
@@ -73,6 +74,16 @@ export class CustomersController {
     @Query('storeId') storeId?: string,
   ) {
     return this.customersService.getCreditStatus(+id, storeId ? +storeId : undefined);
+  }
+
+  @Post('import')
+  @Roles('SALES', 'ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  async importCustomers(
+    @UploadedFile() file: Express.Multer.File,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.customersService.importFromExcel(file.buffer, storeId ? +storeId : undefined);
   }
 
   @Post('check-duplicate')

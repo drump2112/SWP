@@ -155,7 +155,6 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         isClearable={isClearable}
         isMulti={isMulti}
         isSearchable
-        styles={customStyles}
         name={name}
         required={required}
         noOptionsMessage={() => 'Không tìm thấy kết quả'}

@@ -12,11 +12,13 @@ import {
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
+import { exportToExcel } from '../utils/excel';
 
 const DebtReportPage: React.FC = () => {
   const { user } = useAuth();
   const [filters, setFilters] = useState<DebtReportParams>({
     storeId: user?.storeId,
+    storeIds: user?.storeId ? [user.storeId] : undefined,
     fromDate: dayjs().startOf('month').format('YYYY-MM-DD'),
     toDate: dayjs().endOf('month').format('YYYY-MM-DD'),
   });
@@ -43,8 +45,25 @@ const DebtReportPage: React.FC = () => {
   });
 
   const handleExportExcel = () => {
-    // TODO: Implement Excel export
-    alert('Chức năng xuất Excel đang phát triển');
+    if (!report) return;
+
+    const data = report.map((item: any) => {
+      // Tìm mã cửa hàng cho từng item dựa trên storeId trong ledgers hoặc mặc định
+      const storeId = item.ledgers?.[0]?.storeId || filters.storeId || filters.storeIds?.[0];
+      const storeCode = stores?.find(s => s.id === storeId)?.code || `CH${storeId || ''}`;
+
+      return {
+        'Mã CH': storeCode,
+        'Mã KH': item.customer?.code,
+        'Tên KH': item.customer?.name,
+        'Dư đầu kỳ': item.openingBalance,
+        'Phát sinh Nợ': item.totalDebit,
+        'Phát sinh Có': item.totalCredit,
+        'Dư cuối kỳ': item.closingBalance
+      };
+    });
+
+    exportToExcel(data, `Tong_hop_cong_no_${filters.fromDate}_${filters.toDate}`);
   };
 
   const handleExportPDF = () => {
@@ -97,18 +116,19 @@ const DebtReportPage: React.FC = () => {
                 Cửa hàng
               </label>
               <SearchableSelect
-                options={[
-                  { value: '', label: 'Tất cả cửa hàng' },
-                  ...(stores?.map(store => ({
-                    value: store.id.toString(),
-                    label: `${store.code} - ${store.name}`
-                  })) || [])
-                ]}
-                value={filters.storeId?.toString() || ''}
-                onChange={(value) =>
-                  setFilters({ ...filters, storeId: value && value !== '' ? +value : undefined })
-                }
-                placeholder="Chọn cửa hàng"
+                options={(stores?.map(store => ({
+                  value: store.id.toString(),
+                  label: `${store.code} - ${store.name}`
+                })) || [])}
+                value={filters.storeIds?.map(id => id.toString()) || []}
+                onChange={(value) => {
+                  const selectedIds = Array.isArray(value) && value.length > 0
+                    ? value.filter(v => v !== '').map(v => +v)
+                    : undefined;
+                  setFilters({ ...filters, storeIds: selectedIds, storeId: undefined });
+                }}
+                placeholder="Tất cả cửa hàng"
+                isMulti
                 isClearable
               />
             </div>

@@ -1,7 +1,6 @@
 
 import { DataSource } from 'typeorm';
 import * as dotenv from 'dotenv';
-import { CreateUserTokens1736000000000 } from './src/migrations/1736000000000-CreateUserTokens';
 
 dotenv.config();
 
@@ -29,11 +28,8 @@ async function run() {
   await queryRunner.startTransaction();
 
   try {
-    console.log('Running migration: CreateUserTokens1736000000000');
-    const migration = new CreateUserTokens1736000000000();
-
-    // Chạy hàm up()
-    await migration.up(queryRunner);
+    console.log('Note: This is a placeholder migration runner.');
+    console.log('Add your migration code here or use TypeORM CLI instead.');
 
     await queryRunner.commitTransaction();
     console.log('Migration executed successfully!');

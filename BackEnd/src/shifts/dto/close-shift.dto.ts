@@ -31,6 +31,40 @@ class ExpenseDto {
   paymentMethod?: string; // CASH, BANK_TRANSFER
 }
 
+class InventoryImportDto {
+  @IsNotEmpty()
+  @IsDateString()
+  docDate: string;
+
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+
+  @IsOptional()
+  @IsString()
+  invoiceNumber?: string;
+
+  @IsNotEmpty()
+  @IsString()
+  licensePlate: string;
+
+  @IsOptional()
+  @IsString()
+  driverName?: string;
+
+  @IsNotEmpty()
+  @IsInt()
+  productId: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  quantity: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 export class CloseShiftDto {
   @IsInt()
   @IsNotEmpty()
@@ -64,6 +98,12 @@ export class CloseShiftDto {
   @ValidateNested({ each: true })
   @Type(() => ExpenseDto)
   expenses?: ExpenseDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InventoryImportDto)
+  inventoryImports?: InventoryImportDto[];
 
   @IsOptional()
   @IsDateString()

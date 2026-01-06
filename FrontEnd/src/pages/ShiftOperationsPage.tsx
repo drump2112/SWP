@@ -6,11 +6,13 @@ import { customersApi } from '../api/customers';
 import { productsApi } from '../api/products';
 import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
+import { inventoryApi, type CreateInventoryDocumentWithTruckDto } from '../api/inventory';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/sweetalert';
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import SearchableSelect from '../components/SearchableSelect';
+import TruckInventoryImportForm, { type InventoryImportFormData } from '../components/TruckInventoryImportForm';
 import {
   PlusIcon,
   TrashIcon,
@@ -20,6 +22,7 @@ import {
   BuildingLibraryIcon,
   ArrowLeftIcon,
   CheckIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 
@@ -215,10 +218,20 @@ const ShiftOperationsPage: React.FC = () => {
             setDraftDeposits(parsed.deposits);
           }
           if (parsed.imports && parsed.imports.length > 0) {
-            setDraftImports(parsed.imports);
+            // Lọc bỏ items với productId không hợp lệ
+            const validImports = parsed.imports.map((imp: any) => ({
+              ...imp,
+              items: imp.items?.filter((item: any) => item.productId && item.productId > 0) || []
+            })).filter((imp: any) => imp.items.length > 0);
+            setDraftImports(validImports);
           }
           if (parsed.exports && parsed.exports.length > 0) {
-            setDraftExports(parsed.exports);
+            // Lọc bỏ items với productId không hợp lệ
+            const validExports = parsed.exports.map((exp: any) => ({
+              ...exp,
+              items: exp.items?.filter((item: any) => item.productId && item.productId > 0) || []
+            })).filter((exp: any) => exp.items.length > 0);
+            setDraftExports(validExports);
           }
           if (parsed.inventoryChecks && parsed.inventoryChecks.length > 0) {
             setDraftInventoryChecks(parsed.inventoryChecks);
@@ -476,16 +489,8 @@ const ShiftOperationsPage: React.FC = () => {
       return; // CHẶN KHÔNG CHO CHỐT
     }
 
-    // Validation 2.6: Kiểm tra đã chọn người chịu trách nhiệm bán lẻ chưa (nếu có bán lẻ)
-    const hasRetailSales = Object.values(declaredRetailQuantities).some(q => q > 0);
-    if (hasRetailSales && !retailCustomerId) {
-      toast.error('Vui lòng chọn "Người chịu trách nhiệm doanh thu bán lẻ" ở Tab 2!', {
-        position: 'top-right',
-        autoClose: 5000,
-      });
-      setActiveTab('debt');
-      return;
-    }
+    // ✅ FIX: Không cần chọn retailCustomerId nữa
+    // Bán lẻ không ghi nợ cho ai cả, chỉ ghi vào cash_ledger
 
     // Validation 3: Confirm chốt ca với tất cả thông tin
     const confirmHtml = `
@@ -525,7 +530,7 @@ const ShiftOperationsPage: React.FC = () => {
           </tbody>
         </table>
         <div style="color: #dc2626; font-weight: 600; font-size: 0.875rem;">
-          ⚠️ Hành động này sẽ lưu TẤT CẢ dữ liệu vào database và không thể hoàn tác!
+          ⚠️ Kiểm tra kỹ số liệu cột bơm và các phiếu trước khi chốt!
         </div>
       </div>
     `;
@@ -558,40 +563,22 @@ const ShiftOperationsPage: React.FC = () => {
 
     const closedAt = result.value;
 
-    // Generate Debt Sales from Retail Quantities
-    const retailDebtSales = [];
-    if (retailCustomerId) {
-      for (const [productIdStr, quantity] of Object.entries(declaredRetailQuantities)) {
-        const productId = Number(productIdStr);
-        if (quantity > 0) {
-          const price = productPrices[productId] || 0;
-          retailDebtSales.push({
-            shiftId: Number(shiftId),
-            customerId: retailCustomerId,
-            productId: productId,
-            quantity: quantity,
-            unitPrice: price,
-            notes: 'Bán lẻ (Ghi nợ người phụ trách)',
-          });
-        }
-      }
-    }
+    // ✅ FIX: Bán lẻ KHÔNG tạo debt sales
+    // Bán lẻ = Thu tiền mặt ngay → Backend đã ghi vào cash_ledger
+    // declaredRetailQuantities chỉ dùng để đối chiếu số lượng
 
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
       closedAt: closedAt ? new Date(closedAt).toISOString() : undefined,
       pumpReadings: readingsArray,
-      debtSales: [
-        ...draftDebtSales.map(ds => ({
-          shiftId: Number(shiftId),
-          customerId: ds.customerId,
-          productId: ds.productId,
-          quantity: ds.quantity,
-          unitPrice: ds.unitPrice,
-          notes: ds.notes,
-        })),
-        ...retailDebtSales
-      ],
+      debtSales: draftDebtSales.map(ds => ({
+        shiftId: Number(shiftId),
+        customerId: ds.customerId,
+        productId: ds.productId,
+        quantity: ds.quantity,
+        unitPrice: ds.unitPrice,
+        notes: ds.notes,
+      })),
       receipts: draftReceipts.map(r => ({
         storeId: r.storeId,
         shiftId: Number(shiftId),
@@ -608,6 +595,16 @@ const ShiftOperationsPage: React.FC = () => {
         depositTime: d.depositTime,
         receiverName: d.receiverName,
         notes: d.notes,
+      })),
+      inventoryImports: draftImports.map(imp => ({
+        docDate: imp.docDate,
+        supplierName: imp.supplierName,
+        invoiceNumber: imp.invoiceNumber,
+        licensePlate: imp.licensePlate,
+        driverName: imp.driverName,
+        productId: imp.productId,
+        quantity: imp.quantity,
+        notes: imp.notes,
       })),
     };
 
@@ -770,45 +767,32 @@ const ShiftOperationsPage: React.FC = () => {
     }
   };
 
-  const handleImportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const docDate = formData.get('docDate') as string;
-    const supplierName = formData.get('supplierName') as string || undefined;
-    const invoiceNumber = formData.get('invoiceNumber') as string || undefined;
-    const notes = formData.get('notes') as string || undefined;
-
-    // Simple item handling for now - just one item per form submission or just header info
-    // Ideally we need a sub-form for items. For now let's just save the header info and maybe a total amount/quantity if needed.
-    // Or we can assume this is just for recording the document existence.
-
-    // Let's try to capture at least one item or a summary
-    const productId = formData.get('productId') ? Number(formData.get('productId')) : undefined;
-    const quantity = formData.get('quantity') ? Number(formData.get('quantity')) : 0;
-    const unitPrice = formData.get('unitPrice') ? Number(formData.get('unitPrice')) : 0;
-
-    if (quantity <= 0) {
-      toast.error('Số lượng phải lớn hơn 0', { position: 'top-right', autoClose: 3000 });
+  const handleImportSubmit = async (formData: InventoryImportFormData) => {
+    if (!report?.shift.storeId) {
+      toast.error('Không tìm thấy thông tin cửa hàng');
       return;
     }
 
-    const amount = quantity * unitPrice;
+    try {
+      // Lưu vào draft để hiển thị
+      const newItem = {
+        id: `draft_${Date.now()}`,
+        docType: 'IMPORT',
+        docDate: formData.docDate,
+        supplierName: formData.supplierName,
+        invoiceNumber: formData.invoiceNumber,
+        licensePlate: formData.licensePlate,
+        driverName: formData.driverName,
+        quantity: formData.quantity,
+        notes: formData.notes,
+      };
 
-    const newItem = {
-      id: `draft_${Date.now()}`,
-      docType: 'IMPORT',
-      docDate,
-      supplierName,
-      invoiceNumber,
-      notes,
-      items: productId ? [{ productId, quantity, unitPrice, amount }] : [],
-      totalAmount: amount
-    };
-
-    setDraftImports(prev => [...prev, newItem]);
-    toast.success('Đã thêm phiếu nhập hàng', { position: 'top-right', autoClose: 3000 });
-    setShowImportForm(false);
-    e.currentTarget.reset();
+      setDraftImports(prev => [...prev, newItem]);
+      toast.success('✅ Đã thêm phiếu nhập kho vào danh sách!', { position: 'top-right', autoClose: 3000 });
+      setShowImportForm(false);
+    } catch (error: any) {
+      toast.error('❌ Lỗi khi lưu phiếu nhập: ' + (error.response?.data?.message || error.message));
+    }
   };
 
   const handleExportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -822,6 +806,11 @@ const ShiftOperationsPage: React.FC = () => {
     const quantity = formData.get('quantity') ? Number(formData.get('quantity')) : 0;
     const unitPrice = formData.get('unitPrice') ? Number(formData.get('unitPrice')) : 0;
 
+    if (!productId || productId <= 0) {
+      toast.error('Vui lòng chọn sản phẩm', { position: 'top-right', autoClose: 3000 });
+      return;
+    }
+
     if (quantity <= 0) {
       toast.error('Số lượng phải lớn hơn 0', { position: 'top-right', autoClose: 3000 });
       return;
@@ -833,9 +822,9 @@ const ShiftOperationsPage: React.FC = () => {
       id: `draft_${Date.now()}`,
       docType: 'EXPORT',
       docDate,
-      supplierName: receiverName, // Map to supplierName for storage consistency or add new field
+      supplierName: receiverName,
       notes,
-      items: productId ? [{ productId, quantity, unitPrice, amount }] : [],
+      items: [{ productId, quantity, unitPrice, amount }],
       totalAmount: amount
     };
 
@@ -1488,13 +1477,13 @@ const ShiftOperationsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Retail Responsibility Section */}
               <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-sm mb-4">
-                <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người chịu trách nhiệm doanh thu bán lẻ</h3>
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người phụ trách ca (tùy chọn)</h3>
                 <p className="text-sm text-gray-600 mb-3">
-                  Chọn nhân viên/cửa hàng trưởng chịu trách nhiệm thu tiền bán lẻ. Lượng bán lẻ sẽ được ghi nhận là công nợ của người này.
+                  ℹ️ Chọn nhân viên phụ trách ca này (chỉ để theo dõi). Bán lẻ = Thu tiền mặt ngay, KHÔNG ghi công nợ.
                 </p>
                 <div className="max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nhân viên phụ trách <span className="text-red-500">*</span>
+                    Nhân viên phụ trách (tùy chọn)
                   </label>
                   <SearchableSelect
                     options={storeCustomers
@@ -1505,14 +1494,12 @@ const ShiftOperationsPage: React.FC = () => {
                       })) || []}
                     value={retailCustomerId}
                     onChange={(value) => setRetailCustomerId(value as number)}
-                    placeholder="-- Chọn nhân viên --"
+                    placeholder="-- Chọn nhân viên (chỉ để theo dõi) --"
                     className="w-full"
                   />
-                  {!retailCustomerId && Object.keys(declaredRetailQuantities).length > 0 && (
-                    <p className="mt-1 text-sm text-red-600">
-                      ⚠️ Vui lòng chọn người chịu trách nhiệm để ghi nhận công nợ bán lẻ.
-                    </p>
-                  )}
+                  <p className="mt-1 text-sm text-gray-500">
+                    ℹ️ Thông tin này chỉ để theo dõi, KHÔNG ghi công nợ.
+                  </p>
                 </div>
               </div>
 
@@ -2087,7 +2074,7 @@ const ShiftOperationsPage: React.FC = () => {
           {activeTab === 'import' && (
             <div className="space-y-6">
               <div className="border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Hàng</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Kho Xăng Dầu (Xe Téc)</h3>
 
                 {isShiftOpen && (
                   <div className="mb-4">
@@ -2096,124 +2083,84 @@ const ShiftOperationsPage: React.FC = () => {
                       className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <PlusIcon className="h-5 w-5 mr-2" />
-                      Tạo phiếu nhập
+                      {showImportForm ? 'Đóng form' : 'Tạo phiếu nhập'}
                     </button>
                   </div>
                 )}
 
                 {showImportForm && (
-                  <form
-                    data-form="import"
+                  <TruckInventoryImportForm
                     onSubmit={handleImportSubmit}
-                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
-                  >
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhập *</label>
-                      <input
-                        type="date"
-                        name="docDate"
-                        required
-                        defaultValue={dayjs().format('YYYY-MM-DD')}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
-                      <input
-                        type="text"
-                        name="supplierName"
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Tên nhà cung cấp"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Số hóa đơn</label>
-                      <input
-                        type="text"
-                        name="invoiceNumber"
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Số hóa đơn / chứng từ"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                      <input
-                        type="text"
-                        name="notes"
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Ghi chú thêm..."
-                      />
-                    </div>
-
-                    {/* Simple Item Entry for now */}
-                    <div className="md:col-span-2 border-t pt-4 mt-2">
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Chi tiết hàng hóa (Nhập nhanh)</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Sản phẩm</label>
-                            <select name="productId" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
-                              <option value="">-- Chọn sản phẩm --</option>
-                              {products?.map(p => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                            </select>
-                         </div>
-                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Số lượng</label>
-                            <input type="number" name="quantity" step="0.01" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0.00" />
-                         </div>
-                         <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">Đơn giá</label>
-                            <input type="number" name="unitPrice" step="1" className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" placeholder="0" />
-                         </div>
-                      </div>
-                    </div>
-
-                    <div className="md:col-span-2 flex justify-end space-x-3 mt-4">
-                      <button
-                        type="button"
-                        onClick={() => setShowImportForm(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                      >
-                        Hủy
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                      >
-                        Thêm phiếu nhập
-                      </button>
-                    </div>
-                  </form>
+                    onCancel={() => setShowImportForm(false)}
+                  />
                 )}
 
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số HĐ</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Số ngăn</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng lít</th>
+                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {draftImports.length > 0 ? (
-                      draftImports.map((item) => (
+                      draftImports.map((item) => {
+                        const status = item.calculation?.status || 'NORMAL';
+                        const statusColor = status === 'EXCESS' ? 'text-green-600' : status === 'SHORTAGE' ? 'text-red-600' : 'text-gray-600';
+                        const statusText = status === 'EXCESS' ? '✅ Thừa' : status === 'SHORTAGE' ? '⚠️ Thiếu' : '✔️ Bình thường';
+
+                        return (
                         <tr key={item.id}>
                           <td className="px-6 py-4 text-sm text-gray-900">{dayjs(item.docDate).format('DD/MM/YYYY')}</td>
+                          <td className="px-6 py-4 text-sm font-medium text-blue-600">{item.licensePlate || '-'}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || '-'}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{item.invoiceNumber || '-'}</td>
-                          <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">{Number(item.totalAmount || 0).toLocaleString('vi-VN')} ₫</td>
-                          <td className="px-6 py-4 text-right text-sm font-medium">
+                          <td className="px-6 py-4 text-sm text-center text-gray-700">{item.compartments?.length || 0} ngăn</td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
+                            {Number(item.totalVolume || 0).toLocaleString('vi-VN')} lít
+                          </td>
+                          <td className="px-6 py-4 text-sm text-center">
+                            <span className={`font-medium ${statusColor}`}>{statusText}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
+                            {item.documentId && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const blob = await inventoryApi.exportDocumentToExcel(item.documentId);
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `Bien_ban_giao_nhan_${item.invoiceNumber || item.documentId}.xlsx`;
+                                    a.click();
+                                    window.URL.revokeObjectURL(url);
+                                    toast.success('Đã tải file Excel thành công');
+                                  } catch (error: any) {
+                                    toast.error('Lỗi khi xuất Excel: ' + error.message);
+                                  }
+                                }}
+                                className="text-green-600 hover:text-green-900 inline-flex items-center"
+                                type="button"
+                                title="Xuất Excel"
+                              >
+                                <DocumentArrowDownIcon className="h-5 w-5" />
+                              </button>
+                            )}
                             <button onClick={() => handleDeleteImport(item.id)} className="text-red-600 hover:text-red-900" type="button">
                               <TrashIcon className="h-5 w-5 inline" />
                             </button>
                           </td>
                         </tr>
-                      ))
+                        );
+                      })
                     ) : (
-                      <tr><td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nhập hàng</td></tr>
+                      <tr><td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">Chưa có phiếu nhập hàng</td></tr>
                     )}
                   </tbody>
                 </table>

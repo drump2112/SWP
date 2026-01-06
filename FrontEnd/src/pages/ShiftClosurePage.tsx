@@ -8,8 +8,10 @@ import {
   LockOpenIcon,
   ClockIcon,
   DocumentTextIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
+import { exportToExcel, exportMultiSheetExcel } from '../utils/excel';
 
 const ShiftClosurePage: React.FC = () => {
   const { user } = useAuth();
@@ -60,6 +62,58 @@ const ShiftClosurePage: React.FC = () => {
     );
     if (confirmed) {
       reopenMutation.mutate(shift.id);
+    }
+  };
+
+  const handleExportShift = async (shift: Shift) => {
+    try {
+      const report = await shiftsApi.getReport(shift.id);
+
+      const summaryData = [
+        { 'Mục': 'Cửa hàng', 'Giá trị': shift.store?.name },
+        { 'Mục': 'Ca số', 'Giá trị': shift.shiftNo },
+        { 'Mục': 'Ngày', 'Giá trị': dayjs(shift.shiftDate).format('DD/MM/YYYY') },
+        { 'Mục': 'Người mở', 'Giá trị': shift.openedBy?.fullName },
+        { 'Mục': 'Người chốt', 'Giá trị': shift.closedBy?.fullName },
+        { 'Mục': '---', 'Giá trị': '---' },
+        { 'Mục': 'Tổng bán lẻ', 'Giá trị': report.summary.totalRetailSales },
+        { 'Mục': 'Bán nợ', 'Giá trị': report.summary.totalDebtSales },
+        { 'Mục': 'Tổng doanh thu', 'Giá trị': report.summary.totalRevenue },
+        { 'Mục': 'Thu nợ', 'Giá trị': report.summary.totalReceipts },
+        { 'Mục': 'Nộp tiền', 'Giá trị': report.summary.totalDeposits },
+        { 'Mục': 'Tồn quỹ', 'Giá trị': report.summary.cashBalance },
+      ];
+
+      const pumpReadingsData = report.pumpReadings.map((pr: any) => ({
+        'Vòi': pr.pumpName,
+        'Mặt hàng': pr.productName,
+        'Số đầu': pr.startValue,
+        'Số cuối': pr.endValue,
+        'Số lượng': pr.quantity,
+        'Đơn giá': pr.price,
+        'Thành tiền': pr.amount
+      }));
+
+      const debtSalesData = report.debtSales.map((ds: any) => ({
+        'Khách hàng': ds.customerName,
+        'Mặt hàng': ds.productName,
+        'Số lượng': ds.quantity,
+        'Đơn giá': ds.unitPrice,
+        'Thành tiền': ds.amount,
+        'Ghi chú': ds.notes
+      }));
+
+      const sheets = [
+        { data: summaryData, sheetName: 'Tong_Hop' },
+        { data: pumpReadingsData, sheetName: 'Chi_Tiet_Voi' },
+        { data: debtSalesData, sheetName: 'Ban_No' }
+      ];
+
+      exportMultiSheetExcel(sheets, `So_giao_ca_${shift.store?.code}_Ca${shift.shiftNo}_${dayjs(shift.shiftDate).format('YYYYMMDD')}`);
+
+    } catch (error) {
+      console.error(error);
+      showError('Không thể lấy dữ liệu báo cáo ca');
     }
   };
 

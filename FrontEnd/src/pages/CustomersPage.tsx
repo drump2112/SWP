@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { customersApi, type Customer, type CreateCustomerDto, type UpdateCustomerDto } from '../api/customers';
 import { storesApi } from '../api/stores';
 import { showSuccess, showError, showConfirm, showWarning } from '../utils/sweetalert';
-import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, ExclamationTriangleIcon, UserIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, MagnifyingGlassIcon, ExclamationTriangleIcon, UserIcon, ArrowUpTrayIcon, DocumentArrowDownIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -14,6 +14,11 @@ const CustomersPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState<string>('');
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importType, setImportType] = useState<'EXTERNAL' | 'INTERNAL'>('EXTERNAL');
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const { data: customers, isLoading } = useQuery({
@@ -139,6 +144,62 @@ const CustomersPage: React.FC = () => {
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) {
+      showError('Vui lòng chọn file Excel');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await customersApi.importFromExcel(
+        selectedFile,
+        user?.storeId || undefined
+      );
+
+      let message = `✓ Thành công: ${result.success} khách hàng\n`;
+      if (result.failed > 0) {
+        message += `✗ Thất bại: ${result.failed} dòng\n\n`;
+        message += 'Chi tiết lỗi:\n';
+        result.errors.slice(0, 5).forEach(err => {
+          message += `• Dòng ${err.row}: ${err.error}\n`;
+        });
+        if (result.errors.length > 5) {
+          message += `... và ${result.errors.length - 5} lỗi khác`;
+        }
+      }
+
+      if (result.success > 0) {
+        await showSuccess(message, 'Import hoàn tất');
+        queryClient.invalidateQueries({ queryKey: ['customers'] });
+        setIsImportModalOpen(false);
+        setSelectedFile(null);
+      } else {
+        await showError(message, 'Import thất bại');
+      }
+    } catch (error: any) {
+      showError(error.response?.data?.message || 'Import thất bại');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleDownloadTemplate = (type: 'EXTERNAL' | 'INTERNAL') => {
+    const filename = type === 'EXTERNAL' ? 'MauImportKhachCongNo.xlsx' : 'MauImportKhachBo.xlsx';
+    const link = document.createElement('a');
+    link.href = `/mau so/${filename}`;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
 
   const filteredCustomers = customers?.filter((customer) => {
@@ -173,7 +234,14 @@ const CustomersPage: React.FC = () => {
           </p>
         </div>
         {user?.roleCode !== 'STORE' && (
-          <div className="mt-4 sm:mt-0">
+          <div className="mt-4 sm:mt-0 flex gap-2">
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center px-4 py-2 border border-indigo-600 rounded-lg shadow-sm text-sm font-medium text-indigo-600 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+            >
+              <ArrowUpTrayIcon className="h-5 w-5 mr-2" />
+              Import Excel
+            </button>
             <button
               onClick={() => setIsModalOpen(true)}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
@@ -508,6 +576,115 @@ const CustomersPage: React.FC = () => {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-screen items-center justify-center p-4">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsImportModalOpen(false)} />
+
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  Import khách hàng từ Excel
+                </h3>
+                <button
+                  onClick={() => setIsImportModalOpen(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <XMarkIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Step 1: Download template */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <h4 className="font-medium text-blue-900 mb-3 flex items-center gap-2">
+                    <DocumentArrowDownIcon className="h-5 w-5" />
+                    Bước 1: Tải file mẫu
+                  </h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => handleDownloadTemplate('EXTERNAL')}
+                      className="px-4 py-3 bg-white border-2 border-blue-300 rounded-lg hover:bg-blue-50 transition-all text-sm font-medium text-blue-700"
+                    >
+                      📊 Khách công nợ (EXTERNAL)
+                    </button>
+                    <button
+                      onClick={() => handleDownloadTemplate('INTERNAL')}
+                      className="px-4 py-3 bg-white border-2 border-green-300 rounded-lg hover:bg-green-50 transition-all text-sm font-medium text-green-700"
+                    >
+                      💵 Khách bộ (INTERNAL)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Step 2: Upload file */}
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                    <ArrowUpTrayIcon className="h-5 w-5" />
+                    Bước 2: Tải file đã điền
+                  </h4>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-indigo-400 transition-all">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={handleFileSelect}
+                      className="hidden"
+                    />
+                    {selectedFile ? (
+                      <div className="space-y-2">
+                        <div className="text-green-600 font-medium">
+                          ✓ {selectedFile.name}
+                        </div>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-sm text-indigo-600 hover:text-indigo-700"
+                        >
+                          Chọn file khác
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-indigo-600 hover:text-indigo-700 font-medium"
+                        >
+                          Nhấn để chọn file Excel
+                        </button>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Hỗ trợ file .xlsx và .xls
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-3 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      setIsImportModalOpen(false);
+                      setSelectedFile(null);
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    onClick={handleImport}
+                    disabled={!selectedFile || isImporting}
+                    className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-medium hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isImporting ? 'Đang import...' : 'Import ngay'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

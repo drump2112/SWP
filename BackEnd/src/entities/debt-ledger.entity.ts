@@ -37,6 +37,9 @@ export class DebtLedger {
   @Column({ type: 'text', nullable: true })
   notes: string;
 
+  @Column({ name: 'superseded_by_shift_id', type: 'int', nullable: true })
+  supersededByShiftId: number | null; // Nếu != NULL: dữ liệu này đã bị thay thế bởi ca khác
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

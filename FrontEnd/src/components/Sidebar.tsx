@@ -16,7 +16,6 @@ import {
   DocumentChartBarIcon,
   BanknotesIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -71,8 +70,6 @@ const navigation: NavItem[] = [
     roles: ['ADMIN', 'DIRECTOR'],
     children: [
       { name: 'Nhập hàng', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],
   },
   {
@@ -83,8 +80,10 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Báo cáo doanh thu', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Báo cáo quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+      { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+      { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
     ],
   },
   {
@@ -97,7 +96,12 @@ const navigation: NavItem[] = [
     name: 'Cài đặt',
     href: '/settings',
     icon: Cog6ToothIcon,
-    roles: ['ADMIN']
+    roles: ['ADMIN'],
+    children: [
+      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
+      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
+      { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: CircleStackIcon, roles: ['ADMIN'] },
+    ],
   },
 ];
 

@@ -12,6 +12,10 @@ import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { Receipt } from '../entities/receipt.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
+import { InventoryDocument } from '../entities/inventory-document.entity';
+import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
+import { Product } from '../entities/product.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 
 @Injectable()
 export class ReportsService {
@@ -38,6 +42,14 @@ export class ReportsService {
     private cashDepositRepository: Repository<CashDeposit>,
     @InjectRepository(PumpReading)
     private pumpReadingRepository: Repository<PumpReading>,
+    @InjectRepository(InventoryDocument)
+    private inventoryDocumentRepository: Repository<InventoryDocument>,
+    @InjectRepository(InventoryDocumentItem)
+    private inventoryDocumentItemRepository: Repository<InventoryDocumentItem>,
+    @InjectRepository(Product)
+    private productRepository: Repository<Product>,
+    @InjectRepository(Warehouse)
+    private warehouseRepository: Repository<Warehouse>,
   ) {}
 
   // ==================== BÁO CÁO CÔNG NỢ ====================
@@ -568,32 +580,31 @@ export class ReportsService {
    * Báo cáo xuất hàng theo cột bơm
    */
   async getSalesByPumpReport(storeId: number, fromDate: Date, toDate: Date) {
-    const sql = `
-      SELECT
-        COALESCE(p.id, 0) as "pumpId",
-        COALESCE(p.pump_code, pr.pump_code) as "pumpCode",
-        COALESCE(p.name, pr.pump_code) as "pumpName",
-        prod.name as "productName",
-        SUM(pr.quantity) as "totalQuantity",
-        SUM(pr.quantity * pr.unit_price) as "totalAmount"
-      FROM pump_readings pr
-      LEFT JOIN shifts s ON pr.shift_id = s.id
-      LEFT JOIN pumps p ON p.pump_code = pr.pump_code AND p.store_id = s.store_id
-      LEFT JOIN products prod ON pr.product_id = prod.id
-      WHERE s.store_id = $1
-      AND s.shift_date BETWEEN $2 AND $3
-      GROUP BY p.id, p.pump_code, p.name, pr.pump_code, prod.name
-      ORDER BY "pumpCode" ASC
-    `;
+    try {
+      // Simplified query
+      const results = await this.pumpReadingRepository
+        .createQueryBuilder('pr')
+        .leftJoin('pr.shift', 'shift')
+        .leftJoin('pr.product', 'product')
+        .select('pr.pump_code', 'pumpCode')
+        .addSelect('product.name', 'productName')
+        .addSelect('pr.unit_price', 'unitPrice')
+        .addSelect('SUM(pr.quantity)', 'totalQuantity')
+        .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
+        .where('shift.store_id = :storeId', { storeId })
+        .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+        .andWhere('shift.status = :status', { status: 'CLOSED' })
+        .groupBy('pr.pump_code')
+        .addGroupBy('product.name')
+        .addGroupBy('pr.unit_price')
+        .getRawMany();
 
-    const result = await this.pumpReadingRepository.query(sql, [storeId, fromDate, toDate]);
-
-    // Convert string numbers to numbers (Postgres returns sums as strings)
-    return result.map(row => ({
-      ...row,
-      totalQuantity: Number(row.totalQuantity),
-      totalAmount: Number(row.totalAmount),
-    }));
+      console.log(`Sales by pump for store ${storeId}:`, results);
+      return results;
+    } catch (error) {
+      console.error('Error in getSalesByPumpReport:', error);
+      throw error;
+    }
   }
 
   /**
@@ -605,6 +616,7 @@ export class ReportsService {
       .leftJoin('pr.product', 'product')
       .select('product.id', 'productId')
       .addSelect('product.name', 'productName')
+      .addSelect('AVG(pr.unit_price)', 'unitPrice')
       .addSelect('SUM(pr.quantity)', 'totalQuantity')
       .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
       .where('shift.store_id = :storeId', { storeId })
@@ -614,5 +626,284 @@ export class ReportsService {
       .orderBy('product.name', 'ASC');
 
     return query.getRawMany();
+  }
+
+  // ==================== BÁO CÁO PHIẾU NHẬP KHO ====================
+
+  /**
+   * Báo cáo bảng kê nhập kho (In Bảng Kê Nhập)
+   * Tương tự như báo cáo công nợ, nhưng cho phiếu nhập kho
+   * @param params - Tham số lọc
+   * @returns Danh sách phiếu nhập kho với chi tiết
+   */
+  async getInventoryImportReport(params: {
+    warehouseId?: number;
+    storeId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+    docType?: string;
+  }) {
+    const { warehouseId, storeId, fromDate, toDate, docType } = params;
+
+    // Build query for inventory documents
+    const query = this.inventoryDocumentRepository
+      .createQueryBuilder('doc')
+      .leftJoinAndSelect('doc.warehouse', 'warehouse')
+      .leftJoinAndSelect('warehouse.store', 'store')
+      .leftJoinAndSelect('doc.items', 'items')
+      .leftJoinAndSelect('items.product', 'product')
+      .leftJoinAndSelect('items.tank', 'tank')
+      .orderBy('doc.docDate', 'DESC')
+      .addOrderBy('doc.id', 'DESC');
+
+    // Filter by warehouse
+    if (warehouseId) {
+      query.andWhere('doc.warehouseId = :warehouseId', { warehouseId });
+    }
+
+    // Filter by store
+    if (storeId) {
+      query.andWhere('warehouse.storeId = :storeId', { storeId });
+    }
+
+    // Filter by date range
+    if (fromDate) {
+      query.andWhere('doc.docDate >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      const nextDay = new Date(toDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      query.andWhere('doc.docDate < :toDate', { toDate: nextDay });
+    }
+
+    // Filter by document type (IMPORT, EXPORT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT)
+    if (docType) {
+      query.andWhere('doc.docType = :docType', { docType });
+    } else {
+      // Mặc định chỉ lấy phiếu nhập (IMPORT, TRANSFER_IN)
+      query.andWhere('doc.docType IN (:...docTypes)', {
+        docTypes: ['IMPORT', 'TRANSFER_IN']
+      });
+    }
+
+    const documents = await query.getMany();
+
+    // Format response
+    return documents.map((doc) => {
+      const totalQuantity = doc.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+      const totalAmount = doc.items.reduce(
+        (sum, item) => sum + Number(item.quantity) * Number(item.unitPrice || 0),
+        0,
+      );
+
+      return {
+        id: doc.id,
+        docDate: doc.docDate,
+        docType: doc.docType,
+        status: doc.status,
+        supplierName: doc.supplierName,
+        invoiceNumber: doc.invoiceNumber,
+        licensePlate: doc.licensePlate,
+        warehouse: {
+          id: doc.warehouse.id,
+          type: doc.warehouse.type,
+          storeName: doc.warehouse.store?.name || 'N/A',
+          storeCode: doc.warehouse.store?.code || 'N/A',
+        },
+        items: doc.items.map((item) => ({
+          id: item.id,
+          productId: item.product.id,
+          productCode: item.product.code,
+          productName: item.product.name,
+          quantity: Number(item.quantity),
+          unitPrice: Number(item.unitPrice || 0),
+          amount: Number(item.quantity) * Number(item.unitPrice || 0),
+          tankCode: item.tank?.tankCode || null,
+          tankName: item.tank?.name || null,
+        })),
+        totalQuantity,
+        totalAmount,
+      };
+    });
+  }
+
+  /**
+   * Báo cáo chi tiết một phiếu nhập kho
+   * @param documentId - ID phiếu nhập kho
+   * @returns Chi tiết phiếu nhập kho
+   */
+  async getInventoryImportDocumentDetail(documentId: number) {
+    const document = await this.inventoryDocumentRepository.findOne({
+      where: { id: documentId },
+      relations: [
+        'warehouse',
+        'warehouse.store',
+        'items',
+        'items.product',
+        'items.tank',
+      ],
+    });
+
+    if (!document) {
+      throw new Error('Inventory document not found');
+    }
+
+    const totalQuantity = document.items.reduce(
+      (sum, item) => sum + Number(item.quantity),
+      0,
+    );
+    const totalAmount = document.items.reduce(
+      (sum, item) => sum + Number(item.quantity) * Number(item.unitPrice || 0),
+      0,
+    );
+
+    return {
+      id: document.id,
+      docDate: document.docDate,
+      docType: document.docType,
+      status: document.status,
+      supplierName: document.supplierName,
+      invoiceNumber: document.invoiceNumber,
+      licensePlate: document.licensePlate,
+      warehouse: {
+        id: document.warehouse.id,
+        type: document.warehouse.type,
+        storeName: document.warehouse.store?.name || 'N/A',
+        storeCode: document.warehouse.store?.code || 'N/A',
+      },
+      items: document.items.map((item) => ({
+        id: item.id,
+        productId: item.product.id,
+        productCode: item.product.code,
+        productName: item.product.name,
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice || 0),
+        amount: Number(item.quantity) * Number(item.unitPrice || 0),
+        tankId: item.tank?.id || null,
+        tankCode: item.tank?.tankCode || null,
+        tankName: item.tank?.name || null,
+      })),
+      totalQuantity,
+      totalAmount,
+    };
+  }
+
+  /**
+   * Báo cáo tổng hợp nhập kho theo mặt hàng
+   * @param params - Tham số lọc
+   * @returns Tổng hợp nhập kho theo từng mặt hàng
+   */
+  async getInventoryImportSummaryByProduct(params: {
+    warehouseId?: number;
+    storeId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+  }) {
+    const { warehouseId, storeId, fromDate, toDate } = params;
+
+    const query = this.inventoryDocumentItemRepository
+      .createQueryBuilder('item')
+      .leftJoin('item.document', 'doc')
+      .leftJoin('doc.warehouse', 'warehouse')
+      .leftJoin('item.product', 'product')
+      .select('product.id', 'productId')
+      .addSelect('product.code', 'productCode')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(item.quantity)', 'totalQuantity')
+      .addSelect('SUM(item.quantity * item.unitPrice)', 'totalAmount')
+      .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
+      .where('doc.docType IN (:...docTypes)', {
+        docTypes: ['IMPORT', 'TRANSFER_IN']
+      })
+      .groupBy('product.id')
+      .addGroupBy('product.code')
+      .addGroupBy('product.name')
+      .orderBy('product.code', 'ASC');
+
+    if (warehouseId) {
+      query.andWhere('doc.warehouseId = :warehouseId', { warehouseId });
+    }
+
+    if (storeId) {
+      query.andWhere('warehouse.storeId = :storeId', { storeId });
+    }
+
+    if (fromDate) {
+      query.andWhere('doc.docDate >= :fromDate', { fromDate });
+    }
+
+    if (toDate) {
+      const nextDay = new Date(toDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      query.andWhere('doc.docDate < :toDate', { toDate: nextDay });
+    }
+
+    const results = await query.getRawMany();
+
+    return results.map((r) => ({
+      productId: r.productId,
+      productCode: r.productCode,
+      productName: r.productName,
+      totalQuantity: Number(r.totalQuantity || 0),
+      totalAmount: Number(r.totalAmount || 0),
+      documentCount: Number(r.documentCount || 0),
+      averagePrice: Number(r.totalQuantity) > 0
+        ? Number(r.totalAmount) / Number(r.totalQuantity)
+        : 0,
+    }));
+  }
+
+  /**
+   * Báo cáo tổng hợp nhập kho theo nhà cung cấp
+   * @param params - Tham số lọc
+   * @returns Tổng hợp nhập kho theo từng nhà cung cấp
+   */
+  async getInventoryImportSummaryBySupplier(params: {
+    warehouseId?: number;
+    storeId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+  }) {
+    const { warehouseId, storeId, fromDate, toDate } = params;
+
+    const query = this.inventoryDocumentRepository
+      .createQueryBuilder('doc')
+      .leftJoin('doc.warehouse', 'warehouse')
+      .leftJoin('doc.items', 'items')
+      .select('doc.supplierName', 'supplierName')
+      .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
+      .addSelect('SUM(items.quantity * items.unitPrice)', 'totalAmount')
+      .where('doc.docType IN (:...docTypes)', {
+        docTypes: ['IMPORT', 'TRANSFER_IN']
+      })
+      .andWhere('doc.supplierName IS NOT NULL')
+      .groupBy('doc.supplierName')
+      .orderBy('totalAmount', 'DESC');
+
+    if (warehouseId) {
+      query.andWhere('doc.warehouseId = :warehouseId', { warehouseId });
+    }
+
+    if (storeId) {
+      query.andWhere('warehouse.storeId = :storeId', { storeId });
+    }
+
+    if (fromDate) {
+      query.andWhere('doc.docDate >= :fromDate', { fromDate });
+    }
+
+    if (toDate) {
+      const nextDay = new Date(toDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      query.andWhere('doc.docDate < :toDate', { toDate: nextDay });
+    }
+
+    const results = await query.getRawMany();
+
+    return results.map((r) => ({
+      supplierName: r.supplierName || 'N/A',
+      documentCount: Number(r.documentCount || 0),
+      totalAmount: Number(r.totalAmount || 0),
+    }));
   }
 }
