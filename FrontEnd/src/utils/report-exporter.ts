@@ -44,10 +44,11 @@ export const createReportWorkbook = (sheetName: string) => {
 export const addReportHeader = (
   worksheet: ExcelJS.Worksheet,
   options: {
-    storeName: string;
+    storeName?: string;
     title: string;
-    fromDate: string;
-    toDate: string;
+    fromDate?: string;
+    toDate?: string;
+    reportDate?: string;
     customerName?: string;
   }
 ) => {
@@ -59,11 +60,13 @@ export const addReportHeader = (
   companyCell.alignment = STYLES.leftAlign;
 
   // Store Name
-  worksheet.mergeCells("A2:E2");
-  const storeCell = worksheet.getCell("A2");
-  storeCell.value = `Cửa hàng: ${options.storeName}`;
-  storeCell.font = STYLES.boldFont;
-  storeCell.alignment = STYLES.leftAlign;
+  if (options.storeName) {
+    worksheet.mergeCells("A2:E2");
+    const storeCell = worksheet.getCell("A2");
+    storeCell.value = `Cửa hàng: ${options.storeName}`;
+    storeCell.font = STYLES.boldFont;
+    storeCell.alignment = STYLES.leftAlign;
+  }
 
   // Report Title
   worksheet.mergeCells("A3:H3");
@@ -72,26 +75,37 @@ export const addReportHeader = (
   titleCell.font = STYLES.titleFont;
   titleCell.alignment = STYLES.centerAlign;
 
-  // Date Range
+  // Date Information
   worksheet.mergeCells("A4:H4");
   const dateCell = worksheet.getCell("A4");
-  dateCell.value = `Từ ngày ${dayjs(options.fromDate).format("DD/MM/YYYY")} đến ngày: ${dayjs(options.toDate).format(
-    "DD/MM/YYYY"
-  )}`;
+  if (options.fromDate && options.toDate) {
+    dateCell.value = `Từ ngày ${dayjs(options.fromDate).format("DD/MM/YYYY")} đến ngày: ${dayjs(options.toDate).format(
+      "DD/MM/YYYY"
+    )}`;
+  } else if (options.reportDate) {
+    dateCell.value = `Ngày báo cáo: ${dayjs(options.reportDate).format("DD/MM/YYYY HH:mm")}`;
+  }
   dateCell.font = STYLES.italicFont;
   dateCell.alignment = STYLES.centerAlign;
 
-  // Customer Name
-  worksheet.mergeCells("A5:H5");
-  const customerCell = worksheet.getCell("A5");
-  customerCell.value = options.customerName || `Khách hàng: XUẤT BÁN LẺ TẠI ${options.storeName.toUpperCase()}`;
-  customerCell.font = STYLES.normalFont;
-  customerCell.alignment = STYLES.centerAlign;
+  // Customer Name (Optional)
+  if (options.customerName) {
+    worksheet.mergeCells("A5:H5");
+    const customerCell = worksheet.getCell("A5");
+    customerCell.value = options.customerName;
+    customerCell.font = STYLES.normalFont;
+    customerCell.alignment = STYLES.centerAlign;
+  }
 
   worksheet.addRow([]); // Empty row 6
 };
 
-export const addReportFooter = (worksheet: ExcelJS.Worksheet) => {
+export const addReportFooter = (
+  worksheet: ExcelJS.Worksheet,
+  options: {
+    signatures?: { left?: string; center?: string; right?: string };
+  } = {}
+) => {
   worksheet.addRow([]);
   worksheet.addRow([]);
   const dateRow = worksheet.addRow([
@@ -107,7 +121,21 @@ export const addReportFooter = (worksheet: ExcelJS.Worksheet) => {
   dateRow.getCell(7).font = { name: "Times New Roman", size: 11, italic: true };
   worksheet.mergeCells(`G${dateRow.number}:I${dateRow.number}`);
 
-  const signTitleRow = worksheet.addRow(["Khách hàng", "", "", "", "Cửa hàng trưởng", "", "Người lập"]);
+  const signatures = options.signatures || {
+    left: "Khách hàng",
+    center: "Cửa hàng trưởng",
+    right: "Người lập",
+  };
+
+  const signTitleRow = worksheet.addRow([
+    signatures.left || "",
+    "",
+    "",
+    "",
+    signatures.center || "",
+    "",
+    signatures.right || "",
+  ]);
   signTitleRow.font = STYLES.boldFont;
   signTitleRow.getCell(1).alignment = STYLES.centerAlign;
   signTitleRow.getCell(5).alignment = STYLES.centerAlign;

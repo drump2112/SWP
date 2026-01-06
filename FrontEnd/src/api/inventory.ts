@@ -1,4 +1,4 @@
-import client from './client';
+import client from "./client";
 
 export interface InventoryItemDto {
   productId: number;
@@ -57,13 +57,28 @@ export interface InventoryReportItem {
   closingBalance: number;
 }
 
+export interface StockProductDto {
+  productId: number;
+  productCode: string;
+  productName: string;
+  totalStock: number;
+  unit: string;
+}
+
+export interface StockReportDto {
+  storeId: number;
+  warehouseId: number;
+  reportDate: string;
+  products: StockProductDto[];
+}
+
 export const inventoryApi = {
   createDocument: async (data: CreateInventoryDocumentDto) => {
-    const response = await client.post('/inventory/documents', data);
+    const response = await client.post("/inventory/documents", data);
     return response.data;
   },
   createDocumentWithTruck: async (data: CreateInventoryDocumentWithTruckDto) => {
-    const response = await client.post('/inventory/documents/with-truck', data);
+    const response = await client.post("/inventory/documents/with-truck", data);
     return response.data;
   },
   getDocumentWithTruck: async (documentId: number) => {
@@ -72,16 +87,24 @@ export const inventoryApi = {
   },
   exportDocumentToExcel: async (documentId: number) => {
     const response = await client.get(`/inventory/documents/with-truck/${documentId}/export-excel`, {
-      responseType: 'blob',
+      responseType: "blob",
     });
     return response.data;
   },
   getInventoryReport: async (warehouseId: number, fromDate?: string, toDate?: string) => {
-    const response = await client.get<InventoryReportItem[]>(`/inventory/report/${warehouseId}`, { params: { fromDate, toDate } });
+    const response = await client.get<InventoryReportItem[]>(`/inventory/report/${warehouseId}`, {
+      params: { fromDate, toDate },
+    });
     return response.data;
   },
   getInventoryReportByStore: async (storeId: number, fromDate?: string, toDate?: string) => {
-    const response = await client.get<InventoryReportItem[]>(`/inventory/report-by-store/${storeId}`, { params: { fromDate, toDate } });
+    const response = await client.get<InventoryReportItem[]>(`/inventory/report-by-store/${storeId}`, {
+      params: { fromDate, toDate },
+    });
+    return response.data;
+  },
+  getStockReport: async (storeId: number) => {
+    const response = await client.get<StockReportDto>(`/inventory/stock-report/${storeId}`);
     return response.data;
   },
   getDocuments: async (storeId: number, type: string, fromDate: string, toDate: string) => {
