@@ -11,7 +11,13 @@ import {
   ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
-import ExcelJS from "exceljs";
+import {
+  createReportWorkbook,
+  addReportHeader,
+  addReportFooter,
+  downloadExcel,
+  STYLES,
+} from "../utils/report-exporter";
 
 const SalesReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -70,72 +76,14 @@ const SalesReportPage: React.FC = () => {
     // @ts-ignore
     const storeName = user?.store?.name || stores?.find((s) => s.id === selectedStoreId)?.name || "Cửa hàng";
 
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Báo cáo xuất hàng", {
-      views: [{ showGridLines: false }],
-      pageSetup: {
-        paperSize: 9, // A4
-        orientation: "portrait",
-        fitToPage: true,
-        fitToWidth: 1,
-        fitToHeight: 0, // auto height
-        margins: {
-          left: 0.7,
-          right: 0.7,
-          top: 0.75,
-          bottom: 0.75,
-          header: 0.3,
-          footer: 0.3,
-        },
-      },
+    const { workbook, worksheet } = createReportWorkbook("Báo cáo xuất hàng");
+
+    addReportHeader(worksheet, {
+      storeName,
+      title: "BẢNG KÊ CHI TIẾT BÁN HÀNG",
+      fromDate,
+      toDate,
     });
-
-    // Styles
-    const titleFont = { name: "Times New Roman", size: 16, bold: true };
-    const headerFont = { name: "Times New Roman", size: 11, bold: true };
-    const normalFont = { name: "Times New Roman", size: 11 };
-    const boldFont = { name: "Times New Roman", size: 11, bold: true };
-
-    const centerAlign: Partial<ExcelJS.Alignment> = { vertical: "middle", horizontal: "center", wrapText: true };
-    const leftAlign: Partial<ExcelJS.Alignment> = { vertical: "middle", horizontal: "left", wrapText: true };
-    const rightAlign: Partial<ExcelJS.Alignment> = { vertical: "middle", horizontal: "right", wrapText: true };
-
-    const borderStyle: Partial<ExcelJS.Borders> = {
-      top: { style: "thin" },
-      left: { style: "thin" },
-      bottom: { style: "thin" },
-      right: { style: "thin" },
-    };
-
-    // Store Name
-    worksheet.mergeCells("A1:E1");
-    const storeCell = worksheet.getCell("A1");
-    storeCell.value = `Cửa hàng: ${storeName}`;
-    storeCell.font = boldFont;
-    storeCell.alignment = leftAlign;
-
-    // Report Title
-    worksheet.mergeCells("A3:H3");
-    const titleCell = worksheet.getCell("A3");
-    titleCell.value = "BẢNG KÊ CHI TIẾT BÁN HÀNG";
-    titleCell.font = titleFont;
-    titleCell.alignment = centerAlign;
-
-    // Date Range
-    worksheet.mergeCells("A4:H4");
-    const dateCell = worksheet.getCell("A4");
-    dateCell.value = `Từ ngày ${dayjs(fromDate).format("DD/MM/YYYY")} đến ngày: ${dayjs(toDate).format("DD/MM/YYYY")}`;
-    dateCell.font = { name: "Times New Roman", size: 12, italic: true };
-    dateCell.alignment = centerAlign;
-
-    // Customer Name (Hardcoded for now as per image or requirements)
-    worksheet.mergeCells("A5:H5");
-    const customerCell = worksheet.getCell("A5");
-    customerCell.value = `Khách hàng: XUẤT BÁN LẺ TẠI ` + storeName.toUpperCase(); // Or customize if needed
-    customerCell.font = normalFont;
-    customerCell.alignment = centerAlign;
-
-    worksheet.addRow([]); // Empty row 6
 
     // Columns setup
     worksheet.columns = [
@@ -163,10 +111,10 @@ const SalesReportPage: React.FC = () => {
       "Thành tiền",
       "Người nhận",
     ];
-    headerRow.font = headerFont;
-    headerRow.alignment = centerAlign;
+    headerRow.font = STYLES.headerFont;
+    headerRow.alignment = STYLES.centerAlign;
     headerRow.eachCell((cell) => {
-      cell.border = borderStyle;
+      cell.border = STYLES.borderStyle;
     });
 
     // Data Processing & Grouping
@@ -203,13 +151,13 @@ const SalesReportPage: React.FC = () => {
 
         worksheet.mergeCells(`A${groupRow.number}:D${groupRow.number}`);
 
-        groupRow.font = boldFont;
+        groupRow.font = STYLES.boldFont;
         groupRow.eachCell((cell, colNumber) => {
-          cell.border = borderStyle;
-          if (colNumber === 1) cell.alignment = leftAlign;
+          cell.border = STYLES.borderStyle;
+          if (colNumber === 1) cell.alignment = STYLES.leftAlign;
           if (colNumber === 6 || colNumber === 8) {
             cell.numFmt = colNumber === 6 ? "#,##0.00" : "#,##0";
-            cell.alignment = rightAlign;
+            cell.alignment = STYLES.rightAlign;
           }
         });
 
@@ -227,15 +175,15 @@ const SalesReportPage: React.FC = () => {
             "", // Người nhận
           ]);
 
-          row.font = normalFont;
+          row.font = STYLES.normalFont;
           row.eachCell((cell, colNumber) => {
-            cell.border = borderStyle;
+            cell.border = STYLES.borderStyle;
             if (colNumber === 1 || colNumber === 2 || colNumber === 3 || colNumber === 5) {
-              cell.alignment = centerAlign;
+              cell.alignment = STYLES.centerAlign;
             } else if (colNumber === 4) {
-              cell.alignment = leftAlign;
+              cell.alignment = STYLES.leftAlign;
             } else {
-              cell.alignment = rightAlign;
+              cell.alignment = STYLES.rightAlign;
               if (colNumber === 6) cell.numFmt = "#,##0.00"; // Quantity
               else if (colNumber === 7 || colNumber === 8) cell.numFmt = "#,##0"; // Price, Amount
             }
@@ -248,12 +196,12 @@ const SalesReportPage: React.FC = () => {
 
       // Total Row
       const totalRow = worksheet.addRow(["", "", "", "Cộng tổng", "", totalAllQuantity, "", totalAllAmount, ""]);
-      totalRow.font = boldFont;
+      totalRow.font = STYLES.boldFont;
       totalRow.eachCell((cell, colNumber) => {
-        cell.border = borderStyle;
-        if (colNumber === 4) cell.alignment = centerAlign;
+        cell.border = STYLES.borderStyle;
+        if (colNumber === 4) cell.alignment = STYLES.centerAlign;
         if (colNumber === 6 || colNumber === 8) {
-          cell.alignment = rightAlign;
+          cell.alignment = STYLES.rightAlign;
           cell.numFmt = colNumber === 6 ? "#,##0.00" : "#,##0";
         }
       });
@@ -280,52 +228,18 @@ const SalesReportPage: React.FC = () => {
         totalQuantity += Number(item.totalQuantity);
         totalAmount += Number(item.totalAmount);
 
-        row.font = normalFont;
-        row.eachCell((cell) => (cell.border = borderStyle));
+        row.font = STYLES.normalFont;
+        row.eachCell((cell) => (cell.border = STYLES.borderStyle));
       });
 
       const totalRow = worksheet.addRow(["", "", "", "Tổng cộng", "", totalQuantity, "", totalAmount, ""]);
-      totalRow.font = boldFont;
-      totalRow.eachCell((cell) => (cell.border = borderStyle));
+      totalRow.font = STYLES.boldFont;
+      totalRow.eachCell((cell) => (cell.border = STYLES.borderStyle));
       worksheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
     }
 
-    // Signatures
-    worksheet.addRow([]);
-    worksheet.addRow([]);
-    const dateRow = worksheet.addRow([
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      `Ngày ${dayjs().date()} tháng ${dayjs().month() + 1} năm ${dayjs().year()}`,
-    ]);
-    dateRow.getCell(7).alignment = { horizontal: "center" };
-    dateRow.getCell(7).font = { name: "Times New Roman", size: 11, italic: true };
-    worksheet.mergeCells(`G${dateRow.number}:I${dateRow.number}`);
-
-    const signTitleRow = worksheet.addRow(["Khách hàng", "", "", "", "Cửa hàng trưởng", "", "Người lập"]);
-    signTitleRow.font = boldFont;
-    signTitleRow.getCell(1).alignment = centerAlign;
-    signTitleRow.getCell(5).alignment = centerAlign;
-    signTitleRow.getCell(7).alignment = centerAlign;
-
-    // Merge cells for signatures alignment
-    worksheet.mergeCells(`A${signTitleRow.number}:C${signTitleRow.number}`);
-    worksheet.mergeCells(`E${signTitleRow.number}:F${signTitleRow.number}`);
-    worksheet.mergeCells(`G${signTitleRow.number}:I${signTitleRow.number}`);
-
-    // Export
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `Bao_cao_xuat_hang_${dayjs().format("YYYYMMDD_HHmmss")}.xlsx`;
-    anchor.click();
-    window.URL.revokeObjectURL(url);
+    addReportFooter(worksheet);
+    await downloadExcel(workbook, "Bao_cao_xuat_hang");
   };
 
   return (
