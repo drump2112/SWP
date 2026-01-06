@@ -1,4 +1,11 @@
-import { Controller, Get, Query, Param, UseGuards, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Param,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -26,9 +33,8 @@ export class ReportsController {
     @Query('toDate') toDate?: string,
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
-    const effectiveStoreId = user.roleCode === 'STORE'
-      ? user.storeId
-      : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getDebtReport({
       storeId: effectiveStoreId,
@@ -105,7 +111,8 @@ export class ReportsController {
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     if (!effectiveStoreId) {
       throw new BadRequestException('Store ID is required');
@@ -126,8 +133,26 @@ export class ReportsController {
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
     return this.reportsService.getSalesByProductReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
+    );
+  }
+
+  @Get('sales/by-shift')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByShiftReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+    return this.reportsService.getSalesByShiftReport(
       effectiveStoreId,
       new Date(fromDate),
       new Date(toDate),
@@ -150,9 +175,8 @@ export class ReportsController {
     @Query('refType') refType?: string,
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
-    const effectiveStoreId = user.roleCode === 'STORE'
-      ? user.storeId
-      : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getCashReport({
       storeId: effectiveStoreId,
@@ -164,7 +188,9 @@ export class ReportsController {
   @Get('inventory')
   @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getInventoryReport(@Query('warehouseId') warehouseId?: string) {
-    return this.reportsService.getInventoryReport(warehouseId ? +warehouseId : undefined);
+    return this.reportsService.getInventoryReport(
+      warehouseId ? +warehouseId : undefined,
+    );
   }
 
   @Get('dashboard')
@@ -198,9 +224,8 @@ export class ReportsController {
     @Query('docType') docType?: string,
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
-    const effectiveStoreId = user.roleCode === 'STORE'
-      ? user.storeId
-      : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getInventoryImportReport({
       warehouseId: warehouseId ? +warehouseId : undefined,
@@ -234,9 +259,8 @@ export class ReportsController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE'
-      ? user.storeId
-      : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getInventoryImportSummaryByProduct({
       warehouseId: warehouseId ? +warehouseId : undefined,
@@ -259,9 +283,8 @@ export class ReportsController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE'
-      ? user.storeId
-      : (storeId ? +storeId : undefined);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getInventoryImportSummaryBySupplier({
       warehouseId: warehouseId ? +warehouseId : undefined,

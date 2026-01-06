@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict q3hT4Drp2tSLSr3HOHZefUeZIjceTWeU4DxryKu4ShvGB5a9L11AaDSxGipvpjQ
+\restrict 3Iq8Eya3NGHWF9BvzbMFA0MryglPN0ta1yy7OsbyXG1r3RLg1Bq4BdQbOQFCNfe
 
 -- Dumped from database version 15.15 (Debian 15.15-1.pgdg13+1)
 -- Dumped by pg_dump version 15.15 (Debian 15.15-1.pgdg13+1)
@@ -212,7 +212,8 @@ CREATE TABLE public.cash_ledger (
     ref_id integer,
     cash_in numeric(18,2) DEFAULT '0'::numeric NOT NULL,
     cash_out numeric(18,2) DEFAULT '0'::numeric NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    superseded_by_shift_id integer
 );
 
 
@@ -264,7 +265,8 @@ CREATE TABLE public.customers (
     address character varying(500),
     phone character varying(20),
     credit_limit numeric(15,2),
-    notes text
+    notes text,
+    type character varying(20) DEFAULT 'EXTERNAL'::character varying NOT NULL
 );
 
 
@@ -305,7 +307,8 @@ CREATE TABLE public.debt_ledger (
     debit numeric(18,2) DEFAULT '0'::numeric NOT NULL,
     credit numeric(18,2) DEFAULT '0'::numeric NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    notes text
+    notes text,
+    superseded_by_shift_id integer
 );
 
 
@@ -423,7 +426,8 @@ CREATE TABLE public.inventory_document_items (
     document_id integer NOT NULL,
     product_id integer,
     quantity numeric(18,3),
-    unit_price numeric(18,2)
+    unit_price numeric(18,2),
+    tank_id integer
 );
 
 
@@ -461,7 +465,10 @@ CREATE TABLE public.inventory_documents (
     doc_type character varying(50),
     doc_date date,
     ref_shift_id integer,
-    status character varying(20)
+    status character varying(20),
+    supplier_name character varying(255),
+    invoice_number character varying(50),
+    license_plate character varying(20)
 );
 
 
@@ -501,7 +508,9 @@ CREATE TABLE public.inventory_ledger (
     ref_id integer,
     quantity_in numeric(18,3) DEFAULT '0'::numeric NOT NULL,
     quantity_out numeric(18,3) DEFAULT '0'::numeric NOT NULL,
-    created_at timestamp without time zone DEFAULT now() NOT NULL
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    tank_id integer,
+    superseded_by_shift_id integer
 );
 
 
@@ -527,6 +536,266 @@ ALTER TABLE public.inventory_ledger_id_seq OWNER TO postgres;
 --
 
 ALTER SEQUENCE public.inventory_ledger_id_seq OWNED BY public.inventory_ledger.id;
+
+
+--
+-- Name: inventory_loss_calculations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.inventory_loss_calculations (
+    id integer NOT NULL,
+    document_id integer NOT NULL,
+    expansion_coefficient numeric(10,6),
+    loss_coefficient numeric(10,6),
+    total_truck_volume numeric(18,3),
+    total_actual_volume numeric(18,3),
+    total_received_volume numeric(18,3),
+    total_loss_volume numeric(18,3),
+    allowed_loss_volume numeric(18,3),
+    excess_shortage_volume numeric(18,3),
+    temperature_adjustment_volume numeric(18,3),
+    notes text,
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.inventory_loss_calculations OWNER TO postgres;
+
+--
+-- Name: COLUMN inventory_loss_calculations.expansion_coefficient; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.expansion_coefficient IS 'Hệ số giãn nở (β)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.loss_coefficient; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.loss_coefficient IS 'Hệ số hao hụt vận chuyển (α)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.total_truck_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.total_truck_volume IS 'Tổng thể tích tại xe téc (lít)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.total_actual_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.total_actual_volume IS 'Tổng thể tích thực tế (lít)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.total_received_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.total_received_volume IS 'Tổng lượng thực nhận (lít)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.total_loss_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.total_loss_volume IS 'Tổng hao hụt (lít)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.allowed_loss_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.allowed_loss_volume IS 'Hao hụt cho phép (lít)';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.excess_shortage_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.excess_shortage_volume IS 'Lượng thừa/thiếu (lít) - Dương: thừa, Âm: thiếu';
+
+
+--
+-- Name: COLUMN inventory_loss_calculations.temperature_adjustment_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_loss_calculations.temperature_adjustment_volume IS 'Lượng điều chỉnh do nhiệt độ (lít)';
+
+
+--
+-- Name: inventory_loss_calculations_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.inventory_loss_calculations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.inventory_loss_calculations_id_seq OWNER TO postgres;
+
+--
+-- Name: inventory_loss_calculations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.inventory_loss_calculations_id_seq OWNED BY public.inventory_loss_calculations.id;
+
+
+--
+-- Name: inventory_truck_compartments; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.inventory_truck_compartments (
+    id integer NOT NULL,
+    document_id integer NOT NULL,
+    product_id integer,
+    compartment_number integer NOT NULL,
+    compartment_height numeric(10,2),
+    truck_temperature numeric(5,2),
+    truck_volume numeric(18,3),
+    warehouse_height numeric(10,2),
+    actual_temperature numeric(5,2),
+    actual_volume numeric(18,3),
+    received_volume numeric(18,3),
+    loss_volume numeric(18,3),
+    height_loss_truck numeric(10,2),
+    height_loss_warehouse numeric(10,2),
+    created_at timestamp without time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.inventory_truck_compartments OWNER TO postgres;
+
+--
+-- Name: COLUMN inventory_truck_compartments.compartment_height; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.compartment_height IS 'Chiều cao téc tại ngăn (cm)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.truck_temperature; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.truck_temperature IS 'Nhiệt độ tại xe téc (°C)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.truck_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.truck_volume IS 'Thể tích tại nhiệt độ xe téc (lít)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.warehouse_height; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.warehouse_height IS 'Chiều cao téc tại kho (cm)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.actual_temperature; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.actual_temperature IS 'Nhiệt độ thực tế (°C)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.actual_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.actual_volume IS 'Thể tích tại nhiệt độ thực tế (lít)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.received_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.received_volume IS 'Lượng thực nhận (lít)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.loss_volume; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.loss_volume IS 'Lượng hao hụt (lít)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.height_loss_truck; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.height_loss_truck IS 'Hao hụt chiều cao đo đạc tại xe (cm)';
+
+
+--
+-- Name: COLUMN inventory_truck_compartments.height_loss_warehouse; Type: COMMENT; Schema: public; Owner: postgres
+--
+
+COMMENT ON COLUMN public.inventory_truck_compartments.height_loss_warehouse IS 'Hao hụt chiều cao téc tại kho (cm)';
+
+
+--
+-- Name: inventory_truck_compartments_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.inventory_truck_compartments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.inventory_truck_compartments_id_seq OWNER TO postgres;
+
+--
+-- Name: inventory_truck_compartments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.inventory_truck_compartments_id_seq OWNED BY public.inventory_truck_compartments.id;
+
+
+--
+-- Name: migrations; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.migrations (
+    id integer NOT NULL,
+    "timestamp" bigint NOT NULL,
+    name character varying NOT NULL
+);
+
+
+ALTER TABLE public.migrations OWNER TO postgres;
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.migrations_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER TABLE public.migrations_id_seq OWNER TO postgres;
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.migrations_id_seq OWNED BY public.migrations.id;
 
 
 --
@@ -652,7 +921,8 @@ CREATE TABLE public.pump_readings (
     start_value numeric(18,3),
     end_value numeric(18,3),
     quantity numeric(18,3),
-    pump_id integer
+    pump_id integer,
+    unit_price numeric(18,2)
 );
 
 
@@ -1009,7 +1279,10 @@ CREATE TABLE public.shifts (
     shift_no integer NOT NULL,
     opened_at timestamp without time zone,
     closed_at timestamp without time zone,
-    status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL
+    status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL,
+    version integer DEFAULT 1 NOT NULL,
+    adjusted_from_shift_id integer,
+    is_active boolean DEFAULT true NOT NULL
 );
 
 
@@ -1087,10 +1360,10 @@ CREATE TABLE public.tanks (
     name character varying(200) NOT NULL,
     capacity numeric(18,3) NOT NULL,
     product_id integer NOT NULL,
-    current_stock numeric(18,3) DEFAULT '0'::numeric NOT NULL,
     is_active boolean DEFAULT true NOT NULL,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
-    updated_at timestamp without time zone DEFAULT now() NOT NULL
+    updated_at timestamp without time zone DEFAULT now() NOT NULL,
+    current_stock numeric(18,3) DEFAULT '0'::numeric NOT NULL
 );
 
 
@@ -1131,6 +1404,21 @@ ALTER TABLE public.tanks_id_seq OWNER TO postgres;
 
 ALTER SEQUENCE public.tanks_id_seq OWNED BY public.tanks.id;
 
+
+--
+-- Name: user_tokens; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.user_tokens (
+    id character varying NOT NULL,
+    user_id integer NOT NULL,
+    expires_at timestamp without time zone NOT NULL,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    is_revoked boolean DEFAULT false NOT NULL
+);
+
+
+ALTER TABLE public.user_tokens OWNER TO postgres;
 
 --
 -- Name: users; Type: TABLE; Schema: public; Owner: postgres
@@ -1292,6 +1580,27 @@ ALTER TABLE ONLY public.inventory_ledger ALTER COLUMN id SET DEFAULT nextval('pu
 
 
 --
+-- Name: inventory_loss_calculations id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_loss_calculations ALTER COLUMN id SET DEFAULT nextval('public.inventory_loss_calculations_id_seq'::regclass);
+
+
+--
+-- Name: inventory_truck_compartments id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_truck_compartments ALTER COLUMN id SET DEFAULT nextval('public.inventory_truck_compartments_id_seq'::regclass);
+
+
+--
+-- Name: migrations id; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.migrations ALTER COLUMN id SET DEFAULT nextval('public.migrations_id_seq'::regclass);
+
+
+--
 -- Name: permissions id; Type: DEFAULT; Schema: public; Owner: postgres
 --
 
@@ -1415,8 +1724,8 @@ ALTER TABLE ONLY public.warehouses ALTER COLUMN id SET DEFAULT nextval('public.w
 --
 
 COPY public.audit_logs (id, table_name, record_id, action, old_data, new_data, changed_by, changed_at) FROM stdin;
-1	shifts	2	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-02T15:10:18.477Z"}	\N	2026-01-02 15:10:18.358462
-2	shifts	5	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-02T15:57:22.104Z"}	\N	2026-01-02 15:57:22.087025
+13	shifts	19	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-06T10:00:00.000Z"}	\N	2026-01-06 10:00:48.394255
+14	shifts	20	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-06T12:33:00.000Z"}	\N	2026-01-06 12:34:02.961378
 \.
 
 
@@ -1441,6 +1750,8 @@ COPY public.bank_ledger (id, bank_account_id, store_id, ref_type, ref_id, bank_i
 --
 
 COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit_time, receiver_name, notes, created_by, created_at, payment_method) FROM stdin;
+8	1	19	11876500.00	2026-01-06	\N	\N	Nộp tiền bán hàng	\N	2026-01-06 10:00:48.394255	CASH
+9	1	20	739800.00	2026-01-06	\N	\N	Nop tien hang	\N	2026-01-06 12:34:02.961378	CASH
 \.
 
 
@@ -1448,9 +1759,11 @@ COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit
 -- Data for Name: cash_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.cash_ledger (id, store_id, ref_type, ref_id, cash_in, cash_out, created_at) FROM stdin;
-3	1	SHIFT_CLOSE	2	10947581.09	0.00	2026-01-02 15:10:18.358462
-4	2	SHIFT_CLOSE	5	10723000.00	0.00	2026-01-02 15:57:22.087025
+COPY public.cash_ledger (id, store_id, ref_type, ref_id, cash_in, cash_out, created_at, superseded_by_shift_id) FROM stdin;
+20	1	SHIFT_CLOSE	19	12822000.00	0.00	2026-01-06 10:00:48.394255	\N
+21	1	DEPOSIT	8	0.00	11876500.00	2026-01-06 10:00:48.394255	\N
+22	1	SHIFT_CLOSE	20	912300.00	0.00	2026-01-06 12:34:02.961378	\N
+23	1	DEPOSIT	9	0.00	739800.00	2026-01-06 12:34:02.961378	\N
 \.
 
 
@@ -1459,6 +1772,8 @@ COPY public.cash_ledger (id, store_id, ref_type, ref_id, cash_in, cash_out, crea
 --
 
 COPY public.customer_stores (customer_id, store_id) FROM stdin;
+24	1
+25	16
 \.
 
 
@@ -1466,9 +1781,11 @@ COPY public.customer_stores (customer_id, store_id) FROM stdin;
 -- Data for Name: customers; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.customers (id, code, name, tax_code, address, phone, credit_limit, notes) FROM stdin;
-1	KH001	CÔNG TY TNHH O SUNG RF VINA	2301035391	Lô CN1-1, Khu công nghiệp Quế Võ 3, Phường Quế Võ, Tỉnh Bắc Ninh, Việt Nam	\N	\N	\N
-2	KH00002	CÔNG TY TNHH TUẤN MẠNH MD	2301101703	Thôn Mộ Đạo, Phường Bồng Lai, Tỉnh Bắc Ninh, Việt Nam	\N	\N	\N
+COPY public.customers (id, code, name, tax_code, address, phone, credit_limit, notes, type) FROM stdin;
+1	KH001	CÔNG TY TNHH O SUNG RF VINA	2301035391	Lô CN1-1, Khu công nghiệp Quế Võ 3, Phường Quế Võ, Tỉnh Bắc Ninh, Việt Nam	\N	\N	\N	EXTERNAL
+2	KH0002	CÔNG TY TNHH TUẤN MẠNH MD	2301101703	Thôn Mộ Đạo, Phường Bồng Lai, Tỉnh Bắc Ninh, Việt Nam	\N	\N	\N	EXTERNAL
+24	KH00002	abc	\N	1232131	031225666	\N	\N	INTERNAL
+25	KH00003	zxc	\N	zzzz	0915856356	\N	\N	INTERNAL
 \.
 
 
@@ -1476,10 +1793,9 @@ COPY public.customers (id, code, name, tax_code, address, phone, credit_limit, n
 -- Data for Name: debt_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.debt_ledger (id, customer_id, store_id, ref_type, ref_id, debit, credit, created_at, notes) FROM stdin;
-10	1	1	DEBT_SALE	9	862500.00	0.00	2026-01-02 15:10:18.358462	\N
-11	2	1	DEBT_SALE	10	862500.00	0.00	2026-01-02 15:10:18.358462	\N
-12	1	2	DEBT_SALE	11	1759000.00	0.00	2026-01-02 15:57:22.087025	\N
+COPY public.debt_ledger (id, customer_id, store_id, ref_type, ref_id, debit, credit, created_at, notes, superseded_by_shift_id) FROM stdin;
+18	2	1	DEBT_SALE	16	945500.00	0.00	2026-01-06 10:00:48.394255	Xuất công nợ tuấn mạnh	\N
+19	2	1	DEBT_SALE	17	172500.00	0.00	2026-01-06 12:34:02.961378	Bán công nợ	\N
 \.
 
 
@@ -1507,7 +1823,7 @@ COPY public.expenses (id, store_id, shift_id, expense_category_id, amount, descr
 -- Data for Name: inventory_document_items; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.inventory_document_items (id, document_id, product_id, quantity, unit_price) FROM stdin;
+COPY public.inventory_document_items (id, document_id, product_id, quantity, unit_price, tank_id) FROM stdin;
 \.
 
 
@@ -1515,7 +1831,7 @@ COPY public.inventory_document_items (id, document_id, product_id, quantity, uni
 -- Data for Name: inventory_documents; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.inventory_documents (id, warehouse_id, doc_type, doc_date, ref_shift_id, status) FROM stdin;
+COPY public.inventory_documents (id, warehouse_id, doc_type, doc_date, ref_shift_id, status, supplier_name, invoice_number, license_plate) FROM stdin;
 \.
 
 
@@ -1523,7 +1839,42 @@ COPY public.inventory_documents (id, warehouse_id, doc_type, doc_date, ref_shift
 -- Data for Name: inventory_ledger; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.inventory_ledger (id, warehouse_id, product_id, ref_type, ref_id, quantity_in, quantity_out, created_at) FROM stdin;
+COPY public.inventory_ledger (id, warehouse_id, product_id, ref_type, ref_id, quantity_in, quantity_out, created_at, tank_id, superseded_by_shift_id) FROM stdin;
+32	2	2	ADJUSTMENT	\N	11000.000	0.000	2026-01-06 08:19:18.268447	\N	\N
+33	2	3	ADJUSTMENT	\N	11000.000	0.000	2026-01-06 08:19:18.268447	\N	\N
+39	1	3	SHIFT_SALE	19	0.000	120.000	2026-01-06 10:00:48.394255	3	\N
+40	1	3	SHIFT_SALE	19	0.000	130.000	2026-01-06 10:00:48.394255	3	\N
+41	1	2	SHIFT_SALE	19	0.000	140.000	2026-01-06 10:00:48.394255	1	\N
+42	1	2	SHIFT_SALE	19	0.000	150.000	2026-01-06 10:00:48.394255	2	\N
+43	1	2	SHIFT_SALE	19	0.000	160.000	2026-01-06 10:00:48.394255	2	\N
+30	1	2	ADJUSTMENT	\N	10000.000	0.000	2026-01-01 07:45:33.488	\N	\N
+31	1	3	ADJUSTMENT	\N	10000.000	0.000	2026-01-01 07:45:33.488163	\N	\N
+44	1	3	SHIFT_SALE	20	0.000	20.000	2026-01-06 12:34:02.961378	\N	\N
+45	1	2	SHIFT_SALE	20	0.000	30.000	2026-01-06 12:34:02.961378	\N	\N
+\.
+
+
+--
+-- Data for Name: inventory_loss_calculations; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.inventory_loss_calculations (id, document_id, expansion_coefficient, loss_coefficient, total_truck_volume, total_actual_volume, total_received_volume, total_loss_volume, allowed_loss_volume, excess_shortage_volume, temperature_adjustment_volume, notes, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: inventory_truck_compartments; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.inventory_truck_compartments (id, document_id, product_id, compartment_number, compartment_height, truck_temperature, truck_volume, warehouse_height, actual_temperature, actual_volume, received_volume, loss_volume, height_loss_truck, height_loss_warehouse, created_at) FROM stdin;
+\.
+
+
+--
+-- Data for Name: migrations; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.migrations (id, "timestamp", name) FROM stdin;
 \.
 
 
@@ -1564,14 +1915,17 @@ COPY public.products (id, code, name, unit, is_fuel) FROM stdin;
 -- Data for Name: pump_readings; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.pump_readings (id, shift_id, pump_code, product_id, start_value, end_value, quantity, pump_id) FROM stdin;
-31	2	V1	3	0.000	120.000	120.000	\N
-32	2	V2	3	0.000	120.000	120.000	\N
-33	2	V3	2	0.000	120.000	120.000	\N
-34	2	V4	2	0.000	120.000	120.000	\N
-35	2	V5	2	0.000	119.999	119.999	\N
-36	5	V01	2	0.000	100.000	100.000	\N
-37	5	V02	3	0.000	500.000	500.000	\N
+COPY public.pump_readings (id, shift_id, pump_code, product_id, start_value, end_value, quantity, pump_id, unit_price) FROM stdin;
+66	19	V1	3	0.000	120.000	120.000	\N	17250.00
+67	19	V2	3	0.000	130.000	130.000	\N	17250.00
+68	19	V3	2	0.000	140.000	140.000	\N	18910.00
+69	19	V4	2	0.000	150.000	150.000	\N	18910.00
+70	19	V5	2	0.000	160.000	160.000	\N	18910.00
+71	20	V1	3	120.000	130.000	10.000	\N	17250.00
+72	20	V2	3	130.000	140.000	10.000	\N	17250.00
+73	20	V3	2	140.000	150.000	10.000	\N	18910.00
+74	20	V4	2	150.000	160.000	10.000	\N	18910.00
+75	20	V5	2	160.000	170.000	10.000	\N	18910.00
 \.
 
 
@@ -1644,16 +1998,18 @@ COPY public.roles (id, code, name) FROM stdin;
 --
 
 COPY public.sales (id, shift_id, store_id, product_id, quantity, unit_price, amount, customer_id, payment_method) FROM stdin;
-27	2	1	3	120.000	17250.00	2070000.00	\N	CASH
-28	2	1	3	120.000	17250.00	2070000.00	\N	CASH
-29	2	1	2	120.000	18910.00	2269200.00	\N	CASH
-30	2	1	2	120.000	18910.00	2269200.00	\N	CASH
-31	2	1	2	119.999	18910.00	2269181.09	\N	CASH
-32	2	1	3	50.000	17250.00	862500.00	1	CASH
-33	2	1	3	50.000	17250.00	862500.00	2	CASH
-34	5	2	2	100.000	19280.00	1928000.00	\N	CASH
-35	5	2	3	500.000	17590.00	8795000.00	\N	CASH
-36	5	2	3	100.000	17590.00	1759000.00	1	CASH
+69	19	1	3	120.000	17250.00	2070000.00	\N	CASH
+70	19	1	3	130.000	17250.00	2242500.00	\N	CASH
+71	19	1	2	140.000	18910.00	2647400.00	\N	CASH
+72	19	1	2	150.000	18910.00	2836500.00	\N	CASH
+73	19	1	2	160.000	18910.00	3025600.00	\N	CASH
+74	19	1	2	50.000	18910.00	945500.00	2	CASH
+75	20	1	3	10.000	17250.00	172500.00	\N	CASH
+76	20	1	3	10.000	17250.00	172500.00	\N	CASH
+77	20	1	2	10.000	18910.00	189100.00	\N	CASH
+78	20	1	2	10.000	18910.00	189100.00	\N	CASH
+79	20	1	2	10.000	18910.00	189100.00	\N	CASH
+80	20	1	3	10.000	17250.00	172500.00	2	CASH
 \.
 
 
@@ -1670,9 +2026,8 @@ COPY public.shift_adjustments (id, shift_id, adjustment_type, reason, created_by
 --
 
 COPY public.shift_debt_sales (id, shift_id, customer_id, product_id, quantity, unit_price, amount, notes, created_at) FROM stdin;
-9	2	1	3	50.000	17250.00	862500.00	\N	2026-01-02 15:10:18.358462
-10	2	2	3	50.000	17250.00	862500.00	\N	2026-01-02 15:10:18.358462
-11	5	1	3	100.000	17590.00	1759000.00	\N	2026-01-02 15:57:22.087025
+16	19	2	2	50.000	18910.00	945500.00	Xuất công nợ tuấn mạnh	2026-01-06 10:00:48.394255
+17	20	2	3	10.000	17250.00	172500.00	\N	2026-01-06 12:34:02.961378
 \.
 
 
@@ -1680,11 +2035,9 @@ COPY public.shift_debt_sales (id, shift_id, customer_id, product_id, quantity, u
 -- Data for Name: shifts; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.shifts (id, store_id, shift_date, shift_no, opened_at, closed_at, status) FROM stdin;
-2	1	2026-01-02	1	2026-01-02 05:30:00	2026-01-02 22:10:18.477	CLOSED
-5	2	2026-01-02	1	2026-01-02 17:30:00	2026-01-02 22:57:22.104	CLOSED
-8	1	2026-01-02	2	2026-01-02 22:11:00	\N	OPEN
-9	3	2026-01-03	1	2026-01-03 05:30:00	\N	OPEN
+COPY public.shifts (id, store_id, shift_date, shift_no, opened_at, closed_at, status, version, adjusted_from_shift_id, is_active) FROM stdin;
+19	1	2026-01-06	1	2026-01-06 16:58:00	2026-01-06 17:00:00	CLOSED	1	\N	t
+20	1	2026-01-06	2	2026-01-06 17:10:00	2026-01-06 19:33:00	CLOSED	1	\N	t
 \.
 
 
@@ -1696,6 +2049,19 @@ COPY public.stores (id, code, name, region_id, is_active, address, phone) FROM s
 1	CH81	Cửa Hàng Xăng Dầu 81	1	t	Bắc Ninh	0975478916
 2	CH10	Cửa Hàng Xăng Dầu Số 10	2	t	Thái Nguyên 	0943696816
 3	CH11	Cửa Hàng Xăng Dầu số 11	1	t	Hà Nội 	0911123412
+4	CH79	Cửa Hàng 79	2	t	Nghệ An	0983145203
+5	CH371	Cửa Hàng 371	2	t	Nghệ An 	0988655700
+6	Ch372	Cửa Hàng 372	2	t	Nghệ An 	0969899767
+7	CH373	Cửa Hàng 373	2	t	Nghệ An 	0989501779
+8	CH374	Cửa Hàng 374	2	t	Nghệ An 	0849528694
+9	CH375	Cửa Hàng 375	2	t	Nghệ An	0382952426
+10	CH376	Cửa Hàng 376	2	t	Nghệ An 	0946162257
+11	CH 378	Cửa Hàng 378	2	t	Nghệ An	0918603777
+14	CHMH	Cửa Hàng Mỹ Hà 	1	t	Bắc Giang	0918273645
+15	CHSK	Cửa Hàng Song Khê	1	t	Bắc Giang	0948536965
+16	CH98	Cửa hàng 98	1	t	Bắc Giang	0335613623
+13	CH100	Cửa Hàng 100	2	t	Nghệ An 	086531532
+12	CH379	Cửa Hàng 379	2	t	Nghệ An	0396782854
 \.
 
 
@@ -1703,14 +2069,40 @@ COPY public.stores (id, code, name, region_id, is_active, address, phone) FROM s
 -- Data for Name: tanks; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.tanks (id, store_id, tank_code, name, capacity, product_id, current_stock, is_active, created_at, updated_at) FROM stdin;
-3	1	B03	Bể Dầu 05 Số 3	25000.000	3	8141.500	t	2026-01-02 05:12:37.203953	2026-01-02 15:10:18.358462
-1	1	B01	Bể Xăng 95 Số 1	25000.000	2	1713.000	t	2026-01-02 05:02:28.482246	2026-01-02 15:10:18.358462
-2	1	B02	Bể Xăng 95 Số 2	25000.000	2	3896.001	t	2026-01-02 05:12:07.082635	2026-01-02 15:10:18.358462
-4	2	B01	Bể Xăng Ron 95 số 1	10000.000	2	1134.000	t	2026-01-02 15:43:25.920698	2026-01-02 15:57:22.087025
-5	2	B02	Bể Dầu 05 Số 2	10000.000	3	1845.000	t	2026-01-02 15:43:59.141073	2026-01-02 15:57:22.087025
-6	3	B01	Bồn 1 Xăng 95	23000.000	2	12000.000	t	2026-01-03 07:37:23.762617	2026-01-03 07:37:53.386173
-7	3	B02	Bể Dầu 05 	12000.000	3	10000.000	t	2026-01-03 07:38:12.189685	2026-01-03 07:38:12.189685
+COPY public.tanks (id, store_id, tank_code, name, capacity, product_id, is_active, created_at, updated_at, current_stock) FROM stdin;
+6	3	B01	Bồn 1 Xăng 95	23000.000	2	t	2026-01-03 07:37:23.762617	2026-01-04 14:18:13.944998	0.000
+7	3	B02	Bể Dầu 05 	12000.000	3	t	2026-01-03 07:38:12.189685	2026-01-04 14:18:13.944998	0.000
+4	2	B01	Bể Xăng Ron 95 số 1	10000.000	2	t	2026-01-02 15:43:25.920698	2026-01-05 03:52:26.727697	0.000
+5	2	B02	Bể Dầu 05 Số 2	10000.000	3	t	2026-01-02 15:43:59.141073	2026-01-05 03:52:26.727697	0.000
+3	1	B03	Bể Dầu 05 Số 3	25000.000	3	t	2026-01-02 05:12:37.203953	2026-01-05 06:16:54.885452	0.000
+1	1	B01	Bể Xăng 95 Số 1	25000.000	2	t	2026-01-02 05:02:28.482246	2026-01-05 06:16:54.885452	0.000
+2	1	B02	Bể Xăng 95 Số 2	25000.000	2	t	2026-01-02 05:12:07.082635	2026-01-05 06:16:54.885452	0.000
+\.
+
+
+--
+-- Data for Name: user_tokens; Type: TABLE DATA; Schema: public; Owner: postgres
+--
+
+COPY public.user_tokens (id, user_id, expires_at, created_at, is_revoked) FROM stdin;
+e4b9f35c-4b9a-4f6f-a0ae-520f70b04767	1	2026-01-13 16:55:38.358	2026-01-06 09:55:38.363994	f
+87e30ab4-af70-4713-bfd7-8ff5bcf4f468	1	2026-01-13 16:55:38.362	2026-01-06 09:55:38.369223	f
+47daff9b-b5b7-41a2-8e1d-d3c21550f074	1	2026-01-13 16:55:38.364	2026-01-06 09:55:38.369552	f
+f201da91-5a6b-4fb6-9298-87b60304bb69	1	2026-01-12 12:44:29.096	2026-01-05 05:44:29.101329	f
+b86b2308-cc88-4577-bbed-27799a0dbdcc	1	2026-01-12 12:44:29.103	2026-01-05 05:44:29.10628	f
+24beeaf0-bf57-46c7-8f1c-682492da58f6	4	2026-01-13 18:03:36.161	2026-01-06 11:03:36.162607	f
+bd856ffd-9f67-4286-8831-1c4275910962	4	2026-01-13 19:26:42.596	2026-01-06 12:26:42.598671	f
+2e47c1c9-597f-40bf-bdf1-ebea2e2f4a1a	4	2026-01-12 15:30:09.156	2026-01-05 08:30:09.158119	f
+cab25bf7-2873-410d-847a-e9fade14b2bf	4	2026-01-12 15:30:09.163	2026-01-05 08:30:09.165227	f
+9cf786cb-6e27-4c58-be96-80841cd5f210	4	2026-01-12 15:30:09.166	2026-01-05 08:30:09.17083	f
+7c2127a8-df31-43bd-804a-0a98b94c2692	4	2026-01-12 15:30:10.213	2026-01-05 08:30:10.216731	f
+f7711c63-11cf-4c29-99c8-8b8f99dcda5b	6	2026-01-12 16:22:23.515	2026-01-05 09:22:23.517081	f
+ee821f1d-44fe-4778-b5eb-ce9f7a086f27	4	2026-01-12 17:42:27.493	2026-01-05 10:42:27.496747	f
+89136f18-f46d-4ed2-a30a-7a7f8adc8ac3	1	2026-01-13 00:52:50.304	2026-01-05 17:52:50.306191	f
+bdd33cb9-345d-41f9-b9e1-1d8951012721	1	2026-01-13 00:52:52.796	2026-01-05 17:52:52.798059	f
+41ecd550-7e44-443e-916d-5fe5a7377151	4	2026-01-13 11:44:07.592	2026-01-06 04:44:07.595677	f
+c2d009fb-5919-4adf-9167-eb16de931f99	1	2026-01-13 13:22:49.133	2026-01-06 06:22:49.142394	f
+0859bf82-2a88-45d8-9356-ae7e7d6501f3	1	2026-01-13 15:20:30.509	2026-01-06 08:20:30.511533	f
 \.
 
 
@@ -1720,9 +2112,9 @@ COPY public.tanks (id, store_id, tank_code, name, capacity, product_id, current_
 
 COPY public.users (id, username, password_hash, full_name, role_id, store_id, is_active, created_at) FROM stdin;
 1	admin	$2b$10$ut6jSmhyLaPp0rsEgmzXt.lm.28tTn8E20o/dhpFi/mKlSL2YPBRm	Administrator	1	\N	t	2026-01-01 15:28:14.236209
-4	canh81	$2b$10$86ZgJkgc3Izm63iLC6FpxeJXuSk3mUySDXJPQsnmY0bmHbAaQber.	nguyen thi canh	5	1	t	2026-01-01 18:01:34.674572
 5	ch10	$2b$10$UaKaGNx8MH57lpudce9M5e0O0wgkbjnUN1oApvIYXhd.No1FDDawe	HTT	5	2	t	2026-01-02 15:42:27.402355
 6	ch11	$2b$10$xev.vAwfgzcTu57K2q1OXOPgPfQYqyFmpsdKHM5p.xWM7ulWFVKhm	ch11	5	3	t	2026-01-03 07:36:38.844602
+4	ch81	$2b$10$86ZgJkgc3Izm63iLC6FpxeJXuSk3mUySDXJPQsnmY0bmHbAaQber.	Tây Nam 81	5	1	t	2026-01-01 18:01:34.674572
 \.
 
 
@@ -1731,6 +2123,8 @@ COPY public.users (id, username, password_hash, full_name, role_id, store_id, is
 --
 
 COPY public.warehouses (id, type, store_id) FROM stdin;
+1	STORE	1
+2	STORE	15
 \.
 
 
@@ -1738,7 +2132,7 @@ COPY public.warehouses (id, type, store_id) FROM stdin;
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 2, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 14, true);
 
 
 --
@@ -1759,35 +2153,35 @@ SELECT pg_catalog.setval('public.bank_ledger_id_seq', 1, false);
 -- Name: cash_deposits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cash_deposits_id_seq', 1, true);
+SELECT pg_catalog.setval('public.cash_deposits_id_seq', 9, true);
 
 
 --
 -- Name: cash_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cash_ledger_id_seq', 4, true);
+SELECT pg_catalog.setval('public.cash_ledger_id_seq', 23, true);
 
 
 --
 -- Name: customers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.customers_id_seq', 2, true);
+SELECT pg_catalog.setval('public.customers_id_seq', 25, true);
 
 
 --
 -- Name: debt_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.debt_ledger_id_seq', 12, true);
+SELECT pg_catalog.setval('public.debt_ledger_id_seq', 19, true);
 
 
 --
 -- Name: expense_categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.expense_categories_id_seq', 4, true);
+SELECT pg_catalog.setval('public.expense_categories_id_seq', 20, true);
 
 
 --
@@ -1815,7 +2209,28 @@ SELECT pg_catalog.setval('public.inventory_documents_id_seq', 1, false);
 -- Name: inventory_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.inventory_ledger_id_seq', 29, true);
+SELECT pg_catalog.setval('public.inventory_ledger_id_seq', 45, true);
+
+
+--
+-- Name: inventory_loss_calculations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.inventory_loss_calculations_id_seq', 1, false);
+
+
+--
+-- Name: inventory_truck_compartments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.inventory_truck_compartments_id_seq', 1, false);
+
+
+--
+-- Name: migrations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
+--
+
+SELECT pg_catalog.setval('public.migrations_id_seq', 4, true);
 
 
 --
@@ -1843,7 +2258,7 @@ SELECT pg_catalog.setval('public.products_id_seq', 6, true);
 -- Name: pump_readings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.pump_readings_id_seq', 37, true);
+SELECT pg_catalog.setval('public.pump_readings_id_seq', 75, true);
 
 
 --
@@ -1857,14 +2272,14 @@ SELECT pg_catalog.setval('public.pumps_id_seq', 9, true);
 -- Name: receipt_details_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.receipt_details_id_seq', 1, true);
+SELECT pg_catalog.setval('public.receipt_details_id_seq', 2, true);
 
 
 --
 -- Name: receipts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.receipts_id_seq', 1, true);
+SELECT pg_catalog.setval('public.receipts_id_seq', 2, true);
 
 
 --
@@ -1885,7 +2300,7 @@ SELECT pg_catalog.setval('public.roles_id_seq', 6, true);
 -- Name: sales_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.sales_id_seq', 36, true);
+SELECT pg_catalog.setval('public.sales_id_seq', 80, true);
 
 
 --
@@ -1899,21 +2314,21 @@ SELECT pg_catalog.setval('public.shift_adjustments_id_seq', 1, false);
 -- Name: shift_debt_sales_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.shift_debt_sales_id_seq', 11, true);
+SELECT pg_catalog.setval('public.shift_debt_sales_id_seq', 17, true);
 
 
 --
 -- Name: shifts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.shifts_id_seq', 9, true);
+SELECT pg_catalog.setval('public.shifts_id_seq', 20, true);
 
 
 --
 -- Name: stores_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.stores_id_seq', 3, true);
+SELECT pg_catalog.setval('public.stores_id_seq', 16, true);
 
 
 --
@@ -1934,7 +2349,7 @@ SELECT pg_catalog.setval('public.users_id_seq', 6, true);
 -- Name: warehouses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.warehouses_id_seq', 1, false);
+SELECT pg_catalog.setval('public.warehouses_id_seq', 2, true);
 
 
 --
@@ -1994,6 +2409,14 @@ ALTER TABLE ONLY public.product_prices
 
 
 --
+-- Name: inventory_truck_compartments PK_32337000fb1a252c82e79cd9969; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_truck_compartments
+    ADD CONSTRAINT "PK_32337000fb1a252c82e79cd9969" PRIMARY KEY (id);
+
+
+--
 -- Name: inventory_document_items PK_3e80345f40e8b5a4b4b5fb60fee; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2050,6 +2473,14 @@ ALTER TABLE ONLY public.receipts
 
 
 --
+-- Name: user_tokens PK_63764db9d9aaa4af33e07b2f4bf; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_tokens
+    ADD CONSTRAINT "PK_63764db9d9aaa4af33e07b2f4bf" PRIMARY KEY (id);
+
+
+--
 -- Name: inventory_documents PK_67c1a6358723ad4b9b0c16d8dd4; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2082,11 +2513,27 @@ ALTER TABLE ONLY public.shifts
 
 
 --
+-- Name: migrations PK_8c82d7f526340ab734260ea46be; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.migrations
+    ADD CONSTRAINT "PK_8c82d7f526340ab734260ea46be" PRIMARY KEY (id);
+
+
+--
 -- Name: permissions PK_920331560282b8bd21bb02290df; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
 ALTER TABLE ONLY public.permissions
     ADD CONSTRAINT "PK_920331560282b8bd21bb02290df" PRIMARY KEY (id);
+
+
+--
+-- Name: inventory_loss_calculations PK_941904ffc1c538cfafdfa06d741; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_loss_calculations
+    ADD CONSTRAINT "PK_941904ffc1c538cfafdfa06d741" PRIMARY KEY (id);
 
 
 --
@@ -2183,6 +2630,14 @@ ALTER TABLE ONLY public.pump_readings
 
 ALTER TABLE ONLY public.shift_adjustments
     ADD CONSTRAINT "PK_f662575f03ec154f35ff26b2c71" PRIMARY KEY (id);
+
+
+--
+-- Name: inventory_loss_calculations UQ_6da3cc3f555f3d3d30e8d21fbd4; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_loss_calculations
+    ADD CONSTRAINT "UQ_6da3cc3f555f3d3d30e8d21fbd4" UNIQUE (document_id);
 
 
 --
@@ -2421,6 +2876,14 @@ ALTER TABLE ONLY public.stores
 
 
 --
+-- Name: inventory_truck_compartments FK_20e58b8745d3821c0a41f3a79f6; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_truck_compartments
+    ADD CONSTRAINT "FK_20e58b8745d3821c0a41f3a79f6" FOREIGN KEY (product_id) REFERENCES public.products(id);
+
+
+--
 -- Name: receipt_details FK_2e8881782bed950943198d904b2; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2533,6 +2996,14 @@ ALTER TABLE ONLY public.expenses
 
 
 --
+-- Name: inventory_truck_compartments FK_62869db8770693f851701d64133; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_truck_compartments
+    ADD CONSTRAINT "FK_62869db8770693f851701d64133" FOREIGN KEY (document_id) REFERENCES public.inventory_documents(id);
+
+
+--
 -- Name: inventory_ledger FK_6bfc43bdb3bd3dd0b3c1920acc7; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2546,6 +3017,14 @@ ALTER TABLE ONLY public.inventory_ledger
 
 ALTER TABLE ONLY public.sales
     ADD CONSTRAINT "FK_6c1fae113ae666969a94d79d637" FOREIGN KEY (store_id) REFERENCES public.stores(id);
+
+
+--
+-- Name: inventory_loss_calculations FK_6da3cc3f555f3d3d30e8d21fbd4; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_loss_calculations
+    ADD CONSTRAINT "FK_6da3cc3f555f3d3d30e8d21fbd4" FOREIGN KEY (document_id) REFERENCES public.inventory_documents(id);
 
 
 --
@@ -2605,6 +3084,14 @@ ALTER TABLE ONLY public.users
 
 
 --
+-- Name: user_tokens FK_9e144a67be49e5bba91195ef5de; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.user_tokens
+    ADD CONSTRAINT "FK_9e144a67be49e5bba91195ef5de" FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: pumps FK_a27f91279cfb33205ffa8d89ea1; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2618,6 +3105,14 @@ ALTER TABLE ONLY public.pumps
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT "FK_a2cecd1a3531c0b041e29ba46e1" FOREIGN KEY (role_id) REFERENCES public.roles(id);
+
+
+--
+-- Name: inventory_ledger FK_a576f26c6bff5945e12889eb9bc; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_ledger
+    ADD CONSTRAINT "FK_a576f26c6bff5945e12889eb9bc" FOREIGN KEY (tank_id) REFERENCES public.tanks(id);
 
 
 --
@@ -2693,6 +3188,14 @@ ALTER TABLE ONLY public.debt_ledger
 
 
 --
+-- Name: inventory_document_items FK_cee3cd0fe35eda56420dd69d9c5; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.inventory_document_items
+    ADD CONSTRAINT "FK_cee3cd0fe35eda56420dd69d9c5" FOREIGN KEY (tank_id) REFERENCES public.tanks(id);
+
+
+--
 -- Name: shift_adjustments FK_d00ce9f5f177a3199b378364d7b; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2752,5 +3255,5 @@ ALTER TABLE ONLY public.inventory_document_items
 -- PostgreSQL database dump complete
 --
 
-\unrestrict q3hT4Drp2tSLSr3HOHZefUeZIjceTWeU4DxryKu4ShvGB5a9L11AaDSxGipvpjQ
+\unrestrict 3Iq8Eya3NGHWF9BvzbMFA0MryglPN0ta1yy7OsbyXG1r3RLg1Bq4BdQbOQFCNfe
 

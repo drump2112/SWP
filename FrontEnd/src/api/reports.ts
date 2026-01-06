@@ -1,4 +1,4 @@
-import api from './client';
+import api from "./client";
 
 export interface DebtReportParams {
   storeId?: number;
@@ -154,18 +154,18 @@ export const reportsApi = {
       toDate: params.toDate,
     };
     if (params.storeIds && params.storeIds.length > 0) {
-      queryParams.storeIds = params.storeIds.join(',');
+      queryParams.storeIds = params.storeIds.join(",");
     }
     if (params.productId) {
       queryParams.productId = params.productId;
     }
-    const { data } = await api.get('/reports/sales', { params: queryParams });
+    const { data } = await api.get("/reports/sales", { params: queryParams });
     return data;
   },
 
   // Báo cáo công nợ
   getDebtReport: async (params: DebtReportParams): Promise<DebtReportItem[]> => {
-    const { data } = await api.get('/reports/debt', { params });
+    const { data } = await api.get("/reports/debt", { params });
     return data;
   },
 
@@ -177,19 +177,32 @@ export const reportsApi = {
 
   // Báo cáo sổ quỹ tiền mặt
   getCashReport: async (params: CashReportParams): Promise<CashReportData> => {
-    const { data } = await api.get('/reports/cash', { params });
+    const { data } = await api.get("/reports/cash", { params });
     return data;
   },
 
   // Báo cáo xuất hàng theo cột bơm
-  getSalesByPump: async (params: { storeId?: number; fromDate: string; toDate: string }): Promise<SalesByPumpItem[]> => {
-    const { data } = await api.get('/reports/sales/by-pump', { params });
+  getSalesByPump: async (params: {
+    storeId?: number;
+    fromDate: string;
+    toDate: string;
+  }): Promise<SalesByPumpItem[]> => {
+    const { data } = await api.get("/reports/sales/by-pump", { params });
     return data;
   },
 
   // Báo cáo xuất hàng theo mặt hàng
-  getSalesByProduct: async (params: { storeId?: number; fromDate: string; toDate: string }): Promise<SalesByProductItem[]> => {
-    const { data } = await api.get('/reports/sales/by-product', { params });
+  getSalesByProduct: async (params: {
+    storeId?: number;
+    fromDate: string;
+    toDate: string;
+  }): Promise<SalesByProductItem[]> => {
+    const { data } = await api.get("/reports/sales/by-product", { params });
+    return data;
+  },
+
+  getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string }): Promise<any[]> => {
+    const { data } = await api.get("/reports/sales/by-shift", { params });
     return data;
   },
 };

@@ -78,14 +78,16 @@ export class ReportsService {
 
     if (customerId) {
       if (storeId) {
-        customerIdsQuery.andWhere('dl.customer_id = :customerId', { customerId });
+        customerIdsQuery.andWhere('dl.customer_id = :customerId', {
+          customerId,
+        });
       } else {
         customerIdsQuery.where('dl.customer_id = :customerId', { customerId });
       }
     }
 
     const customerIdsResult = await customerIdsQuery.getRawMany();
-    const customerIds = customerIdsResult.map(r => r.customerId);
+    const customerIds = customerIdsResult.map((r) => r.customerId);
 
     if (customerIds.length === 0) {
       return [];
@@ -103,7 +105,12 @@ export class ReportsService {
       customers.map(async (customer) => {
         // Lấy dư đầu kỳ (trước fromDate)
         const openingBalance = fromDate
-          ? await this.getCustomerBalance(customer.id, storeId, new Date(0), fromDate)
+          ? await this.getCustomerBalance(
+              customer.id,
+              storeId,
+              new Date(0),
+              fromDate,
+            )
           : 0;
 
         // Lấy phát sinh trong kỳ
@@ -127,7 +134,10 @@ export class ReportsService {
           .getMany();
 
         const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
-        const totalCredit = ledgers.reduce((sum, l) => sum + Number(l.credit), 0);
+        const totalCredit = ledgers.reduce(
+          (sum, l) => sum + Number(l.credit),
+          0,
+        );
         const closingBalance = openingBalance + totalDebit - totalCredit;
 
         // Lấy chi tiết từ shift_debt_sales để hiển thị sản phẩm, số lượng, giá
@@ -242,8 +252,6 @@ export class ReportsService {
       throw new Error('Shift not found');
     }
 
-
-
     // Lấy phiếu thu tiền (thanh toán nợ)
     const receipts = await this.cashLedgerRepository.find({
       where: {
@@ -288,7 +296,10 @@ export class ReportsService {
       relations: ['customer', 'product'],
     });
 
-    const totalDebtSales = debtSalesData.reduce((sum, sale) => sum + Number(sale.amount), 0);
+    const totalDebtSales = debtSalesData.reduce(
+      (sum, sale) => sum + Number(sale.amount),
+      0,
+    );
     const totalRetailSales = totalFromPumps - totalDebtSales;
 
     return {
@@ -337,7 +348,12 @@ export class ReportsService {
   // ==================== CÁC BÁO CÁO KHÁC ====================
 
   // Báo cáo doanh thu theo cửa hàng
-  async getSalesReport(fromDate: Date, toDate: Date, storeIds?: number[], productId?: number) {
+  async getSalesReport(
+    fromDate: Date,
+    toDate: Date,
+    storeIds?: number[],
+    productId?: number,
+  ) {
     const query = this.saleRepository
       .createQueryBuilder('s')
       .leftJoin('s.shift', 'shift')
@@ -438,10 +454,11 @@ export class ReportsService {
             details = {
               type: 'RECEIPT',
               receiptType: receipt.receiptType,
-              customers: receipt.receiptDetails?.map((rd) => ({
-                customerName: rd.customer?.name || 'N/A',
-                amount: Number(rd.amount),
-              })) || [],
+              customers:
+                receipt.receiptDetails?.map((rd) => ({
+                  customerName: rd.customer?.name || 'N/A',
+                  amount: Number(rd.amount),
+                })) || [],
               totalAmount: Number(receipt.amount),
             };
           }
@@ -531,39 +548,35 @@ export class ReportsService {
 
   // Dashboard tổng quan cho giám đốc
   async getDashboard(fromDate: Date, toDate: Date) {
-    const [
-      totalSales,
-      debtSummary,
-      cashSummary,
-      inventorySummary,
-    ] = await Promise.all([
-      // Tổng doanh thu
-      this.saleRepository
-        .createQueryBuilder('s')
-        .leftJoin('s.shift', 'shift')
-        .select('SUM(s.amount)', 'total')
-        .where('shift.shift_date >= :fromDate', { fromDate })
-        .andWhere('shift.shift_date <= :toDate', { toDate })
-        .getRawOne(),
+    const [totalSales, debtSummary, cashSummary, inventorySummary] =
+      await Promise.all([
+        // Tổng doanh thu
+        this.saleRepository
+          .createQueryBuilder('s')
+          .leftJoin('s.shift', 'shift')
+          .select('SUM(s.amount)', 'total')
+          .where('shift.shift_date >= :fromDate', { fromDate })
+          .andWhere('shift.shift_date <= :toDate', { toDate })
+          .getRawOne(),
 
-      // Tổng công nợ
-      this.debtLedgerRepository
-        .createQueryBuilder('dl')
-        .select('SUM(dl.debit - dl.credit)', 'total')
-        .getRawOne(),
+        // Tổng công nợ
+        this.debtLedgerRepository
+          .createQueryBuilder('dl')
+          .select('SUM(dl.debit - dl.credit)', 'total')
+          .getRawOne(),
 
-      // Tổng quỹ tiền mặt
-      this.cashLedgerRepository
-        .createQueryBuilder('cl')
-        .select('SUM(cl.cash_in - cl.cash_out)', 'total')
-        .getRawOne(),
+        // Tổng quỹ tiền mặt
+        this.cashLedgerRepository
+          .createQueryBuilder('cl')
+          .select('SUM(cl.cash_in - cl.cash_out)', 'total')
+          .getRawOne(),
 
-      // Tổng giá trị tồn kho (simplified)
-      this.inventoryLedgerRepository
-        .createQueryBuilder('il')
-        .select('SUM(il.quantity_in - il.quantity_out)', 'total')
-        .getRawOne(),
-    ]);
+        // Tổng giá trị tồn kho (simplified)
+        this.inventoryLedgerRepository
+          .createQueryBuilder('il')
+          .select('SUM(il.quantity_in - il.quantity_out)', 'total')
+          .getRawOne(),
+      ]);
 
     return {
       period: { fromDate, toDate },
@@ -592,7 +605,10 @@ export class ReportsService {
         .addSelect('SUM(pr.quantity)', 'totalQuantity')
         .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
         .where('shift.store_id = :storeId', { storeId })
-        .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+        .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+          fromDate,
+          toDate,
+        })
         .andWhere('shift.status = :status', { status: 'CLOSED' })
         .groupBy('pr.pump_code')
         .addGroupBy('product.name')
@@ -611,7 +627,8 @@ export class ReportsService {
    * Báo cáo xuất hàng theo mặt hàng
    */
   async getSalesByProductReport(storeId: number, fromDate: Date, toDate: Date) {
-    const query = this.pumpReadingRepository.createQueryBuilder('pr')
+    const query = this.pumpReadingRepository
+      .createQueryBuilder('pr')
       .leftJoin('pr.shift', 'shift')
       .leftJoin('pr.product', 'product')
       .select('product.id', 'productId')
@@ -620,7 +637,10 @@ export class ReportsService {
       .addSelect('SUM(pr.quantity)', 'totalQuantity')
       .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
       .where('shift.store_id = :storeId', { storeId })
-      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
       .groupBy('product.id')
       .addGroupBy('product.name')
       .orderBy('product.name', 'ASC');
@@ -628,7 +648,44 @@ export class ReportsService {
     return query.getRawMany();
   }
 
-  // ==================== BÁO CÁO PHIẾU NHẬP KHO ====================
+  /**
+   * Báo cáo xuất hàng chi tiết theo từng ca
+   */
+  async getSalesByShiftReport(storeId: number, fromDate: Date, toDate: Date) {
+    const query = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('pr.product', 'product')
+      .select('shift.id', 'shiftId')
+      .addSelect('shift.shift_no', 'shiftNo')
+      .addSelect('shift.shift_date', 'shiftDate')
+      .addSelect('shift.opened_at', 'openedAt')
+      .addSelect('shift.closed_at', 'closedAt')
+      .addSelect('shift.status', 'status')
+      .addSelect('product.name', 'productName')
+      .addSelect('AVG(pr.unit_price)', 'unitPrice')
+      .addSelect('SUM(pr.quantity)', 'totalQuantity')
+      .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
+      .where('shift.store_id = :storeId', { storeId })
+      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
+      .groupBy('shift.id')
+      .addGroupBy('shift.shift_no')
+      .addGroupBy('shift.shift_date')
+      .addGroupBy('shift.opened_at')
+      .addGroupBy('shift.closed_at')
+      .addGroupBy('shift.status')
+      .addGroupBy('product.name')
+      .orderBy('shift.shift_date', 'DESC')
+      .addOrderBy('shift.shift_no', 'DESC')
+      .addOrderBy('product.name', 'ASC');
+
+    return query.getRawMany();
+  }
+
+  // ==================== Báo cáo phiếu nhập kho ====================
 
   /**
    * Báo cáo bảng kê nhập kho (In Bảng Kê Nhập)
@@ -682,7 +739,7 @@ export class ReportsService {
     } else {
       // Mặc định chỉ lấy phiếu nhập (IMPORT, TRANSFER_IN)
       query.andWhere('doc.docType IN (:...docTypes)', {
-        docTypes: ['IMPORT', 'TRANSFER_IN']
+        docTypes: ['IMPORT', 'TRANSFER_IN'],
       });
     }
 
@@ -690,9 +747,13 @@ export class ReportsService {
 
     // Format response
     return documents.map((doc) => {
-      const totalQuantity = doc.items.reduce((sum, item) => sum + Number(item.quantity), 0);
+      const totalQuantity = doc.items.reduce(
+        (sum, item) => sum + Number(item.quantity),
+        0,
+      );
       const totalAmount = doc.items.reduce(
-        (sum, item) => sum + Number(item.quantity) * Number(item.unitPrice || 0),
+        (sum, item) =>
+          sum + Number(item.quantity) * Number(item.unitPrice || 0),
         0,
       );
 
@@ -813,7 +874,7 @@ export class ReportsService {
       .addSelect('SUM(item.quantity * item.unitPrice)', 'totalAmount')
       .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
       .where('doc.docType IN (:...docTypes)', {
-        docTypes: ['IMPORT', 'TRANSFER_IN']
+        docTypes: ['IMPORT', 'TRANSFER_IN'],
       })
       .groupBy('product.id')
       .addGroupBy('product.code')
@@ -847,9 +908,10 @@ export class ReportsService {
       totalQuantity: Number(r.totalQuantity || 0),
       totalAmount: Number(r.totalAmount || 0),
       documentCount: Number(r.documentCount || 0),
-      averagePrice: Number(r.totalQuantity) > 0
-        ? Number(r.totalAmount) / Number(r.totalQuantity)
-        : 0,
+      averagePrice:
+        Number(r.totalQuantity) > 0
+          ? Number(r.totalAmount) / Number(r.totalQuantity)
+          : 0,
     }));
   }
 
@@ -874,7 +936,7 @@ export class ReportsService {
       .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
       .addSelect('SUM(items.quantity * items.unitPrice)', 'totalAmount')
       .where('doc.docType IN (:...docTypes)', {
-        docTypes: ['IMPORT', 'TRANSFER_IN']
+        docTypes: ['IMPORT', 'TRANSFER_IN'],
       })
       .andWhere('doc.supplierName IS NOT NULL')
       .groupBy('doc.supplierName')
