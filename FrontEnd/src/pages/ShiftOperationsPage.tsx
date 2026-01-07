@@ -1051,17 +1051,6 @@ const ShiftOperationsPage: React.FC = () => {
                     Đã chốt
                   </span>
                 )}
-                {report?.shift.version && report.shift.version > 1 && (
-                  <>
-                    <span className="text-blue-200">•</span>
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500 text-white shadow-sm">
-                      <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-                      </svg>
-                      Đã sửa {report.shift.version - 1} lần
-                    </span>
-                  </>
-                )}
               </div>
             </div>
           </div>
@@ -1089,28 +1078,6 @@ const ShiftOperationsPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Warning box for adjusted shifts */}
-      {report?.shift.version && report.shift.version > 1 && (
-        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-sm">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-semibold text-yellow-800">
-                ⚠️ Ca này đã được mở lại và sửa đổi {report.shift.version - 1} lần
-              </h3>
-              <p className="mt-1 text-sm text-yellow-700">
-                Dữ liệu cũ đã được đánh dấu superseded và không còn hiển thị trong báo cáo.
-                Chỉ dữ liệu phiên bản mới nhất (v{report.shift.version}) được tính vào tổng kết.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -2585,7 +2552,7 @@ const ShiftOperationsPage: React.FC = () => {
                             <td className="px-6 py-4 text-sm text-right text-gray-900">{Number(item.actualQuantity || 0).toLocaleString('vi-VN')}</td>
                             <td className={`px-6 py-4 text-sm text-right font-semibold ${item.difference < 0 ? 'text-red-600' : 'text-green-600'}`}>
                               {Number(item.difference || 0).toLocaleString('vi-VN')}
-                            </td>
+                            </td> 
                             <td className="px-6 py-4 text-sm text-gray-500">{item.notes || '-'}</td>
                             <td className="px-6 py-4 text-right text-sm font-medium">
                               <button onClick={() => handleDeleteInventory(item.id)} className="text-red-600 hover:text-red-900" type="button">

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, In } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { Shift } from '../entities/shift.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
 import { Sale } from '../entities/sale.entity';
@@ -533,11 +533,11 @@ export class ShiftsService {
       // Đánh dấu dữ liệu cũ là "đã bị thay thế" thay vì xóa hẳn
 
       // 1. Tìm và xóa phiếu xuất tự động của ca này
-      // Phiếu xuất tự động liên kết với shift qua ref_shift_id
+      // Phiếu xuất có notes chứa shift number
       const exportDocs = await manager
         .createQueryBuilder('inventory_documents', 'doc')
         .where('doc.doc_type = :docType', { docType: 'EXPORT' })
-        .andWhere('doc.ref_shift_id = :shiftId', { shiftId: shift.id })
+        .andWhere('doc.notes LIKE :pattern', { pattern: `%Ca ${shift.shiftNo}%` })
         .getMany();
 
       for (const doc of exportDocs) {
@@ -567,63 +567,13 @@ export class ShiftsService {
           .execute();
       }
 
-      // 2. Xử lý cash_ledger và các phiếu thu/chi liên quan shift
-      
-      // 2.1. Xử lý receipts (phiếu thu) của shift
-      const receipts = await manager.find(Receipt, { where: { shiftId } });
-      if (receipts.length > 0) {
-        const receiptIds = receipts.map(r => r.id);
-        
-        // Đánh dấu superseded cho debt_ledger của receipts
-        await manager
-          .createQueryBuilder()
-          .update('debt_ledger')
-          .set({ supersededByShiftId: shiftId })
-          .where('ref_type = :refType', { refType: 'RECEIPT' })
-          .andWhere('ref_id IN (:...refIds)', { refIds: receiptIds })
-          .execute();
-        
-        // Đánh dấu superseded cho cash_ledger của receipts
-        await manager
-          .createQueryBuilder()
-          .update('cash_ledger')
-          .set({ supersededByShiftId: shiftId })
-          .where('ref_type = :refType', { refType: 'RECEIPT' })
-          .andWhere('ref_id IN (:...refIds)', { refIds: receiptIds })
-          .execute();
-        
-        // Xóa receipt_details và receipts
-        await manager.delete('receipt_details', { receiptId: In(receiptIds) });
-        await manager.delete(Receipt, { id: In(receiptIds) });
-      }
-
-      // 2.2. Xử lý deposits (phiếu nộp tiền) của shift
-      const deposits = await manager.find(CashDeposit, { where: { shiftId } });
-      if (deposits.length > 0) {
-        const depositIds = deposits.map(d => d.id);
-        
-        // Đánh dấu superseded cho cash_ledger của deposits
-        await manager
-          .createQueryBuilder()
-          .update('cash_ledger')
-          .set({ supersededByShiftId: shiftId })
-          .where('ref_type = :refType', { refType: 'DEPOSIT' })
-          .andWhere('ref_id IN (:...refIds)', { refIds: depositIds })
-          .execute();
-        
-        // Xóa deposits
-        await manager.delete(CashDeposit, { id: In(depositIds) });
-      }
-
-      // 2.3. Xử lý expenses (chi phí) của shift - cần kiểm tra xem có shift_id không
-      // Note: Expenses có thể không có shift_id trực tiếp, cần kiểm tra entity
-      
-      // 2.4. Đánh dấu superseded cho cash_ledger SHIFT_CLOSE
+      // 2. Đánh dấu cash_ledger entries
       await manager
         .createQueryBuilder()
         .update('cash_ledger')
         .set({
-          supersededByShiftId: shiftId, // ✅ Đánh dấu bị thay thế bởi chính shift này (khi đóng lại)
+          supersededByShiftId: () => 'NULL',
+          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
         })
         .where('ref_type = :refType', { refType: 'SHIFT_CLOSE' })
         .andWhere('ref_id = :refId', { refId: shiftId })
@@ -636,45 +586,35 @@ export class ShiftsService {
           .createQueryBuilder()
           .update('debt_ledger')
           .set({
-            supersededByShiftId: shiftId, // ✅ Đánh dấu bị thay thế
+            supersededByShiftId: () => 'NULL',
             notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
           })
           .where('ref_type = :refType', { refType: 'DEBT_SALE' })
           .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
           .execute();
-
-        // 3.1 Xóa shift_debt_sales (sẽ được tạo lại khi đóng ca)
-        await manager
-          .createQueryBuilder()
-          .delete()
-          .from('shift_debt_sales')
-          .where('id IN (:...ids)', { ids: debtSaleIds })
-          .execute();
       }
 
-      // 4. Xóa pump_readings (sẽ được nhập lại khi đóng ca)
+      // 4. Đánh dấu pump_readings (không xóa để audit)
       await manager
         .createQueryBuilder()
-        .delete()
-        .from('pump_readings')
+        .update('pump_readings')
+        .set({ supersededByShiftId: () => 'NULL' })
         .where('shift_id = :shiftId', { shiftId })
         .execute();
 
-      // 5. Xóa sales (sẽ được tính lại khi đóng ca)
+      // 5. Đánh dấu sales
       await manager
         .createQueryBuilder()
-        .delete()
-        .from('sales')
+        .update('sales')
+        .set({ supersededByShiftId: () => 'NULL' })
         .where('shift_id = :shiftId', { shiftId })
         .execute();
 
-      console.log(`🔄 Deleted pump readings and sales from shift ${shiftId} (will be re-entered)`);
-      console.log(`🔄 Marked ledger data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
+      console.log(`🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
 
-      // 6. Mở lại ca và tăng version
+      // 6. Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
       shift.status = 'OPEN';
       shift.closedAt = null;
-      shift.version = (shift.version || 1) + 1; // ✅ Tăng version để track số lần reopen
       const reopenedShift = await manager.save(Shift, shift);
 
       // Ghi audit log
@@ -682,11 +622,10 @@ export class ShiftsService {
         tableName: 'shifts',
         recordId: shift.id,
         action: 'REOPEN',
-        oldData: { status: oldData.status, closedAt: oldData.closedAt, version: oldData.version },
+        oldData: { status: oldData.status, closedAt: oldData.closedAt },
         newData: {
           status: 'OPEN',
           closedAt: null,
-          version: shift.version,
           note: 'Dữ liệu cũ được đánh dấu superseded, giữ nguyên timestamp'
         },
         changedBy: user?.id,

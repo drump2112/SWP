@@ -54,7 +54,6 @@ export interface Shift {
   openedAt: string;
   closedAt?: string;
   status: string; // OPEN, CLOSED, ADJUSTED
-  version?: number; // Số lần đã reopen/sửa (default = 1)
   store?: any;
 }
 

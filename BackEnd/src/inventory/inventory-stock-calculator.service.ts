@@ -22,7 +22,7 @@ export class InventoryStockCalculatorService {
       .createQueryBuilder('il')
       .select('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
       .where('il.tank_id = :tankId', { tankId })
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
+      // TODO: Thêm .andWhere('il.superseded_by_shift_id IS NULL') sau khi chạy migration
       .getRawOne();
 
     return Number(result?.balance || 0);
@@ -41,7 +41,7 @@ export class InventoryStockCalculatorService {
       .select('il.tank_id', 'tankId')
       .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
       .where('il.tank_id IN (:...tankIds)', { tankIds })
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
+      // TODO: Thêm .andWhere('il.superseded_by_shift_id IS NULL') sau khi chạy migration
       .groupBy('il.tank_id')
       .getRawMany();
 
@@ -72,7 +72,6 @@ export class InventoryStockCalculatorService {
       .select('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
       .where('il.warehouse_id = :warehouseId', { warehouseId })
       .andWhere('il.product_id = :productId', { productId })
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .getRawOne();
 
     return Number(result?.balance || 0);
@@ -97,7 +96,6 @@ export class InventoryStockCalculatorService {
       .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('il.warehouse_id = :warehouseId', { warehouseId })
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .groupBy('il.product_id, p.code, p.name')
       .having('COALESCE(SUM(il.quantity_in - il.quantity_out), 0) > 0')
       .getRawMany();
@@ -140,7 +138,6 @@ export class InventoryStockCalculatorService {
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('t.store_id = :storeId', { storeId })
       .andWhere('t.is_active = true')
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .groupBy('il.tank_id, t.tank_code, t.name, t.capacity, il.product_id, p.code, p.name')
       .getRawMany();
 
@@ -185,7 +182,6 @@ export class InventoryStockCalculatorService {
       .leftJoin('tanks', 't', 't.id = il.tank_id')
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('il.warehouse_id = :warehouseId', { warehouseId })
-      .andWhere('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .groupBy('il.tank_id, t.tank_code, il.product_id, p.code, p.name')
       .having('COALESCE(SUM(il.quantity_in - il.quantity_out), 0) != 0')
       .getRawMany();

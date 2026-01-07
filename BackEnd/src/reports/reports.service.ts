@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, IsNull } from 'typeorm';
+import { Repository, Between } from 'typeorm';
 import { DebtLedger } from '../entities/debt-ledger.entity';
 import { Sale } from '../entities/sale.entity';
 import { CashLedger } from '../entities/cash-ledger.entity';
@@ -116,8 +116,7 @@ export class ReportsService {
         // Lấy phát sinh trong kỳ
         const ledgerQuery = this.debtLedgerRepository
           .createQueryBuilder('dl')
-          .where('dl.customer_id = :customerId', { customerId: customer.id })
-          .andWhere('dl.superseded_by_shift_id IS NULL'); // ✅ Filter superseded records
+          .where('dl.customer_id = :customerId', { customerId: customer.id });
 
         if (storeId) {
           ledgerQuery.andWhere('dl.store_id = :storeId', { storeId });
@@ -221,8 +220,7 @@ export class ReportsService {
       .createQueryBuilder('dl')
       .select('SUM(dl.debit - dl.credit)', 'balance')
       .where('dl.customer_id = :customerId', { customerId })
-      .andWhere('dl.created_at < :toDate', { toDate })
-      .andWhere('dl.superseded_by_shift_id IS NULL'); // ✅ Filter superseded records
+      .andWhere('dl.created_at < :toDate', { toDate });
 
     if (storeId) {
       query.andWhere('dl.store_id = :storeId', { storeId });
@@ -258,7 +256,6 @@ export class ReportsService {
     const receipts = await this.cashLedgerRepository.find({
       where: {
         refType: 'RECEIPT',
-        supersededByShiftId: IsNull(), // ✅ Filter superseded records
         // refId sẽ là receipt_id, cần join với receipts table
       },
       relations: ['store'],
@@ -277,7 +274,6 @@ export class ReportsService {
       where: {
         refType: 'CASH_DEPOSIT',
         storeId: shift.storeId,
-        supersededByShiftId: IsNull(), // ✅ Filter superseded records
       },
     });
 
@@ -404,11 +400,10 @@ export class ReportsService {
     // Lấy số dư đầu kỳ (trước fromDate)
     const openingBalanceQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
-      .select('SUM(cl.cash_in - cl.cash_out)', 'balance')
-      .where('cl.superseded_by_shift_id IS NULL'); // ✅ Filter superseded records
+      .select('SUM(cl.cash_in - cl.cash_out)', 'balance');
 
     if (storeId) {
-      openingBalanceQuery.andWhere('cl.store_id = :storeId', { storeId });
+      openingBalanceQuery.where('cl.store_id = :storeId', { storeId });
     }
 
     if (fromDate) {
@@ -422,11 +417,10 @@ export class ReportsService {
     const ledgerQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
       .leftJoinAndSelect('cl.store', 'store')
-      .where('cl.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .orderBy('cl.created_at', 'ASC');
 
     if (storeId) {
-      ledgerQuery.andWhere('cl.store_id = :storeId', { storeId });
+      ledgerQuery.where('cl.store_id = :storeId', { storeId });
     }
 
     if (fromDate && toDate) {
@@ -539,7 +533,6 @@ export class ReportsService {
       .addSelect('SUM(il.quantity_in)', 'totalIn')
       .addSelect('SUM(il.quantity_out)', 'totalOut')
       .addSelect('SUM(il.quantity_in - il.quantity_out)', 'balance')
-      .where('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .groupBy('il.warehouse_id')
       .addGroupBy('warehouse.type')
       .addGroupBy('product.id')
@@ -548,7 +541,7 @@ export class ReportsService {
       .having('SUM(il.quantity_in - il.quantity_out) != 0');
 
     if (warehouseId) {
-      query.andWhere('il.warehouse_id = :warehouseId', { warehouseId });
+      query.where('il.warehouse_id = :warehouseId', { warehouseId });
     }
 
     return query.getRawMany();
@@ -571,21 +564,18 @@ export class ReportsService {
         this.debtLedgerRepository
           .createQueryBuilder('dl')
           .select('SUM(dl.debit - dl.credit)', 'total')
-          .where('dl.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
           .getRawOne(),
 
         // Tổng quỹ tiền mặt
         this.cashLedgerRepository
           .createQueryBuilder('cl')
           .select('SUM(cl.cash_in - cl.cash_out)', 'total')
-          .where('cl.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
           .getRawOne(),
 
         // Tổng giá trị tồn kho (simplified)
         this.inventoryLedgerRepository
           .createQueryBuilder('il')
           .select('SUM(il.quantity_in - il.quantity_out)', 'total')
-          .where('il.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
           .getRawOne(),
       ]);
 
