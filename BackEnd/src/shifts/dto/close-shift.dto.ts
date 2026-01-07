@@ -65,6 +65,32 @@ class InventoryImportDto {
   notes?: string;
 }
 
+class InventoryExportDto {
+  @IsNotEmpty()
+  @IsDateString()
+  docDate: string;
+
+  @IsOptional()
+  @IsString()
+  supplierName?: string;
+
+  @IsNotEmpty()
+  @IsInt()
+  productId: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  quantity: number;
+
+  @IsNotEmpty()
+  @IsNumber()
+  unitPrice: number;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
 export class CloseShiftDto {
   @IsInt()
   @IsNotEmpty()
@@ -104,6 +130,12 @@ export class CloseShiftDto {
   @ValidateNested({ each: true })
   @Type(() => InventoryImportDto)
   inventoryImports?: InventoryImportDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => InventoryExportDto)
+  inventoryExports?: InventoryExportDto[];
 
   @IsOptional()
   @IsDateString()

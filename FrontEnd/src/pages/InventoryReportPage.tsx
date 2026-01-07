@@ -41,10 +41,13 @@ const InventoryReportPage: React.FC = () => {
   // Fetch documents (Listing)
   const { data: documents, isLoading: isLoadingDocs } = useQuery({
     queryKey: ['inventory-documents', selectedStoreId, reportType, fromDate, toDate],
-    queryFn: () => {
+    queryFn: async () => {
       if (!selectedStoreId || reportType === 'summary') return Promise.resolve([]);
       const type = reportType === 'import' ? 'IMPORT' : 'EXPORT';
-      return inventoryApi.getDocuments(selectedStoreId, type, fromDate, toDate);
+      console.log(`🔍 Fetching documents: storeId=${selectedStoreId}, type=${type}, from=${fromDate}, to=${toDate}`);
+      const result = await inventoryApi.getDocuments(selectedStoreId, type, fromDate, toDate);
+      console.log(`📦 Documents received:`, result);
+      return result;
     },
     enabled: !!selectedStoreId && reportType !== 'summary',
   });
@@ -339,8 +342,21 @@ const InventoryReportPage: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">
-                      Không có dữ liệu
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-500">
+                        <ArchiveBoxIcon className="h-12 w-12 mb-3 text-gray-400" />
+                        <p className="text-sm font-medium">
+                          {reportType === 'summary'
+                            ? 'Chưa có dữ liệu nhập xuất tồn trong kỳ này'
+                            : reportType === 'import'
+                            ? 'Chưa có phiếu nhập hàng trong kỳ này'
+                            : 'Chưa có phiếu xuất hàng trong kỳ này'
+                          }
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Thử chọn khoảng thời gian khác hoặc tạo phiếu mới
+                        </p>
+                      </div>
                     </td>
                   </tr>
                 )}

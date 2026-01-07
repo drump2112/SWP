@@ -77,6 +77,7 @@ export interface CashReportParams {
   storeId?: number;
   fromDate?: string;
   toDate?: string;
+  refType?: string;
 }
 
 export interface CashReportData {

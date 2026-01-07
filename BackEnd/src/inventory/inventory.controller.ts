@@ -146,6 +146,13 @@ export class InventoryController {
     return this.inventoryService.getStockReportByProduct(+storeId);
   }
 
+
+  @Get('test-error')
+  testError() {
+    throw new BadRequestException('Đây là lỗi thử nghiệm');
+  }
+
+
   /**
    * POST /inventory/simple-initial-stock
    * Nhập tồn đầu đơn giản theo cửa hàng + mặt hàng (KHÔNG cần tank)

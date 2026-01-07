@@ -15,6 +15,8 @@ import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { InventoryDocument } from '../entities/inventory-document.entity';
+import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
@@ -197,8 +199,18 @@ export class ShiftsService {
           .execute();
       }
 
-      // 4. ✅ GHI VÀO INVENTORY LEDGER theo cửa hàng (không theo bồn bể)
-      // Lấy warehouse của cửa hàng
+      // 4. ✅ GHI VÀO INVENTORY LEDGER thay vì cập nhật currentStock
+      // Lấy thông tin pumps để biết tank_id và warehouse_id
+      const pumpCodes = closeShiftDto.pumpReadings.map(r => r.pumpCode);
+      const pumps = await manager
+        .createQueryBuilder('pumps', 'p')
+        .where('p.pump_code IN (:...pumpCodes)', { pumpCodes })
+        .andWhere('p.store_id = :storeId', { storeId: shift.storeId })
+        .getMany();
+
+      const pumpMap = new Map(pumps.map(p => [p.pumpCode, p]));
+
+      // Lấy warehouse của cửa hàng (cần cho inventory_ledger)
       const warehouse = await manager.findOne(Warehouse, {
         where: { storeId: shift.storeId, type: 'STORE' },
       });
@@ -207,28 +219,8 @@ export class ShiftsService {
         throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
       }
 
-      // Ghi xuất kho vào InventoryLedger cho từng pump reading
-      // Gom theo productId để giảm số lượng record
-      const productSales = new Map<number, number>();
-      for (const reading of pumpReadingsData) {
-        const current = productSales.get(reading.productId) || 0;
-        productSales.set(reading.productId, current + reading.quantity);
-      }
-
-      // Ghi xuất kho theo sản phẩm
-      for (const [productId, totalQuantity] of productSales.entries()) {
-        await manager.save(InventoryLedger, {
-          warehouseId: warehouse.id,
-          productId: productId,
-          tankId: null, // Quản lý theo cửa hàng, không theo bể
-          refType: 'SHIFT_SALE',
-          refId: shift.id,
-          quantityIn: 0,
-          quantityOut: totalQuantity,
-        });
-
-        console.log(`📉 Warehouse ${warehouse.id}: Ghi xuất ${totalQuantity} lít sản phẩm ${productId} (Shift ${shift.id})`);
-      }
+      // Bước 4: Ghi xuất kho sẽ được xử lý ở bước 6.7 (tạo phiếu xuất tự động)
+      // Không ghi trực tiếp vào InventoryLedger ở đây để tránh duplicate
 
       // 5. ✅ GHI SỔ QUỸ: Thu tiền bán lẻ (QUAN TRỌNG!)
       // Bán lẻ = Thu tiền mặt ngay → Ghi cashIn vào cash_ledger
@@ -412,31 +404,119 @@ export class ShiftsService {
         }
       }
 
-      // 6.5. ✅ Xử lý Inventory Imports (nhập kho từ xe téc)
+      // 6.5. Xử lý Inventory Imports (Phiếu nhập kho)
       if (closeShiftDto.inventoryImports && closeShiftDto.inventoryImports.length > 0) {
-        // Lấy warehouse của cửa hàng
-        const warehouse = await manager.findOne(Warehouse, {
-          where: { storeId: shift.storeId, type: 'STORE' },
-        });
+        for (const importItem of closeShiftDto.inventoryImports) {
+          const doc = await manager.save(InventoryDocument, {
+            warehouseId: warehouse.id,
+            docType: 'IMPORT',
+            docDate: new Date(importItem.docDate),
+            supplierName: importItem.supplierName,
+            invoiceNumber: importItem.invoiceNumber,
+            licensePlate: importItem.licensePlate,
+            notes: importItem.notes,
+          });
 
-        if (!warehouse) {
-          throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
-        }
+          await manager.save(InventoryDocumentItem, {
+            documentId: doc.id,
+            productId: importItem.productId,
+            quantity: importItem.quantity,
+            unitPrice: 0, // Import không có đơn giá trong form
+          });
 
-        for (const importData of closeShiftDto.inventoryImports) {
-          // Ghi vào InventoryLedger (tăng tồn kho)
+          // Ghi inventory ledger
           await manager.save(InventoryLedger, {
             warehouseId: warehouse.id,
-            productId: importData.productId,
-            tankId: null, // Nhập kho chung, chưa phân bổ vào bể cụ thể
-            refType: 'TRUCK_IMPORT',
-            refId: shift.id,
-            quantityIn: importData.quantity,
+            productId: importItem.productId,
+            tankId: null,
+            refType: 'IMPORT',
+            refId: doc.id,
+            quantityIn: importItem.quantity,
             quantityOut: 0,
           });
 
-          console.log(`📈 Warehouse ${warehouse.id}: Ghi nhập ${importData.quantity} lít sản phẩm ${importData.productId} từ xe ${importData.licensePlate} (Shift ${shift.id})`);
+          console.log(`📥 Import: ${importItem.quantity} lít sản phẩm ${importItem.productId} từ ${importItem.licensePlate}`);
         }
+      }
+
+      // 6.6. Xử lý Inventory Exports (Phiếu xuất kho thủ công)
+      if (closeShiftDto.inventoryExports && closeShiftDto.inventoryExports.length > 0) {
+        for (const exportItem of closeShiftDto.inventoryExports) {
+          const doc = await manager.save(InventoryDocument, {
+            warehouseId: warehouse.id,
+            docType: 'EXPORT',
+            docDate: new Date(exportItem.docDate),
+            supplierName: exportItem.supplierName,
+            notes: exportItem.notes,
+          });
+
+          await manager.save(InventoryDocumentItem, {
+            documentId: doc.id,
+            productId: exportItem.productId,
+            quantity: exportItem.quantity,
+            unitPrice: exportItem.unitPrice,
+          });
+
+          // Ghi inventory ledger
+          await manager.save(InventoryLedger, {
+            warehouseId: warehouse.id,
+            productId: exportItem.productId,
+            tankId: null,
+            refType: 'EXPORT',
+            refId: doc.id,
+            quantityIn: 0,
+            quantityOut: exportItem.quantity,
+          });
+
+          console.log(`📤 Export: ${exportItem.quantity} lít sản phẩm ${exportItem.productId}`);
+        }
+      }
+
+      // 6.7. TỰ ĐỘNG TẠO PHIẾU XUẤT từ lượng bơm qua vòi (Vấn đề 2)
+      // Tổng hợp lượng bơm theo từng productId
+      const productSalesMap = new Map<number, number>();
+      for (const reading of pumpReadingsData) {
+        const current = productSalesMap.get(reading.productId) || 0;
+        productSalesMap.set(reading.productId, current + reading.quantity);
+      }
+
+      if (productSalesMap.size > 0) {
+        // Tạo 1 phiếu xuất duy nhất cho tất cả sản phẩm bán trong ca
+        const exportDoc = await manager.save(InventoryDocument, {
+          warehouseId: warehouse.id,
+          docType: 'EXPORT',
+          docDate: new Date(),
+          supplierName: `Xuất bán ca #${shift.shiftNo}`,
+          notes: `Tự động tạo từ lượng bơm qua vòi - Ca ${shift.shiftNo} ngày ${shift.shiftDate}`,
+        });
+
+        for (const [productId, totalQuantity] of productSalesMap.entries()) {
+          // Lấy đơn giá từ pump readings (giả sử tất cả pump cùng sản phẩm có cùng giá)
+          const sampleReading = pumpReadingsData.find(r => r.productId === productId);
+          const unitPrice = sampleReading?.unitPrice || 0;
+
+          await manager.save(InventoryDocumentItem, {
+            documentId: exportDoc.id,
+            productId,
+            quantity: totalQuantity,
+            unitPrice,
+          });
+
+          // Ghi inventory ledger cho phiếu xuất
+          await manager.save(InventoryLedger, {
+            warehouseId: warehouse.id,
+            productId,
+            tankId: null, // Không chỉ định tank cụ thể vì tổng hợp từ nhiều pump
+            refType: 'EXPORT',
+            refId: exportDoc.id,
+            quantityIn: 0,
+            quantityOut: totalQuantity,
+          });
+
+          console.log(`🛒 Xuất bán: ${totalQuantity} lít sản phẩm ${productId} (đơn giá ${unitPrice})`);
+        }
+
+        console.log(`✅ Tạo phiếu xuất tự động từ pump readings - Document ID: ${exportDoc.id}`);
       }
 
       // 7. Đóng ca

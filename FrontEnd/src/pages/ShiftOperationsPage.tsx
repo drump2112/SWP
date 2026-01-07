@@ -6,7 +6,7 @@ import { customersApi } from '../api/customers';
 import { productsApi } from '../api/products';
 import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
-import { inventoryApi, type CreateInventoryDocumentWithTruckDto } from '../api/inventory';
+import { inventoryApi } from '../api/inventory';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/sweetalert';
 import Swal from 'sweetalert2';
@@ -42,6 +42,8 @@ const ShiftOperationsPage: React.FC = () => {
   const [pumpReadings, setPumpReadings] = useState<Record<number, PumpReadingDto>>({});
   const [productPrices, setProductPrices] = useState<Record<number, number>>({});
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
+  const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
+  const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
   const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
   const [retailCustomerId, setRetailCustomerId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -174,6 +176,8 @@ const ShiftOperationsPage: React.FC = () => {
     setShowExportForm(false);
     setShowInventoryForm(false);
     setDebtSaleFormPrice(0);
+    setDebtSaleFormQuantity(0);
+    setDebtSaleFormAmount(0);
     setEditingReceiptId(null);
     setEditingDepositId(null);
   }, [activeTab]);
@@ -606,6 +610,14 @@ const ShiftOperationsPage: React.FC = () => {
         quantity: imp.quantity,
         notes: imp.notes,
       })),
+      inventoryExports: draftExports.map(exp => ({
+        docDate: exp.docDate,
+        supplierName: exp.supplierName,
+        productId: exp.productId,
+        quantity: exp.quantity,
+        unitPrice: exp.unitPrice,
+        notes: exp.notes,
+      })),
     };
 
     closeShiftMutation.mutate(dto);
@@ -618,12 +630,45 @@ const ShiftOperationsPage: React.FC = () => {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
+    const productId = Number(formData.get('productId'));
+    const quantity = Number(formData.get('quantity'));
+
+    // Validation: Kiểm tra tổng công nợ không vượt quá tổng xuất bán qua vòi bơm
+    const readingsArray = Object.values(pumpReadings);
+
+    // Tổng lượng bán qua vòi bơm của sản phẩm này
+    const totalPumpQuantity = readingsArray
+      .filter(r => r.productId === productId)
+      .reduce((sum, r) => sum + calculateQuantity(r), 0);
+
+    // Tổng lượng công nợ hiện tại + lượng mới sẽ thêm
+    const currentDebtQuantity = draftDebtSales
+      .filter(s => s.productId === productId)
+      .reduce((sum, s) => sum + s.quantity, 0);
+
+    const totalDebtQuantity = currentDebtQuantity + quantity;
+
+    // Kiểm tra: Tổng công nợ không được lớn hơn tổng xuất bán qua vòi bơm
+    if (totalDebtQuantity > totalPumpQuantity) {
+      const product = products?.find(p => p.id === productId);
+      toast.error(
+        `Lượng công nợ vượt quá lượng xuất bán!\n` +
+        `Sản phẩm: ${product?.name || productId}\n` +
+        `Tổng xuất bán qua vòi bơm: ${totalPumpQuantity.toFixed(3)} lít\n` +
+        `Tổng công nợ hiện tại: ${currentDebtQuantity.toFixed(3)} lít\n` +
+        `Đang thêm: ${quantity.toFixed(3)} lít\n` +
+        `Tổng sau khi thêm: ${totalDebtQuantity.toFixed(3)} lít`,
+        { position: 'top-right', autoClose: 5000 }
+      );
+      return;
+    }
+
     const data: ShiftDebtSaleDto & { id: string } = {
       id: `draft_${Date.now()}`, // Temporary ID
       shiftId: Number(shiftId),
       customerId: Number(formData.get('customerId')),
-      productId: Number(formData.get('productId')),
-      quantity: Number(formData.get('quantity')),
+      productId: productId,
+      quantity: quantity,
       unitPrice: debtSaleFormPrice,
       notes: formData.get('notes') as string || undefined,
     };
@@ -633,6 +678,8 @@ const ShiftOperationsPage: React.FC = () => {
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
+    setDebtSaleFormQuantity(0);
+    setDebtSaleFormAmount(0);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
     toast.success('Đã thêm vào danh sách công nợ', { position: 'top-right', autoClose: 3000 });
@@ -773,33 +820,31 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
-    try {
-      // Lưu vào draft để hiển thị
-      const newItem = {
-        id: `draft_${Date.now()}`,
-        docType: 'IMPORT',
-        docDate: formData.docDate,
-        supplierName: formData.supplierName,
-        invoiceNumber: formData.invoiceNumber,
-        licensePlate: formData.licensePlate,
-        driverName: formData.driverName,
-        quantity: formData.quantity,
-        notes: formData.notes,
-      };
+    // Lưu vào draft để ghi DB khi chốt ca
+    const newItem = {
+      id: `draft_${Date.now()}`,
+      docType: 'IMPORT',
+      docDate: formData.docDate,
+      supplierName: formData.supplierName,
+      invoiceNumber: formData.invoiceNumber,
+      licensePlate: formData.licensePlate,
+      driverName: formData.driverName,
+      productId: formData.productId,
+      quantity: formData.quantity,
+      notes: formData.notes,
+      totalVolume: formData.quantity,
+    };
 
-      setDraftImports(prev => [...prev, newItem]);
-      toast.success('✅ Đã thêm phiếu nhập kho vào danh sách!', { position: 'top-right', autoClose: 3000 });
-      setShowImportForm(false);
-    } catch (error: any) {
-      toast.error('❌ Lỗi khi lưu phiếu nhập: ' + (error.response?.data?.message || error.message));
-    }
+    setDraftImports(prev => [...prev, newItem]);
+    toast.success('✅ Đã thêm phiếu nhập (sẽ lưu DB khi chốt ca)!', { position: 'top-right', autoClose: 3000 });
+    setShowImportForm(false);
   };
 
   const handleExportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const docDate = formData.get('docDate') as string;
-    const receiverName = formData.get('receiverName') as string || undefined; // Reusing supplierName field or similar
+    const receiverName = formData.get('receiverName') as string || undefined;
     const notes = formData.get('notes') as string || undefined;
 
     const productId = formData.get('productId') ? Number(formData.get('productId')) : undefined;
@@ -818,18 +863,22 @@ const ShiftOperationsPage: React.FC = () => {
 
     const amount = quantity * unitPrice;
 
+    // Lưu vào draft để ghi DB khi chốt ca
     const newItem = {
       id: `draft_${Date.now()}`,
       docType: 'EXPORT',
       docDate,
       supplierName: receiverName,
+      productId,
+      quantity,
+      unitPrice,
       notes,
       items: [{ productId, quantity, unitPrice, amount }],
       totalAmount: amount
     };
 
     setDraftExports(prev => [...prev, newItem]);
-    toast.success('Đã thêm phiếu xuất hàng', { position: 'top-right', autoClose: 3000 });
+    toast.success('Đã thêm phiếu xuất ', { position: 'top-right', autoClose: 3000 });
     setShowExportForm(false);
     e.currentTarget.reset();
   };
@@ -1594,6 +1643,8 @@ const ShiftOperationsPage: React.FC = () => {
                         setShowDebtSaleForm(!showDebtSaleForm);
                         if (!showDebtSaleForm) {
                           setDebtSaleFormPrice(0);
+                          setDebtSaleFormQuantity(0);
+                          setDebtSaleFormAmount(0);
                           setSelectedDebtCustomer(null);
                         setSelectedDebtProduct(null);
                       }
@@ -1628,9 +1679,15 @@ const ShiftOperationsPage: React.FC = () => {
                       onChange={(value) => {
                         setSelectedDebtProduct(value as number);
                         if (value && productPrices[value as number]) {
-                          setDebtSaleFormPrice(productPrices[value as number]);
+                          const price = productPrices[value as number];
+                          setDebtSaleFormPrice(price);
+                          // Cập nhật lại amount nếu đã có quantity
+                          if (debtSaleFormQuantity > 0) {
+                            setDebtSaleFormAmount(debtSaleFormQuantity * price);
+                          }
                         } else {
                           setDebtSaleFormPrice(0);
+                          setDebtSaleFormAmount(0);
                         }
                       }}
                       placeholder="-- Chọn sản phẩm --"
@@ -1641,7 +1698,24 @@ const ShiftOperationsPage: React.FC = () => {
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng (lít) *</label>
-                    <input type="number" name="quantity" step="0.001" min="0" required className="block w-full px-4 py-2 border border-gray-300 rounded-lg" placeholder="VD: 100.5" />
+                    <input
+                      type="number"
+                      name="quantity"
+                      step="0.001"
+                      min="0"
+                      required
+                      value={debtSaleFormQuantity || ''}
+                      onChange={(e) => {
+                        const qty = parseFloat(e.target.value) || 0;
+                        setDebtSaleFormQuantity(qty);
+                        // Tính amount từ quantity * price
+                        if (debtSaleFormPrice > 0) {
+                          setDebtSaleFormAmount(qty * debtSaleFormPrice);
+                        }
+                      }}
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="VD: 100.5"
+                    />
                   </div>
 
                   <div>
@@ -1659,8 +1733,28 @@ const ShiftOperationsPage: React.FC = () => {
                     />
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Thành tiền (₫) *</label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={debtSaleFormAmount || ''}
+                      onChange={(e) => {
+                        const amount = parseFloat(e.target.value) || 0;
+                        setDebtSaleFormAmount(amount);
+                        // Tính ngược quantity từ amount / price
+                        if (debtSaleFormPrice > 0) {
+                          setDebtSaleFormQuantity(amount / debtSaleFormPrice);
+                        }
+                      }}
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      placeholder="Hoặc nhập thành tiền"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
                     <input type="text" name="notes" className="block w-full px-4 py-2 border border-gray-300 rounded-lg" />
                   </div>
 
@@ -1670,6 +1764,8 @@ const ShiftOperationsPage: React.FC = () => {
                       onClick={() => {
                         setShowDebtSaleForm(false);
                         setDebtSaleFormPrice(0);
+                        setDebtSaleFormQuantity(0);
+                        setDebtSaleFormAmount(0);
                         setSelectedDebtCustomer(null);
                         setSelectedDebtProduct(null);
                       }}

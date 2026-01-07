@@ -18,6 +18,15 @@ export interface InventoryImportDto {
   notes?: string;
 }
 
+export interface InventoryExportDto {
+  docDate: string;
+  supplierName?: string;
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+  notes?: string;
+}
+
 export interface CloseShiftDto {
   shiftId: number;
   pumpReadings: PumpReadingDto[];
@@ -25,6 +34,7 @@ export interface CloseShiftDto {
   receipts?: CreateReceiptDto[];
   deposits?: CashDepositDto[];
   inventoryImports?: InventoryImportDto[];
+  inventoryExports?: InventoryExportDto[];
   closedAt?: string;
 }
 

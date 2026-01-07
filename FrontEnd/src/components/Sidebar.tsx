@@ -63,6 +63,8 @@ const navigation: NavItem[] = [
       { name: 'Quản lý giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
     ],
   },
+  // Quản lý kho đã ẩn - quản lý tồn tách riêng
+  /*
   {
     name: 'Quản lý kho',
     href: '/inventory',
@@ -72,6 +74,7 @@ const navigation: NavItem[] = [
       { name: 'Nhập hàng', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],
   },
+  */
   {
     name: 'Báo cáo',
     href: '/reports',

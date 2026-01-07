@@ -180,7 +180,6 @@ const CashReportPage: React.FC = () => {
             </select>
           </div>
         </div>
-
         <div className="mt-4 flex gap-3">
           <button
             onClick={handleExportExcel}
@@ -268,7 +267,7 @@ const CashReportPage: React.FC = () => {
                   Tiền chi (₫)
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
-                  Số dư (₫)
+                  Lũy kế (₫)
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
                   Thao tác
