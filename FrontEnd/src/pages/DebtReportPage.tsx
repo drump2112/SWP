@@ -9,10 +9,18 @@ import {
   FunnelIcon,
   DocumentTextIcon,
   ArrowDownTrayIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
-import { exportToExcel } from '../utils/excel';
+import {
+  createReportWorkbook,
+  addReportHeader,
+  addReportFooter,
+  downloadExcel,
+  STYLES,
+} from '../utils/report-exporter';
+import { printReport, formatCurrency } from '../utils/report-printer';
 
 const DebtReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -44,26 +52,204 @@ const DebtReportPage: React.FC = () => {
     queryFn: () => reportsApi.getDebtReport(filters),
   });
 
-  const handleExportExcel = () => {
-    if (!report) return;
+  const handleExportExcel = async () => {
+    if (!report || report.length === 0) {
+      alert('Không có dữ liệu để xuất');
+      return;
+    }
 
-    const data = report.map((item: any) => {
-      // Tìm mã cửa hàng cho từng item dựa trên storeId trong ledgers hoặc mặc định
+    // @ts-ignore
+    const storeName = user?.store?.name || 'Tất cả cửa hàng';
+
+    const { workbook, worksheet } = createReportWorkbook('Báo cáo công nợ');
+
+    addReportHeader(worksheet, {
+      storeName,
+      title: 'BÁO CÁO TỔNG HỢP CÔNG NỢ KHÁCH HÀNG',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+    });
+
+    // Columns setup
+    worksheet.columns = [
+      { key: 'stt', width: 6 },
+      { key: 'storeCode', width: 10 },
+      { key: 'customerCode', width: 12 },
+      { key: 'customerName', width: 30 },
+      { key: 'opening', width: 18 },
+      { key: 'debit', width: 18 },
+      { key: 'credit', width: 18 },
+      { key: 'closing', width: 18 },
+    ];
+
+    // Table Header (Row 7)
+    const headerRow = worksheet.getRow(7);
+    headerRow.values = [
+      'STT',
+      'Mã CH',
+      'Mã KH',
+      'Tên khách hàng',
+      'Dư đầu kỳ',
+      'Phát sinh Nợ',
+      'Phát sinh Có',
+      'Dư cuối kỳ',
+    ];
+    headerRow.font = STYLES.headerFont;
+    headerRow.alignment = STYLES.centerAlign;
+    headerRow.eachCell((cell) => {
+      cell.border = STYLES.borderStyle;
+    });
+
+    // Data Rows
+    let totalOpening = 0;
+    let totalDebit = 0;
+    let totalCredit = 0;
+    let totalClosing = 0;
+
+    report.forEach((item: any, index: number) => {
+      // Tìm mã cửa hàng
       const storeId = item.ledgers?.[0]?.storeId || filters.storeId || filters.storeIds?.[0];
       const storeCode = stores?.find(s => s.id === storeId)?.code || `CH${storeId || ''}`;
 
-      return {
-        'Mã CH': storeCode,
-        'Mã KH': item.customer?.code,
-        'Tên KH': item.customer?.name,
-        'Dư đầu kỳ': item.openingBalance,
-        'Phát sinh Nợ': item.totalDebit,
-        'Phát sinh Có': item.totalCredit,
-        'Dư cuối kỳ': item.closingBalance
-      };
+      const row = worksheet.addRow([
+        index + 1,
+        storeCode,
+        item.customer?.code,
+        item.customer?.name,
+        Number(item.openingBalance),
+        Number(item.totalDebit),
+        Number(item.totalCredit),
+        Number(item.closingBalance),
+      ]);
+
+      totalOpening += Number(item.openingBalance);
+      totalDebit += Number(item.totalDebit);
+      totalCredit += Number(item.totalCredit);
+      totalClosing += Number(item.closingBalance);
+
+      row.font = STYLES.normalFont;
+      row.eachCell((cell, colNumber) => {
+        cell.border = STYLES.borderStyle;
+        if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
+          cell.alignment = STYLES.centerAlign;
+        } else if (colNumber === 4) {
+          cell.alignment = STYLES.leftAlign;
+        } else {
+          cell.alignment = STYLES.rightAlign;
+          cell.numFmt = '#,##0';
+        }
+      });
     });
 
-    exportToExcel(data, `Tong_hop_cong_no_${filters.fromDate}_${filters.toDate}`);
+    // Total Row
+    const totalRow = worksheet.addRow([
+      '',
+      '',
+      '',
+      'Tổng cộng',
+      totalOpening,
+      totalDebit,
+      totalCredit,
+      totalClosing,
+    ]);
+    totalRow.font = STYLES.boldFont;
+    totalRow.eachCell((cell, colNumber) => {
+      cell.border = STYLES.borderStyle;
+      if (colNumber === 4) {
+        cell.alignment = STYLES.centerAlign;
+      } else if (colNumber >= 5) {
+        cell.alignment = STYLES.rightAlign;
+        cell.numFmt = '#,##0';
+      }
+    });
+    worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+
+    addReportFooter(worksheet, {
+      signatures: {
+        left: 'Khách hàng',
+        center: 'Kế toán',
+        right: 'Giám đốc',
+      },
+    });
+
+    await downloadExcel(workbook, 'Bao_cao_cong_no');
+  };
+
+  const handlePrint = () => {
+    if (!report || report.length === 0) {
+      alert('Không có dữ liệu để in');
+      return;
+    }
+
+    // @ts-ignore
+    const storeName = user?.store?.name || 'Tất cả cửa hàng';
+
+    let totalOpening = 0;
+    let totalDebit = 0;
+    let totalCredit = 0;
+    let totalClosing = 0;
+
+    const tableRows = report.map((item: any, index: number) => {
+      const storeId = item.ledgers?.[0]?.storeId || filters.storeId || filters.storeIds?.[0];
+      const storeCode = stores?.find(s => s.id === storeId)?.code || `CH${storeId || ''}`;
+
+      totalOpening += Number(item.openingBalance);
+      totalDebit += Number(item.totalDebit);
+      totalCredit += Number(item.totalCredit);
+      totalClosing += Number(item.closingBalance);
+
+      return `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td class="text-center">${storeCode}</td>
+          <td class="text-center">${item.customer?.code}</td>
+          <td class="text-left">${item.customer?.name}</td>
+          <td class="text-right">${formatCurrency(item.openingBalance)}</td>
+          <td class="text-right">${formatCurrency(item.totalDebit)}</td>
+          <td class="text-right">${formatCurrency(item.totalCredit)}</td>
+          <td class="text-right font-bold">${formatCurrency(item.closingBalance)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const tableHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Mã CH</th>
+            <th>Mã KH</th>
+            <th>Tên khách hàng</th>
+            <th>Dư đầu kỳ</th>
+            <th>Phát sinh Nợ</th>
+            <th>Phát sinh Có</th>
+            <th>Dư cuối kỳ</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          <tr class="total-row">
+            <td colspan="4" class="text-center">Tổng cộng</td>
+            <td class="text-right">${formatCurrency(totalOpening)}</td>
+            <td class="text-right">${formatCurrency(totalDebit)}</td>
+            <td class="text-right">${formatCurrency(totalCredit)}</td>
+            <td class="text-right">${formatCurrency(totalClosing)}</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    printReport(tableHTML, {
+      storeName,
+      title: 'BÁO CÁO TỔNG HỢP CÔNG NỢ KHÁCH HÀNG',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      signatures: {
+        left: 'Khách hàng',
+        center: 'Kế toán',
+        right: 'Giám đốc',
+      },
+    });
   };
 
   const handleExportPDF = () => {
@@ -189,11 +375,11 @@ const DebtReportPage: React.FC = () => {
             Xuất Excel
           </button>
           <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
+            onClick={handlePrint}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm"
           >
-            <DocumentTextIcon className="h-5 w-5 mr-2" />
-            Xuất PDF
+            <PrinterIcon className="h-5 w-5 mr-2" />
+            In báo cáo
           </button>
         </div>
       </div>

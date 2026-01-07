@@ -7,10 +7,18 @@ import {
   ArchiveBoxIcon,
   CalendarIcon,
   ArrowDownTrayIcon,
-  BuildingStorefrontIcon
+  BuildingStorefrontIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
-import { exportToExcel } from '../utils/excel';
+import {
+  createReportWorkbook,
+  addReportHeader,
+  addReportFooter,
+  downloadExcel,
+  STYLES,
+} from '../utils/report-exporter';
+import { printReport, formatCurrency, formatNumber, formatDate } from '../utils/report-printer';
 
 const InventoryReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -18,6 +26,7 @@ const InventoryReportPage: React.FC = () => {
   const [toDate, setToDate] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(user?.storeId);
   const [reportType, setReportType] = useState<'summary' | 'import' | 'export'>('summary');
+  const [isAllStores, setIsAllStores] = useState(false);
 
   const isStoreUser = user?.roleCode === 'STORE';
 
@@ -28,14 +37,45 @@ const InventoryReportPage: React.FC = () => {
     enabled: !user?.storeId,
   });
 
-  // Fetch inventory report (Summary)
+  // Fetch inventory report (Summary) - single store
   const { data: report, isLoading: isLoadingReport } = useQuery({
     queryKey: ['inventory-report', selectedStoreId, fromDate, toDate],
     queryFn: () => {
       if (!selectedStoreId) return Promise.resolve([]);
       return inventoryApi.getInventoryReportByStore(selectedStoreId, fromDate, toDate);
     },
-    enabled: !!selectedStoreId && reportType === 'summary',
+    enabled: !!selectedStoreId && reportType === 'summary' && !isAllStores,
+  });
+
+  // Fetch inventory reports for all stores
+  const { data: allStoresReport, isLoading: isLoadingAllStoresReport } = useQuery({
+    queryKey: ['inventory-report-all-stores', fromDate, toDate],
+    queryFn: async () => {
+      if (!stores || stores.length === 0) return [];
+
+      const reports = await Promise.all(
+        stores.map(async (store: any) => {
+          try {
+            const storeReport = await inventoryApi.getInventoryReportByStore(store.id, fromDate, toDate);
+            return {
+              storeId: store.id,
+              storeName: store.name,
+              data: storeReport,
+            };
+          } catch (error) {
+            console.error(`Error fetching report for store ${store.id}:`, error);
+            return {
+              storeId: store.id,
+              storeName: store.name,
+              data: [],
+            };
+          }
+        })
+      );
+
+      return reports;
+    },
+    enabled: isAllStores && reportType === 'summary' && !!stores,
   });
 
   // Fetch documents (Listing)
@@ -52,36 +92,468 @@ const InventoryReportPage: React.FC = () => {
     enabled: !!selectedStoreId && reportType !== 'summary',
   });
 
-  const isLoading = reportType === 'summary' ? isLoadingReport : isLoadingDocs;
+  const isLoading = reportType === 'summary'
+    ? (isAllStores ? isLoadingAllStoresReport : isLoadingReport)
+    : isLoadingDocs;
 
-  const handleExport = () => {
+  const handleExport = async () => {
+    // @ts-ignore
+    const storeName = isAllStores
+      ? 'Tất cả cửa hàng'
+      : (user?.store?.name || stores?.find((s) => s.id === selectedStoreId)?.name || 'Cửa hàng');
+
     if (reportType === 'summary') {
-      if (!report) return;
-      const data = report.map((item, index) => ({
-        'STT': index + 1,
-        'Mã hàng': item.productCode,
-        'Tên hàng': item.productName,
-        'ĐVT': item.unitName,
-        'Tồn đầu kỳ': item.openingBalance,
-        'Nhập trong kỳ': item.importQuantity,
-        'Xuất trong kỳ': item.exportQuantity,
-        'Tồn cuối kỳ': item.closingBalance
-      }));
-      exportToExcel(data, `Bao_cao_nhap_xuat_ton_${fromDate}_${toDate}`);
+      if (isAllStores && (!allStoresReport || allStoresReport.length === 0)) {
+        alert('Không có dữ liệu để xuất');
+        return;
+      }
+      if (!isAllStores && (!report || report.length === 0)) {
+        alert('Không có dữ liệu để xuất');
+        return;
+      }
+
+      const { workbook, worksheet } = createReportWorkbook('Nhập xuất tồn');
+
+      addReportHeader(worksheet, {
+        storeName,
+        title: 'BÁO CÁO NHẬP - XUẤT - TỒN',
+        fromDate,
+        toDate,
+      });
+
+      // Columns setup
+      worksheet.columns = [
+        { key: 'stt', width: 6 },
+        { key: 'code', width: 12 },
+        { key: 'name', width: 30 },
+        { key: 'unit', width: 10 },
+        { key: 'opening', width: 15 },
+        { key: 'import', width: 15 },
+        { key: 'export', width: 15 },
+        { key: 'closing', width: 15 },
+      ];
+
+      // Table Header (Row 7)
+      const headerRow = worksheet.getRow(7);
+      headerRow.values = [
+        'STT',
+        'Mã hàng',
+        'Tên hàng',
+        'ĐVT',
+        'Tồn đầu kỳ',
+        'Nhập',
+        'Xuất',
+        'Tồn cuối kỳ',
+      ];
+      headerRow.font = STYLES.headerFont;
+      headerRow.alignment = STYLES.centerAlign;
+      headerRow.eachCell((cell) => {
+        cell.border = STYLES.borderStyle;
+      });
+
+      // Data Rows
+      let totalOpening = 0;
+      let totalImport = 0;
+      let totalExport = 0;
+      let totalClosing = 0;
+
+      if (isAllStores && allStoresReport) {
+        // All stores mode - group by store
+        let stt = 1;
+        allStoresReport.forEach((storeData: any) => {
+          if (storeData.data && storeData.data.length > 0) {
+            // Store header row
+            const storeHeaderRow = worksheet.addRow([storeData.storeName, '', '', '', '', '', '', '']);
+            storeHeaderRow.font = { ...STYLES.boldFont, size: 12 };
+            storeHeaderRow.eachCell((cell) => {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0E0E0' },
+              };
+              cell.border = STYLES.borderStyle;
+            });
+            worksheet.mergeCells(`A${storeHeaderRow.number}:H${storeHeaderRow.number}`);
+
+            // Store data rows
+            storeData.data.forEach((item: any) => {
+              const row = worksheet.addRow([
+                stt++,
+                item.productCode,
+                item.productName,
+                item.unitName,
+                Number(item.openingBalance),
+                Number(item.importQuantity),
+                Number(item.exportQuantity),
+                Number(item.closingBalance),
+              ]);
+
+              totalOpening += Number(item.openingBalance);
+              totalImport += Number(item.importQuantity);
+              totalExport += Number(item.exportQuantity);
+              totalClosing += Number(item.closingBalance);
+
+              row.font = STYLES.normalFont;
+              row.eachCell((cell, colNumber) => {
+                cell.border = STYLES.borderStyle;
+                if (colNumber === 1 || colNumber === 4) {
+                  cell.alignment = STYLES.centerAlign;
+                } else if (colNumber === 2 || colNumber === 3) {
+                  cell.alignment = STYLES.leftAlign;
+                } else {
+                  cell.alignment = STYLES.rightAlign;
+                  cell.numFmt = '#,##0.00';
+                }
+              });
+            });
+          }
+        });
+      } else {
+        // Single store mode
+        if (report) {
+          report.forEach((item, index) => {
+            const row = worksheet.addRow([
+              index + 1,
+              item.productCode,
+              item.productName,
+              item.unitName,
+              Number(item.openingBalance),
+              Number(item.importQuantity),
+              Number(item.exportQuantity),
+              Number(item.closingBalance),
+            ]);
+
+            totalOpening += Number(item.openingBalance);
+            totalImport += Number(item.importQuantity);
+            totalExport += Number(item.exportQuantity);
+            totalClosing += Number(item.closingBalance);
+
+            row.font = STYLES.normalFont;
+            row.eachCell((cell, colNumber) => {
+              cell.border = STYLES.borderStyle;
+              if (colNumber === 1 || colNumber === 4) {
+                cell.alignment = STYLES.centerAlign;
+              } else if (colNumber === 2 || colNumber === 3) {
+                cell.alignment = STYLES.leftAlign;
+              } else {
+                cell.alignment = STYLES.rightAlign;
+                cell.numFmt = '#,##0.00';
+              }
+            });
+          });
+        }
+      }
+
+      // Total Row
+      const totalRow = worksheet.addRow([
+        '',
+        '',
+        '',
+        'Tổng cộng',
+        totalOpening,
+        totalImport,
+        totalExport,
+        totalClosing,
+      ]);
+      totalRow.font = STYLES.boldFont;
+      totalRow.eachCell((cell, colNumber) => {
+        cell.border = STYLES.borderStyle;
+        if (colNumber === 4) {
+          cell.alignment = STYLES.centerAlign;
+        } else if (colNumber >= 5) {
+          cell.alignment = STYLES.rightAlign;
+          cell.numFmt = '#,##0.00';
+        }
+      });
+      worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+
+      addReportFooter(worksheet);
+      await downloadExcel(workbook, 'Bao_cao_nhap_xuat_ton');
+
     } else {
-      if (!documents) return;
-      const data = documents.map((item, index) => ({
-        'STT': index + 1,
-        'Ngày': dayjs(item.docDate).format('DD/MM/YYYY'),
-        'Số chứng từ': item.invoiceNumber || `PN${index + 1}`, // Fallback if no invoice number
-        'Nhà cung cấp': item.supplierName,
-        'Mã hàng': item.productCode,
-        'Tên hàng': item.productName,
-        'Số lượng': item.quantity,
-        'Đơn giá': item.unitPrice,
-        'Thành tiền': item.amount
-      }));
-      exportToExcel(data, `Bang_ke_${reportType}_${fromDate}_${toDate}`);
+      // Import or Export listing
+      if (!documents || documents.length === 0) {
+        alert('Không có dữ liệu để xuất');
+        return;
+      }
+
+      const { workbook, worksheet } = createReportWorkbook(reportType === 'import' ? 'Bảng kê nhập' : 'Bảng kê xuất');
+
+      addReportHeader(worksheet, {
+        storeName,
+        title: reportType === 'import' ? 'BẢNG KÊ CHI TIẾT NHẬP KHO' : 'BẢNG KÊ CHI TIẾT XUẤT KHO',
+        fromDate,
+        toDate,
+      });
+
+      // Columns setup
+      worksheet.columns = [
+        { key: 'stt', width: 6 },
+        { key: 'date', width: 15 },
+        { key: 'invoice', width: 18 },
+        { key: 'supplier', width: 25 },
+        { key: 'product', width: 25 },
+        { key: 'quantity', width: 15 },
+        { key: 'price', width: 15 },
+        { key: 'amount', width: 18 },
+      ];
+
+      // Table Header (Row 7)
+      const headerRow = worksheet.getRow(7);
+      headerRow.values = [
+        'STT',
+        'Ngày',
+        'Số chứng từ',
+        reportType === 'import' ? 'Nhà cung cấp' : 'Khách hàng/Ghi chú',
+        'Mặt hàng',
+        'Số lượng',
+        'Đơn giá',
+        'Thành tiền',
+      ];
+      headerRow.font = STYLES.headerFont;
+      headerRow.alignment = STYLES.centerAlign;
+      headerRow.eachCell((cell) => {
+        cell.border = STYLES.borderStyle;
+      });
+
+      // Data Rows
+      let totalQuantity = 0;
+      let totalAmount = 0;
+
+      documents.forEach((item, index) => {
+        const row = worksheet.addRow([
+          index + 1,
+          dayjs(item.docDate).format('DD/MM/YYYY'),
+          item.invoiceNumber || '-',
+          item.supplierName || '-',
+          item.productName,
+          Number(item.quantity),
+          Number(item.unitPrice),
+          Number(item.amount),
+        ]);
+
+        totalQuantity += Number(item.quantity);
+        totalAmount += Number(item.amount);
+
+        row.font = STYLES.normalFont;
+        row.eachCell((cell, colNumber) => {
+          cell.border = STYLES.borderStyle;
+          if (colNumber === 1 || colNumber === 2) {
+            cell.alignment = STYLES.centerAlign;
+          } else if (colNumber === 3 || colNumber === 4 || colNumber === 5) {
+            cell.alignment = STYLES.leftAlign;
+          } else {
+            cell.alignment = STYLES.rightAlign;
+            if (colNumber === 6) cell.numFmt = '#,##0.00';
+            else cell.numFmt = '#,##0';
+          }
+        });
+      });
+
+      // Total Row
+      const totalRow = worksheet.addRow([
+        '',
+        '',
+        '',
+        '',
+        'Tổng cộng',
+        totalQuantity,
+        '',
+        totalAmount,
+      ]);
+      totalRow.font = STYLES.boldFont;
+      totalRow.eachCell((cell, colNumber) => {
+        cell.border = STYLES.borderStyle;
+        if (colNumber === 5) {
+          cell.alignment = STYLES.centerAlign;
+        } else if (colNumber === 6 || colNumber === 8) {
+          cell.alignment = STYLES.rightAlign;
+          if (colNumber === 6) cell.numFmt = '#,##0.00';
+          else cell.numFmt = '#,##0';
+        }
+      });
+      worksheet.mergeCells(`A${totalRow.number}:D${totalRow.number}`);
+
+      addReportFooter(worksheet);
+      await downloadExcel(workbook, reportType === 'import' ? 'Bang_ke_nhap' : 'Bang_ke_xuat');
+    }
+  };
+
+  const handlePrint = () => {
+    // @ts-ignore
+    const storeName = isAllStores
+      ? 'Tất cả cửa hàng'
+      : (user?.store?.name || stores?.find((s) => s.id === selectedStoreId)?.name || 'Cửa hàng');
+
+    if (reportType === 'summary') {
+      if (isAllStores && (!allStoresReport || allStoresReport.length === 0)) {
+        alert('Không có dữ liệu để in');
+        return;
+      }
+      if (!isAllStores && (!report || report.length === 0)) {
+        alert('Không có dữ liệu để in');
+        return;
+      }
+
+      let totalOpening = 0;
+      let totalImport = 0;
+      let totalExport = 0;
+      let totalClosing = 0;
+
+      let tableRows = '';
+
+      if (isAllStores && allStoresReport) {
+        // All stores mode
+        let stt = 1;
+        allStoresReport.forEach((storeData: any) => {
+          if (storeData.data && storeData.data.length > 0) {
+            // Store header row
+            tableRows += `
+              <tr class="store-header">
+                <td colspan="8" class="text-left font-bold" style="background-color: #e0e0e0; padding: 8px;">${storeData.storeName}</td>
+              </tr>
+            `;
+
+            // Store data rows
+            storeData.data.forEach((item: any) => {
+              totalOpening += Number(item.openingBalance);
+              totalImport += Number(item.importQuantity);
+              totalExport += Number(item.exportQuantity);
+              totalClosing += Number(item.closingBalance);
+
+              tableRows += `
+                <tr>
+                  <td class="text-center">${stt++}</td>
+                  <td class="text-center">${item.productCode}</td>
+                  <td class="text-left">${item.productName}</td>
+                  <td class="text-center">${item.unitName}</td>
+                  <td class="text-right">${formatNumber(item.openingBalance)}</td>
+                  <td class="text-right">${formatNumber(item.importQuantity)}</td>
+                  <td class="text-right">${formatNumber(item.exportQuantity)}</td>
+                  <td class="text-right">${formatNumber(item.closingBalance)}</td>
+                </tr>
+              `;
+            });
+          }
+        });
+      } else {
+        // Single store mode
+        if (report) {
+          tableRows = report.map((item, index) => {
+            totalOpening += Number(item.openingBalance);
+            totalImport += Number(item.importQuantity);
+            totalExport += Number(item.exportQuantity);
+            totalClosing += Number(item.closingBalance);
+
+            return `
+              <tr>
+                <td class="text-center">${index + 1}</td>
+                <td class="text-center">${item.productCode}</td>
+                <td class="text-left">${item.productName}</td>
+                <td class="text-center">${item.unitName}</td>
+              <td class="text-right">${formatNumber(item.openingBalance)}</td>
+              <td class="text-right">${formatNumber(item.importQuantity)}</td>
+              <td class="text-right">${formatNumber(item.exportQuantity)}</td>
+              <td class="text-right">${formatNumber(item.closingBalance)}</td>
+              </tr>
+            `;
+          }).join('');
+        }
+      }
+
+      const tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Mã hàng</th>
+              <th>Tên hàng</th>
+              <th>ĐVT</th>
+              <th>Tồn đầu kỳ</th>
+              <th>Nhập</th>
+              <th>Xuất</th>
+              <th>Tồn cuối kỳ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="total-row">
+              <td colspan="4" class="text-center">Tổng cộng</td>
+              <td class="text-right">${formatNumber(totalOpening)}</td>
+              <td class="text-right">${formatNumber(totalImport)}</td>
+              <td class="text-right">${formatNumber(totalExport)}</td>
+              <td class="text-right">${formatNumber(totalClosing)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      printReport(tableHTML, {
+        storeName,
+        title: 'BÁO CÁO NHẬP - XUẤT - TỒN',
+        fromDate,
+        toDate,
+      });
+    } else {
+      // Import or Export listing
+      if (!documents || documents.length === 0) {
+        alert('Không có dữ liệu để in');
+        return;
+      }
+
+      let totalQuantity = 0;
+      let totalAmount = 0;
+
+      const tableRows = documents.map((item, index) => {
+        totalQuantity += Number(item.quantity);
+        totalAmount += Number(item.amount);
+
+        return `
+          <tr>
+            <td class="text-center">${index + 1}</td>
+            <td class="text-center">${formatDate(item.docDate)}</td>
+            <td class="text-left">${item.invoiceNumber || '-'}</td>
+            <td class="text-left">${item.supplierName || '-'}</td>
+            <td class="text-left">${item.productName}</td>
+            <td class="text-right">${formatNumber(Number(item.quantity))}</td>
+            <td class="text-right">${formatCurrency(Number(item.unitPrice))}</td>
+            <td class="text-right font-bold">${formatCurrency(Number(item.amount))}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Ngày</th>
+              <th>Số chứng từ</th>
+              <th>${reportType === 'import' ? 'Nhà cung cấp' : 'Khách hàng/Ghi chú'}</th>
+              <th>Mặt hàng</th>
+              <th>Số lượng</th>
+              <th>Đơn giá</th>
+              <th>Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="total-row">
+              <td colspan="5" class="text-center">Tổng cộng</td>
+              <td class="text-right">${formatNumber(totalQuantity)}</td>
+              <td></td>
+              <td class="text-right">${formatCurrency(totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      printReport(tableHTML, {
+        storeName,
+        title: reportType === 'import' ? 'BẢNG KÊ CHI TIẾT NHẬP KHO' : 'BẢNG KÊ CHI TIẾT XUẤT KHO',
+        fromDate,
+        toDate,
+      });
     }
   };
 
@@ -97,14 +569,28 @@ const InventoryReportPage: React.FC = () => {
             Theo dõi biến động hàng hóa trong kho
           </p>
         </div>
-        <button
-          onClick={handleExport}
-          disabled={reportType === 'summary' ? !report?.length : !documents?.length}
-          className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-          Xuất Excel
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExport}
+            disabled={reportType === 'summary'
+              ? (isAllStores ? !allStoresReport?.length : !report?.length)
+              : !documents?.length}
+            className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
+            Xuất Excel
+          </button>
+          <button
+            onClick={handlePrint}
+            disabled={reportType === 'summary'
+              ? (isAllStores ? !allStoresReport?.length : !report?.length)
+              : !documents?.length}
+            className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <PrinterIcon className="h-5 w-5 mr-2" />
+            In báo cáo
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -116,11 +602,21 @@ const InventoryReportPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Cửa hàng</label>
               <div className="relative">
                 <select
-                  value={selectedStoreId || ''}
-                  onChange={(e) => setSelectedStoreId(Number(e.target.value))}
+                  value={isAllStores ? 'all' : (selectedStoreId || '')}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === 'all') {
+                      setIsAllStores(true);
+                      setSelectedStoreId(undefined);
+                    } else {
+                      setIsAllStores(false);
+                      setSelectedStoreId(Number(value));
+                    }
+                  }}
                   className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 >
                   <option value="">Chọn cửa hàng</option>
+                  <option value="all">Tất cả cửa hàng</option>
                   {stores?.map((store) => (
                     <option key={store.id} value={store.id}>
                       {store.name}
@@ -288,7 +784,48 @@ const InventoryReportPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {reportType === 'summary' && report && report.length > 0 ? (
+                {reportType === 'summary' && isAllStores && allStoresReport && allStoresReport.length > 0 ? (
+                  // All stores mode - grouped by store
+                  allStoresReport.map((storeData: any, storeIndex: number) => (
+                    <React.Fragment key={storeIndex}>
+                      {storeData.data && storeData.data.length > 0 && (
+                        <>
+                          <tr className="bg-gray-100">
+                            <td colSpan={7} className="px-6 py-3 text-left text-sm font-bold text-gray-900">
+                              {storeData.storeName}
+                            </td>
+                          </tr>
+                          {storeData.data.map((item: any, itemIndex: number) => (
+                            <tr key={`${storeIndex}-${itemIndex}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {item.productCode}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.productName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.unitName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                                {item.openingBalance.toLocaleString('vi-VN')}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                                {item.importQuantity.toLocaleString('vi-VN')}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                                {item.exportQuantity.toLocaleString('vi-VN')}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                                {item.closingBalance.toLocaleString('vi-VN')}
+                              </td>
+                            </tr>
+                          ))}
+                        </>
+                      )}
+                    </React.Fragment>
+                  ))
+                ) : reportType === 'summary' && !isAllStores && report && report.length > 0 ? (
+                  // Single store mode
                   report.map((item) => (
                     <tr key={item.productId} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">

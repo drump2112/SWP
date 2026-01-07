@@ -37,6 +37,7 @@ import { ExpensesModule } from './expenses/expenses.module';
 
 // Reports
 import { ReportsModule } from './reports/reports.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -90,6 +91,7 @@ import { ReportsModule } from './reports/reports.module';
 
     // Reports
     ReportsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

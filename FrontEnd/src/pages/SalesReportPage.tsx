@@ -9,6 +9,7 @@ import {
   CalendarIcon,
   BuildingStorefrontIcon,
   ArrowDownTrayIcon,
+  PrinterIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import {
@@ -18,6 +19,7 @@ import {
   downloadExcel,
   STYLES,
 } from "../utils/report-exporter";
+import { printReport } from '../utils/report-printer';
 
 const SalesReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -59,7 +61,10 @@ const SalesReportPage: React.FC = () => {
   console.log("productReport", productReport);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(amount);
+    return new Intl.NumberFormat("vi-VN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(amount);
   };
 
   const formatNumber = (num: number) => {
@@ -242,6 +247,153 @@ const SalesReportPage: React.FC = () => {
     await downloadExcel(workbook, "Bao_cao_xuat_hang");
   };
 
+  const handlePrint = () => {
+    const dataToExport = reportType === "pump" ? pumpReport : productReport;
+    if (!dataToExport || dataToExport.length === 0) {
+      alert("Không có dữ liệu để in");
+      return;
+    }
+
+    // @ts-ignore
+    const storeName = user?.store?.name || stores?.find((s) => s.id === selectedStoreId)?.name || "Cửa hàng";
+
+    if (reportType === "product") {
+      // Group by Product Name
+      const groupedData: Record<string, any[]> = {};
+      dataToExport.forEach((item: any) => {
+        if (!groupedData[item.productName]) {
+          groupedData[item.productName] = [];
+        }
+        groupedData[item.productName].push(item);
+      });
+
+      let totalAllAmount = 0;
+      let totalAllQuantity = 0;
+
+      const groupRows = Object.keys(groupedData).map((productName) => {
+        const items = groupedData[productName];
+        const subTotalQuantity = items.reduce((sum, item) => sum + Number(item.totalQuantity), 0);
+        const subTotalAmount = items.reduce((sum, item) => sum + Number(item.totalAmount), 0);
+
+        totalAllQuantity += subTotalQuantity;
+        totalAllAmount += subTotalAmount;
+
+        const detailRows = items.map((item: any, idx: number) => `
+          <tr>
+            <td class="text-center">${idx + 1}</td>
+            <td class="text-center">${item.shiftNo}</td>
+            <td class="text-center">${dayjs(item.openedAt || item.shiftDate).format('DD/MM/YYYY HH:mm')}</td>
+            <td class="text-left">${item.productName}</td>
+            <td class="text-center">lít</td>
+            <td class="text-right">${formatNumber(Number(item.totalQuantity))}</td>
+            <td class="text-right">${formatCurrency(Number(item.unitPrice))}</td>
+            <td class="text-right font-bold">${formatCurrency(Number(item.totalAmount))}</td>
+          </tr>
+        `).join('');
+
+        return `
+          <tr class="total-row">
+            <td colspan="4" class="text-left font-bold">${productName}</td>
+            <td class="text-center"></td>
+            <td class="text-right font-bold">${formatNumber(subTotalQuantity)}</td>
+            <td class="text-right"></td>
+            <td class="text-right font-bold">${formatCurrency(subTotalAmount)}</td>
+          </tr>
+          ${detailRows}
+        `;
+      }).join('');
+
+      const tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Số CT</th>
+              <th>Ngày tháng</th>
+              <th>Tên hàng hóa</th>
+              <th>Đơn vị</th>
+              <th>Số lượng</th>
+              <th>Đơn giá</th>
+              <th>Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${groupRows}
+            <tr class="total-row" style="background-color: #f0f0f0; font-weight: bold;">
+              <td colspan="4" class="text-center">Cộng tổng</td>
+              <td></td>
+              <td class="text-right">${formatNumber(totalAllQuantity)}</td>
+              <td></td>
+              <td class="text-right">${formatCurrency(totalAllAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      printReport(tableHTML, {
+        storeName,
+        title: 'BẢNG KÊ CHI TIẾT BÁN HÀNG',
+        fromDate,
+        toDate,
+      });
+    } else {
+      // By pump view
+      let totalQuantity = 0;
+      let totalAmount = 0;
+
+      const tableRows = dataToExport.map((item: any, index: number) => {
+        totalQuantity += Number(item.totalQuantity);
+        totalAmount += Number(item.totalAmount);
+
+        return `
+          <tr>
+            <td class="text-center">${index + 1}</td>
+            <td class="text-center">${item.pumpCode}</td>
+            <td class="text-left">${item.pumpCode}${item.pumpName ? ' - ' + item.pumpName : ''}</td>
+            <td class="text-left">${item.productName}</td>
+            <td class="text-center">lít</td>
+            <td class="text-right">${formatNumber(Number(item.totalQuantity))}</td>
+            <td class="text-right">${formatCurrency(Number(item.unitPrice))}</td>
+            <td class="text-right font-bold">${formatCurrency(Number(item.totalAmount))}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const tableHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>STT</th>
+              <th>Mã vòi</th>
+              <th>Tên vòi bơm</th>
+              <th>Mặt hàng</th>
+              <th>Đơn vị</th>
+              <th>Số lượng</th>
+              <th>Đơn giá</th>
+              <th>Thành tiền</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+            <tr class="total-row">
+              <td colspan="5" class="text-center">Tổng cộng</td>
+              <td class="text-right">${formatNumber(totalQuantity)}</td>
+              <td></td>
+              <td class="text-right">${formatCurrency(totalAmount)}</td>
+            </tr>
+          </tbody>
+        </table>
+      `;
+
+      printReport(tableHTML, {
+        storeName,
+        title: 'BÁO CÁO XUẤT HÀNG THEO VÒI BƠM',
+        fromDate,
+        toDate,
+      });
+    }
+  };
+
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -252,13 +404,22 @@ const SalesReportPage: React.FC = () => {
           </h1>
           <p className="mt-2 text-sm text-gray-600">Xem báo cáo xuất hàng theo cột bơm hoặc mặt hàng</p>
         </div>
-        <button
-          onClick={handleExportExcel}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-        >
-          <ArrowDownTrayIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-          Xuất Excel
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={handleExportExcel}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <ArrowDownTrayIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            Xuất Excel
+          </button>
+          <button
+            onClick={handlePrint}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <PrinterIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
+            In báo cáo
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -420,13 +581,13 @@ const SalesReportPage: React.FC = () => {
                             {item.pumpCode} - {item.pumpName}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.productName}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">
                             {formatCurrency(Number(item.unitPrice))}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                             {formatNumber(Number(item.totalQuantity))}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
                             {formatCurrency(Number(item.totalAmount))}
                           </td>
                         </tr>
@@ -438,13 +599,13 @@ const SalesReportPage: React.FC = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                             {item.productName}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">
                             {formatCurrency(Number(item.unitPrice))}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                             {formatNumber(Number(item.totalQuantity))}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold font-mono">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
                             {formatCurrency(Number(item.totalAmount))}
                           </td>
                         </tr>
@@ -458,7 +619,7 @@ const SalesReportPage: React.FC = () => {
                       >
                         Tổng cộng:
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-mono">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
                         {formatNumber(
                           (reportType === "pump" ? pumpReport : productReport)?.reduce(
                             (sum, item) => sum + Number(item.totalQuantity),
@@ -466,7 +627,7 @@ const SalesReportPage: React.FC = () => {
                           ) || 0
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-mono">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right font-bold">
                         {formatCurrency(
                           (reportType === "pump" ? pumpReport : productReport)?.reduce(
                             (sum, item) => sum + Number(item.totalAmount),

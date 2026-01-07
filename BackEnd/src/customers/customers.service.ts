@@ -188,8 +188,8 @@ export class CustomersService {
     const query = this.debtLedgerRepository
       .createQueryBuilder('dl')
       .select('SUM(dl.debit - dl.credit)', 'balance')
-      .where('dl.customer_id = :customerId', { customerId });
-      // TODO: Thêm .andWhere('dl.superseded_by_shift_id IS NULL') sau khi chạy migration
+      .where('dl.customer_id = :customerId', { customerId })
+      .andWhere('dl.superseded_by_shift_id IS NULL'); // ✅ Filter superseded records
 
     if (storeId) {
       query.andWhere('dl.store_id = :storeId', { storeId });
@@ -245,6 +245,7 @@ export class CustomersService {
     const query = this.debtLedgerRepository
       .createQueryBuilder('dl')
       .where('dl.customer_id = :customerId', { customerId })
+      .andWhere('dl.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .orderBy('dl.created_at', 'ASC');
 
     if (storeId) {

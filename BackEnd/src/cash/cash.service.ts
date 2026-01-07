@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { CashLedger } from '../entities/cash-ledger.entity';
 
 @Injectable()
@@ -15,7 +15,7 @@ export class CashService {
       .createQueryBuilder('cl')
       .select('SUM(cl.cash_in - cl.cash_out)', 'balance')
       .where('cl.store_id = :storeId', { storeId })
-      // TODO: Thêm .andWhere('cl.superseded_by_shift_id IS NULL') sau khi chạy migration
+      .andWhere('cl.superseded_by_shift_id IS NULL') // ✅ Filter superseded records
       .getRawOne();
 
     return {
@@ -26,7 +26,10 @@ export class CashService {
 
   async getCashLedger(storeId: number, limit = 50) {
     const ledgers = await this.cashLedgerRepository.find({
-      where: { storeId },
+      where: { 
+        storeId,
+        supersededByShiftId: IsNull(), // ✅ Filter superseded records
+      },
       order: { createdAt: 'DESC' },
       take: limit,
     });

@@ -6,13 +6,13 @@ import { customersApi } from '../api/customers';
 import { productsApi } from '../api/products';
 import { pumpsApi } from '../api/pumps';
 import { storesApi } from '../api/stores';
-import { inventoryApi } from '../api/inventory';
+import { inventoryApi, type CreateInventoryDocumentWithTruckDto } from '../api/inventory';
 import { useAuth } from '../contexts/AuthContext';
 import { showConfirm } from '../utils/sweetalert';
 import Swal from 'sweetalert2';
 import { toast } from 'react-toastify';
 import SearchableSelect from '../components/SearchableSelect';
-import TruckInventoryImportForm, { type InventoryImportFormData } from '../components/TruckInventoryImportForm';
+import TruckInventoryImportForm, { type InventoryImportFormData, type CompartmentData } from '../components/TruckInventoryImportForm';
 import {
   PlusIcon,
   TrashIcon,
@@ -34,6 +34,8 @@ const ShiftOperationsPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<'pump' | 'debt' | 'receipt' | 'deposit' | 'import' | 'export' | 'inventory'>('pump');
   const [showDebtSaleForm, setShowDebtSaleForm] = useState(false);
+  const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
+  const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
@@ -42,8 +44,6 @@ const ShiftOperationsPage: React.FC = () => {
   const [pumpReadings, setPumpReadings] = useState<Record<number, PumpReadingDto>>({});
   const [productPrices, setProductPrices] = useState<Record<number, number>>({});
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
-  const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
-  const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
   const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
   const [retailCustomerId, setRetailCustomerId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -176,8 +176,6 @@ const ShiftOperationsPage: React.FC = () => {
     setShowExportForm(false);
     setShowInventoryForm(false);
     setDebtSaleFormPrice(0);
-    setDebtSaleFormQuantity(0);
-    setDebtSaleFormAmount(0);
     setEditingReceiptId(null);
     setEditingDepositId(null);
   }, [activeTab]);
@@ -362,7 +360,7 @@ const ShiftOperationsPage: React.FC = () => {
   // NOTE: Các mutations dưới đây không còn cần thiết vì đã chuyển sang Draft Mode
   // Tất cả dữ liệu lưu trong state và chỉ gửi API khi chốt ca
 
-  const handlePumpReadingChange = (pumpId: number, field: 'startValue' | 'endValue', value: string) => {
+  const handlePumpReadingChange = (pumpId: number, field: 'startValue' | 'endValue' | 'testExport', value: string) => {
     setPumpReadings((prev) => {
       const currentReading = prev[pumpId];
       if (!currentReading) return prev;
@@ -391,10 +389,14 @@ const ShiftOperationsPage: React.FC = () => {
     });
   };
 
-  const calculateQuantity = (reading: PumpReadingDto) => reading.endValue - reading.startValue;
+  const calculateQuantity = (reading: PumpReadingDto) => {
+    const grossQuantity = reading.endValue - reading.startValue;
+    const testExport = reading.testExport || 0;
+    return grossQuantity - testExport; // Lượng BÁN thực tế (trừ xuất kiểm thử)
+  };
 
   const calculateAmount = (reading: PumpReadingDto) => {
-    const quantity = calculateQuantity(reading);
+    const quantity = calculateQuantity(reading); // Đã trừ testExport
     const price = productPrices[reading.productId];
 
     if (!price || isNaN(price)) {
@@ -423,6 +425,24 @@ const ShiftOperationsPage: React.FC = () => {
       toast.error('Số cuối phải lớn hơn hoặc bằng số đầu!', {
         position: 'top-right',
         autoClose: 3000,
+      });
+      return;
+    }
+
+    // Validation 1.2: Xuất kiểm thử/quay kho không được lớn hơn lượng bơm
+    const invalidTestExports = readingsArray.filter((r) => {
+      const grossQuantity = r.endValue - r.startValue;
+      const testExport = r.testExport || 0;
+      return testExport > grossQuantity;
+    });
+    if (invalidTestExports.length > 0) {
+      const errorMsg = invalidTestExports.map(r => {
+        const grossQty = r.endValue - r.startValue;
+        return `Vòi ${r.pumpCode}: Xuất KT ${r.testExport?.toFixed(3)} > Bơm ${grossQty.toFixed(3)}`;
+      }).join('; ');
+      toast.error(`Xuất kiểm thử/quay kho không được lớn hơn lượng bơm! ${errorMsg}`, {
+        position: 'top-right',
+        autoClose: 5000,
       });
       return;
     }
@@ -600,24 +620,6 @@ const ShiftOperationsPage: React.FC = () => {
         receiverName: d.receiverName,
         notes: d.notes,
       })),
-      inventoryImports: draftImports.map(imp => ({
-        docDate: imp.docDate,
-        supplierName: imp.supplierName,
-        invoiceNumber: imp.invoiceNumber,
-        licensePlate: imp.licensePlate,
-        driverName: imp.driverName,
-        productId: imp.productId,
-        quantity: imp.quantity,
-        notes: imp.notes,
-      })),
-      inventoryExports: draftExports.map(exp => ({
-        docDate: exp.docDate,
-        supplierName: exp.supplierName,
-        productId: exp.productId,
-        quantity: exp.quantity,
-        unitPrice: exp.unitPrice,
-        notes: exp.notes,
-      })),
     };
 
     closeShiftMutation.mutate(dto);
@@ -630,45 +632,12 @@ const ShiftOperationsPage: React.FC = () => {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    const productId = Number(formData.get('productId'));
-    const quantity = Number(formData.get('quantity'));
-
-    // Validation: Kiểm tra tổng công nợ không vượt quá tổng xuất bán qua vòi bơm
-    const readingsArray = Object.values(pumpReadings);
-
-    // Tổng lượng bán qua vòi bơm của sản phẩm này
-    const totalPumpQuantity = readingsArray
-      .filter(r => r.productId === productId)
-      .reduce((sum, r) => sum + calculateQuantity(r), 0);
-
-    // Tổng lượng công nợ hiện tại + lượng mới sẽ thêm
-    const currentDebtQuantity = draftDebtSales
-      .filter(s => s.productId === productId)
-      .reduce((sum, s) => sum + s.quantity, 0);
-
-    const totalDebtQuantity = currentDebtQuantity + quantity;
-
-    // Kiểm tra: Tổng công nợ không được lớn hơn tổng xuất bán qua vòi bơm
-    if (totalDebtQuantity > totalPumpQuantity) {
-      const product = products?.find(p => p.id === productId);
-      toast.error(
-        `Lượng công nợ vượt quá lượng xuất bán!\n` +
-        `Sản phẩm: ${product?.name || productId}\n` +
-        `Tổng xuất bán qua vòi bơm: ${totalPumpQuantity.toFixed(3)} lít\n` +
-        `Tổng công nợ hiện tại: ${currentDebtQuantity.toFixed(3)} lít\n` +
-        `Đang thêm: ${quantity.toFixed(3)} lít\n` +
-        `Tổng sau khi thêm: ${totalDebtQuantity.toFixed(3)} lít`,
-        { position: 'top-right', autoClose: 5000 }
-      );
-      return;
-    }
-
     const data: ShiftDebtSaleDto & { id: string } = {
       id: `draft_${Date.now()}`, // Temporary ID
       shiftId: Number(shiftId),
       customerId: Number(formData.get('customerId')),
-      productId: productId,
-      quantity: quantity,
+      productId: Number(formData.get('productId')),
+      quantity: Number(formData.get('quantity')),
       unitPrice: debtSaleFormPrice,
       notes: formData.get('notes') as string || undefined,
     };
@@ -678,8 +647,6 @@ const ShiftOperationsPage: React.FC = () => {
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
-    setDebtSaleFormQuantity(0);
-    setDebtSaleFormAmount(0);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
     toast.success('Đã thêm vào danh sách công nợ', { position: 'top-right', autoClose: 3000 });
@@ -820,31 +787,61 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
-    // Lưu vào draft để ghi DB khi chốt ca
-    const newItem = {
-      id: `draft_${Date.now()}`,
-      docType: 'IMPORT',
-      docDate: formData.docDate,
-      supplierName: formData.supplierName,
-      invoiceNumber: formData.invoiceNumber,
-      licensePlate: formData.licensePlate,
-      driverName: formData.driverName,
-      productId: formData.productId,
-      quantity: formData.quantity,
-      notes: formData.notes,
-      totalVolume: formData.quantity,
-    };
+    try {
+      const submitData: CreateInventoryDocumentWithTruckDto = {
+        storeId: report.shift.storeId,
+        docType: 'IMPORT',
+        docDate: formData.docDate,
+        supplierName: formData.supplierName,
+        invoiceNumber: formData.invoiceNumber,
+        licensePlate: formData.licensePlate,
+        driverName: formData.driverName,
+        driverPhone: formData.driverPhone,
+        compartments: formData.compartments?.map((c: CompartmentData) => ({
+          compartmentNumber: c.compartmentNumber,
+          productId: c.productId!,
+          compartmentHeight: c.compartmentHeight,
+          truckTemperature: c.truckTemperature,
+          truckVolume: c.truckVolume,
+          warehouseHeight: c.warehouseHeight,
+          actualTemperature: c.actualTemperature,
+          receivedVolume: c.receivedVolume,
+          heightLossTruck: c.heightLossTruck,
+          heightLossWarehouse: c.heightLossWarehouse,
+        })) || [],
+        notes: formData.notes,
+      };
 
-    setDraftImports(prev => [...prev, newItem]);
-    toast.success('✅ Đã thêm phiếu nhập (sẽ lưu DB khi chốt ca)!', { position: 'top-right', autoClose: 3000 });
-    setShowImportForm(false);
+      const response = await inventoryApi.createDocumentWithTruck(submitData);
+
+      // Lưu vào draft để hiển thị
+      const newItem = {
+        id: `draft_${Date.now()}`,
+        documentId: response.document?.id,
+        docType: 'IMPORT',
+        docDate: formData.docDate,
+        supplierName: formData.supplierName,
+        invoiceNumber: formData.invoiceNumber,
+        licensePlate: formData.licensePlate,
+        notes: formData.notes,
+        compartments: formData.compartments,
+        totalVolume: formData.compartments?.reduce((sum: number, c: CompartmentData) => sum + (c.receivedVolume || 0), 0) || 0,
+        calculation: response.calculation,
+      };
+
+      setDraftImports(prev => [...prev, newItem]);
+      toast.success('✅ Đã lưu phiếu nhập kho với xe téc thành công!', { position: 'top-right', autoClose: 3000 });
+      setShowImportForm(false);
+    } catch (error: any) {
+      toast.error('❌ Lỗi khi lưu phiếu nhập: ' + (error.response?.data?.message || error.message));
+    }
   };
 
   const handleExportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const docDate = formData.get('docDate') as string;
-    const receiverName = formData.get('receiverName') as string || undefined;
+    const receiverName = formData.get('receiverName') as string || undefined; // Reusing supplierName field or similar
     const notes = formData.get('notes') as string || undefined;
 
     const productId = formData.get('productId') ? Number(formData.get('productId')) : undefined;
@@ -863,22 +860,18 @@ const ShiftOperationsPage: React.FC = () => {
 
     const amount = quantity * unitPrice;
 
-    // Lưu vào draft để ghi DB khi chốt ca
     const newItem = {
       id: `draft_${Date.now()}`,
       docType: 'EXPORT',
       docDate,
       supplierName: receiverName,
-      productId,
-      quantity,
-      unitPrice,
       notes,
       items: [{ productId, quantity, unitPrice, amount }],
       totalAmount: amount
     };
 
     setDraftExports(prev => [...prev, newItem]);
-    toast.success('Đã thêm phiếu xuất ', { position: 'top-right', autoClose: 3000 });
+    toast.success('Đã thêm phiếu xuất hàng', { position: 'top-right', autoClose: 3000 });
     setShowExportForm(false);
     e.currentTarget.reset();
   };
@@ -1058,6 +1051,17 @@ const ShiftOperationsPage: React.FC = () => {
                     Đã chốt
                   </span>
                 )}
+                {report?.shift.version && report.shift.version > 1 && (
+                  <>
+                    <span className="text-blue-200">•</span>
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-500 text-white shadow-sm">
+                      <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                      </svg>
+                      Đã sửa {report.shift.version - 1} lần
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1085,6 +1089,28 @@ const ShiftOperationsPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Warning box for adjusted shifts */}
+      {report?.shift.version && report.shift.version > 1 && (
+        <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg shadow-sm">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <h3 className="text-sm font-semibold text-yellow-800">
+                ⚠️ Ca này đã được mở lại và sửa đổi {report.shift.version - 1} lần
+              </h3>
+              <p className="mt-1 text-sm text-yellow-700">
+                Dữ liệu cũ đã được đánh dấu superseded và không còn hiển thị trong báo cáo.
+                Chỉ dữ liệu phiên bản mới nhất (v{report.shift.version}) được tính vào tổng kết.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1310,6 +1336,7 @@ const ShiftOperationsPage: React.FC = () => {
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Sản phẩm</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số cuối</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Xuất KT/Quay kho</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số lít</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Đơn giá</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Thành tiền</th>
@@ -1385,6 +1412,36 @@ const ShiftOperationsPage: React.FC = () => {
                               />
                             </td>
                             <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                step="0.001"
+                                min="0"
+                                max={reading.endValue - reading.startValue}
+                                value={reading.testExport || 0}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value) || 0;
+                                  const grossQuantity = reading.endValue - reading.startValue;
+                                  if (value > grossQuantity) {
+                                    toast.error(`Xuất kiểm thử/quay kho (${value.toFixed(3)}) không được lớn hơn lượng bơm (${grossQuantity.toFixed(3)})!`, {
+                                      position: 'top-right',
+                                      autoClose: 3000,
+                                    });
+                                    return;
+                                  }
+                                  handlePumpReadingChange(pump.id, 'testExport', e.target.value);
+                                }}
+                                onFocus={(e) => e.target.select()}
+                                onKeyDown={(e) => {
+                                  if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                                    e.preventDefault();
+                                  }
+                                }}
+                                className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-purple-500 transition-colors bg-purple-50"
+                                placeholder="0.000"
+                                title="Lượng xuất kiểm thử hoặc quay kho (lít)"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
                               <span className={`text-sm font-bold px-3 py-1 rounded-full ${quantity < 0 ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
                                 {quantity.toFixed(3)}
                               </span>
@@ -1410,6 +1467,11 @@ const ShiftOperationsPage: React.FC = () => {
                     <tfoot className="bg-gray-50">
                       <tr>
                         <td colSpan={4} className="px-4 py-4 text-right font-bold text-gray-800">Tổng cộng:</td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="inline-flex px-3 py-2 bg-purple-600 text-white rounded-lg font-bold text-xs">
+                            {Object.values(pumpReadings).reduce((sum, r) => sum + (Number(r.testExport) || 0), 0).toFixed(3)} lít
+                          </span>
+                        </td>
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg font-bold">
                             {Object.values(pumpReadings).reduce((sum, r) => sum + calculateQuantity(r), 0).toFixed(3)} lít
@@ -1441,6 +1503,7 @@ const ShiftOperationsPage: React.FC = () => {
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Sản phẩm</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số cuối</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Xuất KT/Quay kho</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số lít</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Đơn giá</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Thành tiền</th>
@@ -1478,6 +1541,11 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-4 py-3 text-right text-sm text-gray-700">{Number(reading.startValue).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
                               <td className="px-4 py-3 text-right text-sm text-gray-700">{Number(reading.endValue).toLocaleString('vi-VN', { maximumFractionDigits: 3 })}</td>
                               <td className="px-4 py-3 text-right">
+                                <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-100 text-purple-700">
+                                  {(Number(reading.testExport) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} L
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
                                 <span className="text-sm font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
                                   {quantity.toLocaleString('vi-VN', { maximumFractionDigits: 3 })} L
                                 </span>
@@ -1493,7 +1561,7 @@ const ShiftOperationsPage: React.FC = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
+                          <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
                             Không có dữ liệu pump readings
                           </td>
                         </tr>
@@ -1502,6 +1570,11 @@ const ShiftOperationsPage: React.FC = () => {
                     <tfoot className="bg-gray-50">
                       <tr>
                         <td colSpan={4} className="px-4 py-4 text-right font-bold text-gray-800">Tổng cộng:</td>
+                        <td className="px-4 py-4 text-right">
+                          <span className="inline-flex px-3 py-2 bg-purple-600 text-white rounded-lg font-bold text-xs">
+                            {(report?.pumpReadings?.reduce((sum: number, r: any) => sum + (Number(r.testExport) || 0), 0) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} lít
+                          </span>
+                        </td>
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg font-bold">
                             {(report?.pumpReadings?.reduce((sum: number, r: any) => sum + Number(r.quantity), 0) || 0).toLocaleString('vi-VN', { maximumFractionDigits: 3 })} lít
@@ -1526,13 +1599,10 @@ const ShiftOperationsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Retail Responsibility Section */}
               <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-sm mb-4">
-                <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người phụ trách ca (tùy chọn)</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  ℹ️ Chọn nhân viên phụ trách ca này (chỉ để theo dõi). Bán lẻ = Thu tiền mặt ngay, KHÔNG ghi công nợ.
-                </p>
+                <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người phụ trách ca</h3>
                 <div className="max-w-md">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nhân viên phụ trách (tùy chọn)
+                    CTH/PT Cửa Hàng
                   </label>
                   <SearchableSelect
                     options={storeCustomers
@@ -1546,9 +1616,7 @@ const ShiftOperationsPage: React.FC = () => {
                     placeholder="-- Chọn nhân viên (chỉ để theo dõi) --"
                     className="w-full"
                   />
-                  <p className="mt-1 text-sm text-gray-500">
-                    ℹ️ Thông tin này chỉ để theo dõi, KHÔNG ghi công nợ.
-                  </p>
+
                 </div>
               </div>
 
@@ -1646,10 +1714,10 @@ const ShiftOperationsPage: React.FC = () => {
                           setDebtSaleFormQuantity(0);
                           setDebtSaleFormAmount(0);
                           setSelectedDebtCustomer(null);
-                        setSelectedDebtProduct(null);
-                      }
-                    }}
-                    className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                          setSelectedDebtProduct(null);
+                        }
+                      }}
+                      className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                   >
                     <PlusIcon className="h-5 w-5 mr-2" />
                     Thêm doanh số
@@ -1679,12 +1747,9 @@ const ShiftOperationsPage: React.FC = () => {
                       onChange={(value) => {
                         setSelectedDebtProduct(value as number);
                         if (value && productPrices[value as number]) {
-                          const price = productPrices[value as number];
-                          setDebtSaleFormPrice(price);
-                          // Cập nhật lại amount nếu đã có quantity
-                          if (debtSaleFormQuantity > 0) {
-                            setDebtSaleFormAmount(debtSaleFormQuantity * price);
-                          }
+                          setDebtSaleFormPrice(productPrices[value as number]);
+                          // Tính lại thành tiền khi đổi sản phẩm
+                          setDebtSaleFormAmount(debtSaleFormQuantity * productPrices[value as number]);
                         } else {
                           setDebtSaleFormPrice(0);
                           setDebtSaleFormAmount(0);
@@ -1702,17 +1767,42 @@ const ShiftOperationsPage: React.FC = () => {
                       type="number"
                       name="quantity"
                       step="0.001"
-                      min="0"
-                      required
+                      min="0.001"
                       value={debtSaleFormQuantity || ''}
                       onChange={(e) => {
                         const qty = parseFloat(e.target.value) || 0;
                         setDebtSaleFormQuantity(qty);
-                        // Tính amount từ quantity * price
-                        if (debtSaleFormPrice > 0) {
-                          setDebtSaleFormAmount(qty * debtSaleFormPrice);
+                        setDebtSaleFormAmount(qty * debtSaleFormPrice);
+                      }}
+                      onBlur={(e) => {
+                        const qty = parseFloat(e.target.value) || 0;
+                        if (qty <= 0) {
+                          toast.error('Số lượng phải lớn hơn 0!', { position: 'top-right', autoClose: 2000 });
+                          return;
+                        }
+                        // Kiểm tra không vượt quá tồn kho bán
+                        if (selectedDebtProduct) {
+                          const totalPumpedForProduct = Object.values(pumpReadings)
+                            .filter(r => r.productId === selectedDebtProduct)
+                            .reduce((sum, r) => sum + calculateQuantity(r), 0);
+
+                          const existingDebtForProduct = draftDebtSales
+                            .filter(ds => ds.productId === selectedDebtProduct)
+                            .reduce((sum, ds) => sum + ds.quantity, 0);
+
+                          const availableQty = totalPumpedForProduct - existingDebtForProduct;
+
+                          if (qty > availableQty) {
+                            toast.error(
+                              `Số lượng bán nợ (${qty.toFixed(3)}) vượt quá số lượng còn lại (${availableQty.toFixed(3)} lít)!`,
+                              { position: 'top-right', autoClose: 4000 }
+                            );
+                            setDebtSaleFormQuantity(0);
+                            setDebtSaleFormAmount(0);
+                          }
                         }
                       }}
+                      required
                       className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                       placeholder="VD: 100.5"
                     />
@@ -1734,22 +1824,20 @@ const ShiftOperationsPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Thành tiền (₫) *</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Thành tiền (₫)</label>
                     <input
                       type="number"
                       step="1"
-                      min="0"
                       value={debtSaleFormAmount || ''}
                       onChange={(e) => {
                         const amount = parseFloat(e.target.value) || 0;
                         setDebtSaleFormAmount(amount);
-                        // Tính ngược quantity từ amount / price
                         if (debtSaleFormPrice > 0) {
                           setDebtSaleFormQuantity(amount / debtSaleFormPrice);
                         }
                       }}
-                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      placeholder="Hoặc nhập thành tiền"
+                      className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-blue-50"
+                      placeholder="Tự động tính"
                     />
                   </div>
 
@@ -2308,7 +2396,7 @@ const ShiftOperationsPage: React.FC = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
                       <input
                         type="text"
                         name="notes"
@@ -2364,7 +2452,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
@@ -2448,12 +2536,12 @@ const ShiftOperationsPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
                       <input
                         type="text"
                         name="notes"
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Ghi chú thêm..."
+                        placeholder="Diễn giải thêm..."
                       />
                     </div>
 
@@ -2482,7 +2570,7 @@ const ShiftOperationsPage: React.FC = () => {
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tồn hệ thống</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thực tế</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chênh lệch</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ghi chú</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>

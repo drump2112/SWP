@@ -10,10 +10,18 @@ import {
   ArrowDownTrayIcon,
   ArrowUpIcon,
   ArrowDownIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
-import { exportToExcel } from '../utils/excel';
+import {
+  createReportWorkbook,
+  addReportHeader,
+  addReportFooter,
+  downloadExcel,
+  STYLES,
+} from '../utils/report-exporter';
+import { printReport, formatCurrency, formatDateTime } from '../utils/report-printer';
 
 const CashReportPage: React.FC = () => {
   const { user } = useAuth();
@@ -38,26 +46,226 @@ const CashReportPage: React.FC = () => {
     queryFn: () => reportsApi.getCashReport(filters),
   });
 
-  const handleExportExcel = () => {
-    if (!report?.ledgers) return;
+  const handleExportExcel = async () => {
+    if (!report?.ledgers) {
+      alert('Không có dữ liệu để xuất');
+      return;
+    }
 
-    const data = report.ledgers.map((item: any, index: number) => ({
-      'STT': index + 1,
-      'Ngày': dayjs(item.date).format('DD/MM/YYYY'),
-      'Loại chứng từ': getRefTypeLabel(item.refType),
-      'Mã phiếu': item.refId ? `PC${item.refId}` : '', // Giả lập mã phiếu
-      'Diễn giải': item.details?.notes || item.notes || '',
-      'Thu': item.cashIn,
-      'Chi': item.cashOut,
-      'Tồn': item.balance
-    }));
+    // @ts-ignore
+    const storeName = user?.store?.name || stores?.find((s) => s.id === filters.storeId)?.name || 'Cửa hàng';
 
-    exportToExcel(data, `So_quy_tien_mat_${filters.fromDate}_${filters.toDate}`);
+    const { workbook, worksheet } = createReportWorkbook('Sổ quỹ tiền mặt');
+
+    addReportHeader(worksheet, {
+      storeName,
+      title: 'SỔ QUỸ TIỀN MẶT',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+    });
+
+    // Columns setup
+    worksheet.columns = [
+      { key: 'stt', width: 6 },
+      { key: 'date', width: 18 },
+      { key: 'refType', width: 15 },
+      { key: 'description', width: 35 },
+      { key: 'cashIn', width: 15 },
+      { key: 'cashOut', width: 15 },
+      { key: 'balance', width: 15 },
+    ];
+
+    // Opening Balance Row (Row 7)
+    const openingRow = worksheet.getRow(7);
+    openingRow.values = ['', '', '', 'Số dư đầu kỳ', '', '', report.openingBalance];
+    openingRow.font = STYLES.boldFont;
+    openingRow.getCell(4).alignment = STYLES.leftAlign;
+    openingRow.getCell(7).alignment = STYLES.rightAlign;
+    openingRow.getCell(7).numFmt = '#,##0';
+    openingRow.eachCell((cell) => {
+      cell.border = STYLES.borderStyle;
+    });
+    worksheet.mergeCells(`A${openingRow.number}:C${openingRow.number}`);
+    worksheet.mergeCells(`D${openingRow.number}:F${openingRow.number}`);
+
+    // Table Header (Row 8)
+    const headerRow = worksheet.getRow(8);
+    headerRow.values = [
+      'STT',
+      'Ngày giờ',
+      'Loại chứng từ',
+      'Diễn giải',
+      'Thu (₫)',
+      'Chi (₫)',
+      'Tồn (₫)',
+    ];
+    headerRow.font = STYLES.headerFont;
+    headerRow.alignment = STYLES.centerAlign;
+    headerRow.eachCell((cell) => {
+      cell.border = STYLES.borderStyle;
+    });
+
+    // Data Rows
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+
+    report.ledgers.forEach((ledger: any, index: number) => {
+      const description = ledger.details?.notes || ledger.notes || getRefTypeLabel(ledger.refType);
+
+      const row = worksheet.addRow([
+        index + 1,
+        dayjs(ledger.date).format('DD/MM/YYYY HH:mm'),
+        getRefTypeLabel(ledger.refType),
+        description,
+        Number(ledger.cashIn),
+        Number(ledger.cashOut),
+        Number(ledger.balance),
+      ]);
+
+      totalCashIn += Number(ledger.cashIn);
+      totalCashOut += Number(ledger.cashOut);
+
+      row.font = STYLES.normalFont;
+      row.eachCell((cell, colNumber) => {
+        cell.border = STYLES.borderStyle;
+        if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
+          cell.alignment = STYLES.centerAlign;
+        } else if (colNumber === 4) {
+          cell.alignment = STYLES.leftAlign;
+        } else {
+          cell.alignment = STYLES.rightAlign;
+          cell.numFmt = '#,##0';
+        }
+      });
+    });
+
+    // Total Row
+    const totalRow = worksheet.addRow([
+      '',
+      '',
+      '',
+      'Tổng phát sinh',
+      totalCashIn,
+      totalCashOut,
+      '',
+    ]);
+    totalRow.font = STYLES.boldFont;
+    totalRow.eachCell((cell, colNumber) => {
+      cell.border = STYLES.borderStyle;
+      if (colNumber === 4) {
+        cell.alignment = STYLES.leftAlign;
+      } else if (colNumber === 5 || colNumber === 6) {
+        cell.alignment = STYLES.rightAlign;
+        cell.numFmt = '#,##0';
+      }
+    });
+    worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+
+    // Closing Balance Row
+    const closingRow = worksheet.addRow([
+      '',
+      '',
+      '',
+      'Số dư cuối kỳ',
+      '',
+      '',
+      report.closingBalance,
+    ]);
+    closingRow.font = STYLES.boldFont;
+    closingRow.getCell(4).alignment = STYLES.leftAlign;
+    closingRow.getCell(7).alignment = STYLES.rightAlign;
+    closingRow.getCell(7).numFmt = '#,##0';
+    closingRow.eachCell((cell) => {
+      cell.border = STYLES.borderStyle;
+    });
+    worksheet.mergeCells(`A${closingRow.number}:C${closingRow.number}`);
+    worksheet.mergeCells(`D${closingRow.number}:F${closingRow.number}`);
+
+    addReportFooter(worksheet, {
+      signatures: {
+        left: 'Kế toán',
+        center: 'Cửa hàng trưởng',
+        right: 'Thủ quỹ',
+      },
+    });
+
+    await downloadExcel(workbook, 'So_quy_tien_mat');
   };
 
-  const handleExportPDF = () => {
-    // TODO: Implement PDF export
-    alert('Chức năng xuất PDF đang phát triển');
+  const handlePrint = () => {
+    if (!report?.ledgers) {
+      alert('Không có dữ liệu để in');
+      return;
+    }
+
+    // @ts-ignore
+    const storeName = user?.store?.name || stores?.find((s) => s.id === filters.storeId)?.name || 'Cửa hàng';
+
+    let totalCashIn = 0;
+    let totalCashOut = 0;
+
+    const tableRows = report.ledgers.map((ledger: any, index: number) => {
+      const description = ledger.details?.notes || ledger.notes || getRefTypeLabel(ledger.refType);
+      totalCashIn += Number(ledger.cashIn);
+      totalCashOut += Number(ledger.cashOut);
+
+      return `
+        <tr>
+          <td class="text-center">${index + 1}</td>
+          <td class="text-center">${formatDateTime(ledger.date)}</td>
+          <td class="text-center">${getRefTypeLabel(ledger.refType)}</td>
+          <td class="text-left">${description}</td>
+          <td class="text-right">${ledger.cashIn > 0 ? formatCurrency(ledger.cashIn) : '-'}</td>
+          <td class="text-right">${ledger.cashOut > 0 ? formatCurrency(ledger.cashOut) : '-'}</td>
+          <td class="text-right font-bold">${formatCurrency(ledger.balance)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    const tableHTML = `
+      <table>
+        <tr style="background-color: #dbeafe;">
+          <td colspan="4" class="text-left font-bold">Số dư đầu kỳ</td>
+          <td colspan="3" class="text-right font-bold">${formatCurrency(report.openingBalance)} ₫</td>
+        </tr>
+        <thead>
+          <tr>
+            <th>STT</th>
+            <th>Ngày giờ</th>
+            <th>Loại chứng từ</th>
+            <th>Diễn giải</th>
+            <th>Thu (₫)</th>
+            <th>Chi (₫)</th>
+            <th>Tồn (₫)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+          <tr class="total-row">
+            <td colspan="4" class="text-left">Tổng phát sinh</td>
+            <td class="text-right">${formatCurrency(totalCashIn)}</td>
+            <td class="text-right">${formatCurrency(totalCashOut)}</td>
+            <td></td>
+          </tr>
+          <tr style="background-color: #f3e8ff;">
+            <td colspan="4" class="text-left font-bold">Số dư cuối kỳ</td>
+            <td colspan="3" class="text-right font-bold">${formatCurrency(report.closingBalance)} ₫</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    printReport(tableHTML, {
+      storeName,
+      title: 'SỔ QUỸ TIỀN MẶT',
+      fromDate: filters.fromDate,
+      toDate: filters.toDate,
+      signatures: {
+        left: 'Kế toán',
+        center: 'Cửa hàng trưởng',
+        right: 'Thủ quỹ',
+      },
+    });
   };
 
   const getRefTypeLabel = (refType: string) => {
@@ -189,11 +397,11 @@ const CashReportPage: React.FC = () => {
             Xuất Excel
           </button>
           <button
-            onClick={handleExportPDF}
-            className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all shadow-sm"
+            onClick={handlePrint}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm"
           >
-            <DocumentTextIcon className="h-5 w-5 mr-2" />
-            Xuất PDF
+            <PrinterIcon className="h-5 w-5 mr-2" />
+            In báo cáo
           </button>
         </div>
       </div>

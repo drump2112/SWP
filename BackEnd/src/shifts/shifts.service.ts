@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, In } from 'typeorm';
 import { Shift } from '../entities/shift.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
 import { Sale } from '../entities/sale.entity';
 import { InventoryLedger } from '../entities/inventory-ledger.entity';
+import { InventoryDocument } from '../entities/inventory-document.entity';
+import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { ProductPrice } from '../entities/product-price.entity';
 import { AuditLog } from '../entities/audit-log.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
@@ -15,8 +17,6 @@ import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
-import { InventoryDocument } from '../entities/inventory-document.entity';
-import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
@@ -155,7 +155,9 @@ export class ShiftsService {
       }
 
       const pumpReadingsData = closeShiftDto.pumpReadings.map(reading => {
-        const quantity = reading.endValue - reading.startValue;
+        const grossQuantity = reading.endValue - reading.startValue; // Tổng lượng bơm
+        const testExport = reading.testExport || 0; // Xuất kiểm thử/quay kho
+        const quantity = grossQuantity - testExport; // Số lượng BÁN thực tế
         const unitPrice = priceMap.get(reading.productId)!;
         return {
           shiftId: shift.id,
@@ -163,8 +165,9 @@ export class ShiftsService {
           productId: reading.productId,
           startValue: reading.startValue,
           endValue: reading.endValue,
-          quantity,
+          quantity, // Số lượng BÁN (không bao gồm testExport)
           unitPrice, // Lưu giá tại thời điểm chốt ca để đảm bảo tính toàn vẹn dữ liệu kế toán
+          testExport, // Xuất kiểm thử / Quay kho (lưu riêng)
         };
       });
 
@@ -199,18 +202,7 @@ export class ShiftsService {
           .execute();
       }
 
-      // 4. ✅ GHI VÀO INVENTORY LEDGER thay vì cập nhật currentStock
-      // Lấy thông tin pumps để biết tank_id và warehouse_id
-      const pumpCodes = closeShiftDto.pumpReadings.map(r => r.pumpCode);
-      const pumps = await manager
-        .createQueryBuilder('pumps', 'p')
-        .where('p.pump_code IN (:...pumpCodes)', { pumpCodes })
-        .andWhere('p.store_id = :storeId', { storeId: shift.storeId })
-        .getMany();
-
-      const pumpMap = new Map(pumps.map(p => [p.pumpCode, p]));
-
-      // Lấy warehouse của cửa hàng (cần cho inventory_ledger)
+      // 4. ✅ LẤY WAREHOUSE cho việc tạo phiếu xuất tự động sau này
       const warehouse = await manager.findOne(Warehouse, {
         where: { storeId: shift.storeId, type: 'STORE' },
       });
@@ -219,8 +211,9 @@ export class ShiftsService {
         throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
       }
 
-      // Bước 4: Ghi xuất kho sẽ được xử lý ở bước 6.7 (tạo phiếu xuất tự động)
-      // Không ghi trực tiếp vào InventoryLedger ở đây để tránh duplicate
+      // LƯU Ý: KHÔNG ghi inventory_ledger ở đây vì sẽ được xử lý tự động
+      // qua phiếu xuất bán (EXPORT document) ở bước 6.7 phía dưới
+      // → Tránh trùng lặp ghi ledger 2 lần cho cùng 1 lượng bán
 
       // 5. ✅ GHI SỔ QUỸ: Thu tiền bán lẻ (QUAN TRỌNG!)
       // Bán lẻ = Thu tiền mặt ngay → Ghi cashIn vào cash_ledger
@@ -404,80 +397,16 @@ export class ShiftsService {
         }
       }
 
-      // 6.5. Xử lý Inventory Imports (Phiếu nhập kho)
-      if (closeShiftDto.inventoryImports && closeShiftDto.inventoryImports.length > 0) {
-        for (const importItem of closeShiftDto.inventoryImports) {
-          const doc = await manager.save(InventoryDocument, {
-            warehouseId: warehouse.id,
-            docType: 'IMPORT',
-            docDate: new Date(importItem.docDate),
-            supplierName: importItem.supplierName,
-            invoiceNumber: importItem.invoiceNumber,
-            licensePlate: importItem.licensePlate,
-            notes: importItem.notes,
-          });
+      // 6.7. TỰ ĐỘNG TẠO PHIẾU XUẤT BÁN từ lượng bơm qua vòi
+      // LƯU Ý: testExport là lượng đổ ra kiểm thử rồi ĐỔ NGƯỢC LẠI vào bể
+      // → KHÔNG tạo phiếu xuất cho testExport vì KHÔNG làm giảm tồn kho
+      // → CHỈ tạo phiếu xuất cho lượng BÁN thực tế (đã trừ testExport)
 
-          await manager.save(InventoryDocumentItem, {
-            documentId: doc.id,
-            productId: importItem.productId,
-            quantity: importItem.quantity,
-            unitPrice: 0, // Import không có đơn giá trong form
-          });
-
-          // Ghi inventory ledger
-          await manager.save(InventoryLedger, {
-            warehouseId: warehouse.id,
-            productId: importItem.productId,
-            tankId: null,
-            refType: 'IMPORT',
-            refId: doc.id,
-            quantityIn: importItem.quantity,
-            quantityOut: 0,
-          });
-
-          console.log(`📥 Import: ${importItem.quantity} lít sản phẩm ${importItem.productId} từ ${importItem.licensePlate}`);
-        }
-      }
-
-      // 6.6. Xử lý Inventory Exports (Phiếu xuất kho thủ công)
-      if (closeShiftDto.inventoryExports && closeShiftDto.inventoryExports.length > 0) {
-        for (const exportItem of closeShiftDto.inventoryExports) {
-          const doc = await manager.save(InventoryDocument, {
-            warehouseId: warehouse.id,
-            docType: 'EXPORT',
-            docDate: new Date(exportItem.docDate),
-            supplierName: exportItem.supplierName,
-            notes: exportItem.notes,
-          });
-
-          await manager.save(InventoryDocumentItem, {
-            documentId: doc.id,
-            productId: exportItem.productId,
-            quantity: exportItem.quantity,
-            unitPrice: exportItem.unitPrice,
-          });
-
-          // Ghi inventory ledger
-          await manager.save(InventoryLedger, {
-            warehouseId: warehouse.id,
-            productId: exportItem.productId,
-            tankId: null,
-            refType: 'EXPORT',
-            refId: doc.id,
-            quantityIn: 0,
-            quantityOut: exportItem.quantity,
-          });
-
-          console.log(`📤 Export: ${exportItem.quantity} lít sản phẩm ${exportItem.productId}`);
-        }
-      }
-
-      // 6.7. TỰ ĐỘNG TẠO PHIẾU XUẤT từ lượng bơm qua vòi (Vấn đề 2)
-      // Tổng hợp lượng bơm theo từng productId
+      // Tổng hợp lượng BÁN theo từng productId (đã trừ testExport)
       const productSalesMap = new Map<number, number>();
       for (const reading of pumpReadingsData) {
         const current = productSalesMap.get(reading.productId) || 0;
-        productSalesMap.set(reading.productId, current + reading.quantity);
+        productSalesMap.set(reading.productId, current + reading.quantity); // quantity đã trừ testExport
       }
 
       if (productSalesMap.size > 0) {
@@ -603,25 +532,98 @@ export class ShiftsService {
       // 🔄 SOFT DELETE STRATEGY:
       // Đánh dấu dữ liệu cũ là "đã bị thay thế" thay vì xóa hẳn
 
-      // 1. Đánh dấu inventory_ledger entries của ca này là superseded
-      await manager
-        .createQueryBuilder()
-        .update('inventory_ledger')
-        .set({
-          supersededByShiftId: () => 'NULL', // Sẽ update sau khi tạo ca mới
-          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
-        })
-        .where('ref_type = :refType', { refType: 'SHIFT_SALE' })
-        .andWhere('ref_id = :refId', { refId: shiftId })
-        .execute();
+      // 1. Tìm và xóa phiếu xuất tự động của ca này
+      // Phiếu xuất tự động liên kết với shift qua ref_shift_id
+      const exportDocs = await manager
+        .createQueryBuilder('inventory_documents', 'doc')
+        .where('doc.doc_type = :docType', { docType: 'EXPORT' })
+        .andWhere('doc.ref_shift_id = :shiftId', { shiftId: shift.id })
+        .getMany();
 
-      // 2. Đánh dấu cash_ledger entries
+      for (const doc of exportDocs) {
+        // Xóa inventory_ledger entries của phiếu xuất này
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('inventory_ledger')
+          .where('ref_type = :refType', { refType: 'EXPORT' })
+          .andWhere('ref_id = :refId', { refId: doc.id })
+          .execute();
+
+        // Xóa inventory_document_items
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('inventory_document_items')
+          .where('document_id = :docId', { docId: doc.id })
+          .execute();
+
+        // Xóa inventory_document
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('inventory_documents')
+          .where('id = :docId', { docId: doc.id })
+          .execute();
+      }
+
+      // 2. Xử lý cash_ledger và các phiếu thu/chi liên quan shift
+      
+      // 2.1. Xử lý receipts (phiếu thu) của shift
+      const receipts = await manager.find(Receipt, { where: { shiftId } });
+      if (receipts.length > 0) {
+        const receiptIds = receipts.map(r => r.id);
+        
+        // Đánh dấu superseded cho debt_ledger của receipts
+        await manager
+          .createQueryBuilder()
+          .update('debt_ledger')
+          .set({ supersededByShiftId: shiftId })
+          .where('ref_type = :refType', { refType: 'RECEIPT' })
+          .andWhere('ref_id IN (:...refIds)', { refIds: receiptIds })
+          .execute();
+        
+        // Đánh dấu superseded cho cash_ledger của receipts
+        await manager
+          .createQueryBuilder()
+          .update('cash_ledger')
+          .set({ supersededByShiftId: shiftId })
+          .where('ref_type = :refType', { refType: 'RECEIPT' })
+          .andWhere('ref_id IN (:...refIds)', { refIds: receiptIds })
+          .execute();
+        
+        // Xóa receipt_details và receipts
+        await manager.delete('receipt_details', { receiptId: In(receiptIds) });
+        await manager.delete(Receipt, { id: In(receiptIds) });
+      }
+
+      // 2.2. Xử lý deposits (phiếu nộp tiền) của shift
+      const deposits = await manager.find(CashDeposit, { where: { shiftId } });
+      if (deposits.length > 0) {
+        const depositIds = deposits.map(d => d.id);
+        
+        // Đánh dấu superseded cho cash_ledger của deposits
+        await manager
+          .createQueryBuilder()
+          .update('cash_ledger')
+          .set({ supersededByShiftId: shiftId })
+          .where('ref_type = :refType', { refType: 'DEPOSIT' })
+          .andWhere('ref_id IN (:...refIds)', { refIds: depositIds })
+          .execute();
+        
+        // Xóa deposits
+        await manager.delete(CashDeposit, { id: In(depositIds) });
+      }
+
+      // 2.3. Xử lý expenses (chi phí) của shift - cần kiểm tra xem có shift_id không
+      // Note: Expenses có thể không có shift_id trực tiếp, cần kiểm tra entity
+      
+      // 2.4. Đánh dấu superseded cho cash_ledger SHIFT_CLOSE
       await manager
         .createQueryBuilder()
         .update('cash_ledger')
         .set({
-          supersededByShiftId: () => 'NULL',
-          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+          supersededByShiftId: shiftId, // ✅ Đánh dấu bị thay thế bởi chính shift này (khi đóng lại)
         })
         .where('ref_type = :refType', { refType: 'SHIFT_CLOSE' })
         .andWhere('ref_id = :refId', { refId: shiftId })
@@ -634,35 +636,45 @@ export class ShiftsService {
           .createQueryBuilder()
           .update('debt_ledger')
           .set({
-            supersededByShiftId: () => 'NULL',
+            supersededByShiftId: shiftId, // ✅ Đánh dấu bị thay thế
             notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
           })
           .where('ref_type = :refType', { refType: 'DEBT_SALE' })
           .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
           .execute();
+
+        // 3.1 Xóa shift_debt_sales (sẽ được tạo lại khi đóng ca)
+        await manager
+          .createQueryBuilder()
+          .delete()
+          .from('shift_debt_sales')
+          .where('id IN (:...ids)', { ids: debtSaleIds })
+          .execute();
       }
 
-      // 4. Đánh dấu pump_readings (không xóa để audit)
+      // 4. Xóa pump_readings (sẽ được nhập lại khi đóng ca)
       await manager
         .createQueryBuilder()
-        .update('pump_readings')
-        .set({ supersededByShiftId: () => 'NULL' })
+        .delete()
+        .from('pump_readings')
         .where('shift_id = :shiftId', { shiftId })
         .execute();
 
-      // 5. Đánh dấu sales
+      // 5. Xóa sales (sẽ được tính lại khi đóng ca)
       await manager
         .createQueryBuilder()
-        .update('sales')
-        .set({ supersededByShiftId: () => 'NULL' })
+        .delete()
+        .from('sales')
         .where('shift_id = :shiftId', { shiftId })
         .execute();
 
-      console.log(`🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
+      console.log(`🔄 Deleted pump readings and sales from shift ${shiftId} (will be re-entered)`);
+      console.log(`🔄 Marked ledger data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
 
-      // 6. Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
+      // 6. Mở lại ca và tăng version
       shift.status = 'OPEN';
       shift.closedAt = null;
+      shift.version = (shift.version || 1) + 1; // ✅ Tăng version để track số lần reopen
       const reopenedShift = await manager.save(Shift, shift);
 
       // Ghi audit log
@@ -670,10 +682,11 @@ export class ShiftsService {
         tableName: 'shifts',
         recordId: shift.id,
         action: 'REOPEN',
-        oldData: { status: oldData.status, closedAt: oldData.closedAt },
+        oldData: { status: oldData.status, closedAt: oldData.closedAt, version: oldData.version },
         newData: {
           status: 'OPEN',
           closedAt: null,
+          version: shift.version,
           note: 'Dữ liệu cũ được đánh dấu superseded, giữ nguyên timestamp'
         },
         changedBy: user?.id,

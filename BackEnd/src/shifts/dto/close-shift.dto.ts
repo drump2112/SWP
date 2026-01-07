@@ -14,6 +14,10 @@ class PumpReadingDto {
 
   @IsNotEmpty()
   endValue: number;
+
+  @IsOptional()
+  @IsNumber()
+  testExport?: number; // Xuất kiểm thử / Quay kho
 }
 
 class ExpenseDto {

@@ -2,15 +2,31 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { productsApi } from '../api/products';
 
+export interface CompartmentData {
+  compartmentNumber: number;
+  productId?: number;
+  compartmentHeight: number;
+  truckTemperature: number;
+  truckVolume: number;
+  warehouseHeight: number;
+  actualTemperature: number;
+  receivedVolume: number;
+  heightLossTruck?: number;
+  heightLossWarehouse?: number;
+}
+
 export interface InventoryImportFormData {
   docDate: string;
   supplierName: string;
   invoiceNumber: string;
   licensePlate: string;
   driverName?: string;
-  productId: number;
-  quantity: number;
+  driverPhone?: string;
+  compartments: CompartmentData[];
   notes?: string;
+  // Legacy fields (for backward compatibility)
+  productId?: number;
+  quantity?: number;
 }
 
 interface Props {

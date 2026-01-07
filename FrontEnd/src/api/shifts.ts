@@ -5,6 +5,7 @@ export interface PumpReadingDto {
   productId: number;
   startValue: number;
   endValue: number;
+  testExport?: number; // Xuất kiểm thử / Quay kho
 }
 
 export interface InventoryImportDto {
@@ -53,6 +54,7 @@ export interface Shift {
   openedAt: string;
   closedAt?: string;
   status: string; // OPEN, CLOSED, ADJUSTED
+  version?: number; // Số lần đã reopen/sửa (default = 1)
   store?: any;
 }
 

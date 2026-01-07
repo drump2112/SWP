@@ -24,6 +24,7 @@
     "react-router-dom": "^7.11.0",
     "react-select": "^5.10.2",
     "react-toastify": "^11.0.5",
+    "recharts": "^3.6.0",
     "sweetalert2": "^11.26.17",
     "xlsx": "^0.18.5"
   },
@@ -32,6 +33,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@types/recharts": "^1.8.29",
     "@vitejs/plugin-react": "^5.1.1",
     "autoprefixer": "^10.4.23",
     "eslint": "^9.39.1",

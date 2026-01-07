@@ -61,6 +61,16 @@ export class PumpReading {
   })
   unitPrice: number;
 
+  @Column({
+    name: 'test_export',
+    type: 'decimal',
+    precision: 18,
+    scale: 3,
+    nullable: true,
+    default: 0,
+  })
+  testExport: number; // Xuất kiểm thử / Quay kho
+
   @ManyToOne(() => Shift, (shift) => shift.pumpReadings)
   @JoinColumn({ name: 'shift_id' })
   shift: Shift;
