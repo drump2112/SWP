@@ -10,6 +10,7 @@ import {
 import { Warehouse } from './warehouse.entity';
 import { Product } from './product.entity';
 import { Tank } from './tank.entity';
+import { Shift } from './shift.entity';
 
 @Entity('inventory_ledger')
 @Index('idx_inventory_ledger_lookup', ['warehouseId', 'productId', 'createdAt'])
@@ -22,6 +23,9 @@ export class InventoryLedger {
 
   @Column({ name: 'product_id' })
   productId: number;
+
+  @Column({ name: 'shift_id', nullable: true })
+  shiftId: number;
 
   @Column({ name: 'tank_id', nullable: true })
   tankId?: number | null;
@@ -67,4 +71,8 @@ export class InventoryLedger {
   @ManyToOne(() => Tank)
   @JoinColumn({ name: 'tank_id' })
   tank: Tank;
+
+  @ManyToOne(() => Shift)
+  @JoinColumn({ name: 'shift_id' })
+  shift: Shift;
 }

@@ -1,8 +1,22 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Put, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Put,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
-import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
+import {
+  CreateShiftDebtSaleDto,
+  CreateCashDepositDto,
+  CreateReceiptDto,
+} from './dto/shift-operations.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -37,6 +51,17 @@ export class ShiftsController {
     return this.shiftsService.closeShift(closeShiftDto, user);
   }
 
+  @Put(':id')
+  @Roles('STORE', 'ADMIN')
+  update(
+    @Param('id') id: string,
+    @Body() closeShiftDto: CloseShiftDto,
+    @CurrentUser() user: any,
+  ) {
+    console.log('Updating shift with ID:', id);
+    return this.shiftsService.update(+id, closeShiftDto, user);
+  }
+
   @Put(':id/reopen')
   @Roles('ADMIN')
   reopenShift(@Param('id') id: string, @CurrentUser() user: any) {
@@ -59,7 +84,10 @@ export class ShiftsController {
 
   @Post('debt-sales')
   @Roles('STORE', 'ADMIN')
-  createDebtSale(@Body() createDto: CreateShiftDebtSaleDto, @CurrentUser() user: any) {
+  createDebtSale(
+    @Body() createDto: CreateShiftDebtSaleDto,
+    @CurrentUser() user: any,
+  ) {
     return this.shiftsService.createDebtSale(createDto, user);
   }
 
@@ -79,7 +107,10 @@ export class ShiftsController {
 
   @Post('cash-deposits')
   @Roles('STORE', 'ADMIN')
-  createCashDeposit(@Body() createDto: CreateCashDepositDto, @CurrentUser() user: any) {
+  createCashDeposit(
+    @Body() createDto: CreateCashDepositDto,
+    @CurrentUser() user: any,
+  ) {
     return this.shiftsService.createCashDeposit(createDto, user);
   }
 
@@ -120,5 +151,4 @@ export class ShiftsController {
   getPreviousShiftReadings(@Param('shiftId') shiftId: string) {
     return this.shiftsService.getPreviousShiftReadings(+shiftId);
   }
-
 }

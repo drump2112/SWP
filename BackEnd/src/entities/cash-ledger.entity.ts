@@ -8,6 +8,7 @@ import {
   Index,
 } from 'typeorm';
 import { Store } from './store.entity';
+import { Shift } from './shift.entity';
 
 @Entity('cash_ledger')
 @Index('idx_cash_ledger_store', ['storeId', 'createdAt'])
@@ -17,6 +18,9 @@ export class CashLedger {
 
   @Column({ name: 'store_id' })
   storeId: number;
+
+  @Column({ name: 'shift_id', nullable: true })
+  shiftId: number;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
   refType: string; // RECEIPT (Phiếu thu), DEPOSIT (Phiếu nộp), EXPENSE (Chi phí), ADJUST (Điều chỉnh), SHIFT_CLOSE, SHIFT_OPEN, SALE, PAYMENT
@@ -51,4 +55,8 @@ export class CashLedger {
   @ManyToOne(() => Store)
   @JoinColumn({ name: 'store_id' })
   store: Store;
+
+  @ManyToOne(() => Shift)
+  @JoinColumn({ name: 'shift_id' })
+  shift: Shift;
 }

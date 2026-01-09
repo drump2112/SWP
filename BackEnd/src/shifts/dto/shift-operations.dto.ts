@@ -1,7 +1,20 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min, IsDateString, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Min,
+  IsDateString,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateShiftDebtSaleDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
   @IsNotEmpty()
   @IsNumber()
   shiftId: number;
@@ -31,6 +44,10 @@ export class CreateShiftDebtSaleDto {
 
 // DTO cho phiếu thu tiền (thanh toán nợ)
 export class CreateReceiptDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
   @IsNotEmpty()
   @IsNumber()
   storeId: number;
@@ -75,6 +92,10 @@ export class ReceiptDetailDto {
 }
 
 export class CreateCashDepositDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
   @IsNotEmpty()
   @IsNumber()
   storeId: number;

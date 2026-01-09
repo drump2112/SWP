@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Shift } from '../entities/shift.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
 import { Sale } from '../entities/sale.entity';
@@ -19,7 +23,12 @@ import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
-import { CreateShiftDebtSaleDto, CreateCashDepositDto, CreateReceiptDto } from './dto/shift-operations.dto';
+import {
+  CreateShiftDebtSaleDto,
+  CreateCashDepositDto,
+  CreateReceiptDto,
+} from './dto/shift-operations.dto';
+import { In, Brackets } from 'typeorm';
 
 @Injectable()
 export class ShiftsService {
@@ -71,7 +80,7 @@ export class ShiftsService {
     if (previousOpenShift) {
       throw new BadRequestException(
         `Không thể mở ca mới. Ca ${previousOpenShift.shiftNo} ngày ${new Date(previousOpenShift.shiftDate).toLocaleDateString('vi-VN')} vẫn đang mở. ` +
-        `Vui lòng chốt ca trước đó trước khi mở ca mới.`
+          `Vui lòng chốt ca trước đó trước khi mở ca mới.`,
       );
     }
 
@@ -87,7 +96,7 @@ export class ShiftsService {
     if (existingShift) {
       throw new BadRequestException(
         `Ca ${createShiftDto.shiftNo} ngày ${createShiftDto.shiftDate} đã tồn tại. ` +
-        `Vui lòng chọn số ca khác hoặc vào ca đã có để chốt ca.`
+          `Vui lòng chọn số ca khác hoặc vào ca đã có để chốt ca.`,
       );
     }
 
@@ -102,377 +111,554 @@ export class ShiftsService {
     return this.shiftRepository.save(shift);
   }
 
-  async closeShift(closeShiftDto: CloseShiftDto, user: any): Promise<Shift> {
-    console.log('📥 closeShift called with DTO:', JSON.stringify(closeShiftDto, null, 2));
-
+  async update(
+    id: number,
+    updateDto: CloseShiftDto,
+    user: any,
+  ): Promise<Shift> {
     return await this.dataSource.transaction(async (manager) => {
-      const shift = await manager.findOne(Shift, {
-        where: { id: closeShiftDto.shiftId },
+      console.log(`🚀 Bắt đầu Update lại Shift ID: ${id}`);
+
+      const _shift = await manager.findOne(Shift, {
+        where: { id },
         relations: ['store', 'store.region'],
       });
+      if (!_shift) throw new NotFoundException('Shift not found');
 
-      if (!shift) {
-        throw new NotFoundException('Shift not found');
-      }
+      // Reset status để chuẩn bị cho việc đóng lại
+      _shift.status = 'OPEN';
 
-      if (shift.status !== 'OPEN') {
-        throw new BadRequestException('Shift is already closed');
-      }
-
-      // Kiểm tra đã có pump readings chưa (tránh duplicate)
-      const existingReadings = await manager.count(PumpReading, {
-        where: { shiftId: shift.id },
+      // ==========================================
+      // 1. GATHER IDs (Lấy ID các bảng con)
+      // ==========================================
+      // Lấy ID Receipt
+      const receipts = await manager.find(Receipt, {
+        where: { shiftId: id },
+        select: ['id'],
       });
-      if (existingReadings > 0) {
-        throw new BadRequestException('Shift already has pump readings. Cannot close again.');
-      }
+      const receiptIds = receipts.map((r) => r.id);
 
-      // Lưu trạng thái cũ để ghi audit log
-      const oldData = { ...shift };
+      // Lấy ID InventoryDocument (Cực kỳ quan trọng vì nó hay dính Ledger)
+      // Giả sử bạn tìm doc theo logic nào đó (ví dụ text trong note hoặc refShiftId)
+      // Nếu bảng InventoryDocument chưa có cột shiftId, bạn phải tìm qua bảng trung gian hoặc logic khác
+      // Ở đây tôi giả định bạn đã thêm refShiftId hoặc tìm cách nào đó lấy được docIds
+      // const linkedDocs = await manager.find(InventoryDocument, {
+      //   where: { notes: Like(`%Ca ${id}%`) }, // Ví dụ tìm theo note nếu chưa có cột shiftId
+      // });
+      const docIds = []; //linkedDocs.map((d) => d.id);
 
-      // 1. Lưu số liệu cột bơm (bulk insert với unitPrice để lưu vết giá)
-      // Lấy giá trước để dùng cho cả pump_readings và sales
-      const productIds = [...new Set(closeShiftDto.pumpReadings.map(r => r.productId))];
-      const prices = await manager.find(ProductPrice, {
-        where: productIds.map(productId => ({
-          productId,
-          regionId: shift.store.regionId,
-        })),
-      });
-
-      const priceMap = new Map<number, number>();
-      for (const price of prices) {
-        if (price.validFrom <= new Date() && (!price.validTo || price.validTo > new Date())) {
-          priceMap.set(price.productId, Number(price.price));
+      // ==========================================
+      // 2. DELETE LEAF NODES (Xóa dữ liệu phụ thuộc/con trước)
+      // ==========================================
+      try {
+        // 2.1. Xóa INVENTORY LEDGER (Thủ phạm số 1 gây rollback)
+        // Ledger kho thường tham chiếu đến Document, không phải Shift
+        if (docIds.length > 0) {
+          console.log('🗑️ Deleting Inventory Ledgers & Items...');
+          await manager.delete(InventoryLedger, {
+            refType: 'EXPORT',
+            refId: In(docIds),
+          });
+          await manager.delete(InventoryDocumentItem, {
+            documentId: In(docIds),
+          });
         }
+
+        // 2.2. Xóa CASH/DEBT LEDGER
+        console.log('🗑️ Deleting Cash/Debt Ledgers...');
+        // Xóa các ledger liên quan trực tiếp đến Close Shift (Bán lẻ)
+        await manager.delete(CashLedger, { refType: 'SHIFT_CLOSE', refId: id });
+        await manager.delete(DebtLedger, { refType: 'DEBT_SALE', shiftId: id }); // Hoặc theo refId của ShiftDebtSale
+
+        // Xóa ledger liên quan đến Receipt/Deposit/Expense
+        // (Lưu ý: TypeORM delete hỗ trợ In([]) nên không cần check length > 0, nhưng check cho tối ưu)
+        if (receiptIds.length > 0) {
+          await manager.delete(ReceiptDetail, { receiptId: In(receiptIds) });
+          await manager.delete(CashLedger, {
+            refType: 'RECEIPT',
+            refId: In(receiptIds),
+          });
+          await manager.delete(DebtLedger, {
+            refType: 'RECEIPT',
+            refId: In(receiptIds),
+          });
+        }
+        // Xóa thêm CashLedger của Deposit và Expense nếu cần (tương tự như trên)...
+      } catch (error) {
+        console.error('❌ Lỗi khi xóa LEAF NODES:', error.message);
+        throw new BadRequestException(`Lỗi xóa dữ liệu phụ: ${error.message}`);
       }
 
-      // Validate: Tất cả sản phẩm phải có giá
-      const missingPrices = closeShiftDto.pumpReadings.filter(r => !priceMap.has(r.productId));
-      if (missingPrices.length > 0) {
-        const productIdsStr = [...new Set(missingPrices.map(r => r.productId))].join(', ');
-        throw new BadRequestException(`Không tìm thấy giá cho sản phẩm: ${productIdsStr}. Vui lòng cập nhật bảng giá.`);
+      // ==========================================
+      // 3. DELETE CORE NODES (Xóa các bảng chính)
+      // ==========================================
+      try {
+        console.log('🗑️ Deleting Core Tables...');
+
+        // Xóa Sale trước (đề phòng Sale có link ngược lại PumpReading - dù hiếm)
+        await manager.delete(Sale, { shiftId: id });
+
+        // Xóa ShiftDebtSale
+        await manager.delete(ShiftDebtSale, { shiftId: id });
+
+        // Xóa Receipt
+        if (receiptIds.length > 0) {
+          await manager.delete(Receipt, { shiftId: id });
+        }
+
+        // Xóa Inventory Document (Thủ phạm số 2)
+        if (docIds.length > 0) {
+          await manager.delete(InventoryDocument, { id: In(docIds) });
+        }
+
+        // Xóa Deposit & Expense
+        await manager.delete(CashDeposit, { shiftId: id });
+        await manager.delete(Expense, { shiftId: id });
+
+        // CUỐI CÙNG: Xóa PumpReading
+        console.log('🗑️ Deleting PumpReading...');
+        const pumpRes = await manager.delete(PumpReading, { shiftId: id });
+        console.log(`✅ PumpReading deleted count: ${pumpRes.affected}`);
+      } catch (error) {
+        console.error('❌ Lỗi khi xóa CORE NODES:', error.message);
+        // Đây là chỗ giúp bạn biết bảng nào đang chặn PumpReading bị xóa
+        throw new BadRequestException(
+          `Lỗi xóa dữ liệu chính: ${error.message}`,
+        );
       }
 
-      const pumpReadingsData = closeShiftDto.pumpReadings.map(reading => {
-        const grossQuantity = reading.endValue - reading.startValue; // Tổng lượng bơm
-        const testExport = reading.testExport || 0; // Xuất kiểm thử/quay kho
-        const quantity = grossQuantity - testExport; // Số lượng BÁN thực tế
-        const unitPrice = priceMap.get(reading.productId)!;
-        return {
-          shiftId: shift.id,
-          pumpCode: reading.pumpCode,
-          productId: reading.productId,
-          startValue: reading.startValue,
-          endValue: reading.endValue,
-          quantity, // Số lượng BÁN (không bao gồm testExport)
-          unitPrice, // Lưu giá tại thời điểm chốt ca để đảm bảo tính toàn vẹn dữ liệu kế toán
-          testExport, // Xuất kiểm thử / Quay kho (lưu riêng)
-        };
-      });
+      // ==========================================
+      // 4. RE-CREATE (Tạo lại)
+      // ==========================================
+      console.log('🔄 Re-calculating Close Shift...');
+      const shift = await this.closeShiftProcess(
+        manager,
+        updateDto,
+        user,
+        _shift,
+      );
+      return shift;
+    });
+  }
+  async closeShiftProcess(
+    manager: EntityManager,
+    closeShiftDto: CloseShiftDto,
+    user: any,
+    _shift?: Shift,
+  ): Promise<Shift> {
+    const shift =
+      _shift ||
+      (await manager.findOne(Shift, {
+        where: { id: closeShiftDto.shiftId },
+        relations: ['store', 'store.region'],
+      })) ||
+      undefined;
 
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    if (shift.status !== 'OPEN') {
+      throw new BadRequestException('Shift is already closed');
+    }
+
+    // Kiểm tra đã có pump readings chưa (tránh duplicate)
+    const existingReadings = await manager.count(PumpReading, {
+      where: { shiftId: shift.id },
+    });
+    if (existingReadings > 0) {
+      throw new BadRequestException(
+        'Shift already has pump readings. Cannot close again.',
+      );
+    }
+
+    // Lưu trạng thái cũ để ghi audit log
+    const oldData = { ...shift };
+
+    // 1. Lưu số liệu cột bơm (bulk insert với unitPrice để lưu vết giá)
+    // Lấy giá trước để dùng cho cả pump_readings và sales
+    const productIds = [
+      ...new Set(closeShiftDto.pumpReadings.map((r) => r.productId)),
+    ];
+    const prices = await manager.find(ProductPrice, {
+      where: productIds.map((productId) => ({
+        productId,
+        regionId: shift.store.regionId,
+      })),
+    });
+
+    const priceMap = new Map<number, number>();
+    for (const price of prices) {
+      if (
+        price.validFrom <= new Date() &&
+        (!price.validTo || price.validTo > new Date())
+      ) {
+        priceMap.set(price.productId, Number(price.price));
+      }
+    }
+
+    // Validate: Tất cả sản phẩm phải có giá
+    const missingPrices = closeShiftDto.pumpReadings.filter(
+      (r) => !priceMap.has(r.productId),
+    );
+    if (missingPrices.length > 0) {
+      const productIdsStr = [
+        ...new Set(missingPrices.map((r) => r.productId)),
+      ].join(', ');
+      throw new BadRequestException(
+        `Không tìm thấy giá cho sản phẩm: ${productIdsStr}. Vui lòng cập nhật bảng giá.`,
+      );
+    }
+
+    const pumpReadingsData = closeShiftDto.pumpReadings.map((reading) => {
+      const grossQuantity = reading.endValue - reading.startValue; // Tổng lượng bơm
+      const testExport = reading.testExport || 0; // Xuất kiểm thử/quay kho
+      const quantity = grossQuantity - testExport; // Số lượng BÁN thực tế
+      const unitPrice = priceMap.get(reading.productId)!;
+      return {
+        shiftId: shift.id,
+        pumpCode: reading.pumpCode,
+        productId: reading.productId,
+        startValue: reading.startValue,
+        endValue: reading.endValue,
+        quantity, // Số lượng BÁN (không bao gồm testExport)
+        unitPrice, // Lưu giá tại thời điểm chốt ca để đảm bảo tính toàn vẹn dữ liệu kế toán
+        testExport, // Xuất kiểm thử / Quay kho (lưu riêng)
+      };
+    });
+
+    await manager
+      .createQueryBuilder()
+      .insert()
+      .into(PumpReading)
+      .values(pumpReadingsData)
+      .execute();
+
+    // 2. ✅ Tạo sales từ pump readings - ĐÂY LÀ BÁN LẺ (customerId = null)
+    // Bán lẻ = Thu tiền mặt ngay, KHÔNG ghi công nợ
+    const salesData = pumpReadingsData.map((reading) => {
+      const unitPrice = priceMap.get(reading.productId)!; // Safe after validation
+      return {
+        shiftId: shift.id,
+        storeId: shift.storeId,
+        productId: reading.productId,
+        quantity: reading.quantity,
+        unitPrice,
+        amount: reading.quantity * unitPrice,
+        customerId: undefined, // ✅ NULL = Bán lẻ (không phải công nợ)
+      };
+    });
+
+    if (salesData.length > 0) {
       await manager
         .createQueryBuilder()
         .insert()
-        .into(PumpReading)
-        .values(pumpReadingsData)
+        .into(Sale)
+        .values(salesData)
         .execute();
+    }
 
-      // 2. ✅ Tạo sales từ pump readings - ĐÂY LÀ BÁN LẺ (customerId = null)
-      // Bán lẻ = Thu tiền mặt ngay, KHÔNG ghi công nợ
-      const salesData = pumpReadingsData.map(reading => {
-        const unitPrice = priceMap.get(reading.productId)!; // Safe after validation
-        return {
+    // 4. ✅ LẤY WAREHOUSE cho việc tạo phiếu xuất tự động sau này
+    const warehouse = await manager.findOne(Warehouse, {
+      where: { storeId: shift.storeId, type: 'STORE' },
+    });
+
+    if (!warehouse) {
+      throw new BadRequestException(
+        `Không tìm thấy kho cho cửa hàng ${shift.storeId}`,
+      );
+    }
+
+    // LƯU Ý: KHÔNG ghi inventory_ledger ở đây vì sẽ được xử lý tự động
+    // qua phiếu xuất bán (EXPORT document) ở bước 6.7 phía dưới
+    // → Tránh trùng lặp ghi ledger 2 lần cho cùng 1 lượng bán
+
+    // 5. ✅ GHI SỔ QUỸ: Thu tiền bán lẻ (QUAN TRỌNG!)
+    // Bán lẻ = Thu tiền mặt ngay → Ghi cashIn vào cash_ledger
+    // KHÔNG ghi debt_ledger vì không phải công nợ
+    // NOTE: Logic hiện tại giả định TOÀN BỘ bán lẻ là tiền mặt
+    // Trong thực tế, cần phân biệt: tiền mặt / thẻ / ví điện tử
+    // TODO: Thêm payment_method cho mỗi sale hoặc thêm field cash_amount vào CloseShiftDto
+    const totalRetailAmount = salesData.reduce(
+      (sum, s) => sum + Number(s.amount),
+      0,
+    );
+
+    if (totalRetailAmount > 0) {
+      await manager.save(CashLedger, {
+        shiftId: shift.id,
+        storeId: shift.storeId,
+        refType: 'SHIFT_CLOSE',
+        refId: shift.id,
+        cashIn: totalRetailAmount, // ✅ Thu tiền vào quỹ
+        cashOut: 0,
+        notes: 'Thu tiền bán lẻ (giả định toàn bộ là tiền mặt)',
+      });
+    }
+
+    // 6. Xử lý DRAFT DATA: Debt Sales, Receipts, Deposits
+    // 6.1. ✅ Xử lý Debt Sales (bán công nợ - KHÁC VỚI BÁN LẺ!)
+    // Frontend chỉ gửi debt sales cho khách hàng thực sự mua nợ
+    // KHÔNG bao gồm bán lẻ (đã xử lý ở bước 5)
+    if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
+      for (const debtSale of closeShiftDto.debtSales) {
+        const totalAmount = debtSale.quantity * debtSale.unitPrice;
+
+        // Lưu vào shift_debt_sales
+        const debtSaleRecord = await manager.save(ShiftDebtSale, {
+          shiftId: shift.id,
+          customerId: debtSale.customerId,
+          productId: debtSale.productId,
+          quantity: debtSale.quantity,
+          unitPrice: debtSale.unitPrice,
+          amount: totalAmount,
+          notes: debtSale.notes,
+        });
+
+        // ✅ Ghi công nợ (debit customer - PHÁT SINH NỢ)
+        // Chỉ dành cho bán công nợ, KHÔNG dùng cho bán lẻ
+        await manager.save(DebtLedger, {
+          customerId: debtSale.customerId,
+          storeId: shift.storeId,
+          refType: 'DEBT_SALE',
+          refId: debtSaleRecord.id,
+          debit: totalAmount,
+          credit: 0,
+          notes: debtSale.notes || 'Bán công nợ',
+          shiftId: shift.id,
+        });
+
+        // NOTE: Bán công nợ KHÔNG giảm tồn kho bể, KHÔNG ghi cash_ledger
+        // Vì đã tính trong pump readings rồi (bước 4)
+        // Công nợ chỉ là PHÂN LOẠI doanh thu: Bán lẻ vs Bán nợ
+        // - Bán lẻ → cashIn (bước 5)
+        // - Bán nợ → debit customer (không ảnh hưởng cash)
+
+        // Ghi sales (để tracking)
+        await manager.save(Sale, {
           shiftId: shift.id,
           storeId: shift.storeId,
-          productId: reading.productId,
-          quantity: reading.quantity,
-          unitPrice,
-          amount: reading.quantity * unitPrice,
-          customerId: undefined, // ✅ NULL = Bán lẻ (không phải công nợ)
-        };
-      });
-
-      if (salesData.length > 0) {
-        await manager
-          .createQueryBuilder()
-          .insert()
-          .into(Sale)
-          .values(salesData)
-          .execute();
-      }
-
-      // 4. ✅ LẤY WAREHOUSE cho việc tạo phiếu xuất tự động sau này
-      const warehouse = await manager.findOne(Warehouse, {
-        where: { storeId: shift.storeId, type: 'STORE' },
-      });
-
-      if (!warehouse) {
-        throw new BadRequestException(`Không tìm thấy kho cho cửa hàng ${shift.storeId}`);
-      }
-
-      // LƯU Ý: KHÔNG ghi inventory_ledger ở đây vì sẽ được xử lý tự động
-      // qua phiếu xuất bán (EXPORT document) ở bước 6.7 phía dưới
-      // → Tránh trùng lặp ghi ledger 2 lần cho cùng 1 lượng bán
-
-      // 5. ✅ GHI SỔ QUỸ: Thu tiền bán lẻ (QUAN TRỌNG!)
-      // Bán lẻ = Thu tiền mặt ngay → Ghi cashIn vào cash_ledger
-      // KHÔNG ghi debt_ledger vì không phải công nợ
-      // NOTE: Logic hiện tại giả định TOÀN BỘ bán lẻ là tiền mặt
-      // Trong thực tế, cần phân biệt: tiền mặt / thẻ / ví điện tử
-      // TODO: Thêm payment_method cho mỗi sale hoặc thêm field cash_amount vào CloseShiftDto
-      const totalRetailAmount = salesData.reduce((sum, s) => sum + Number(s.amount), 0);
-
-      if (totalRetailAmount > 0) {
-        await manager.save(CashLedger, {
-          storeId: shift.storeId,
-          refType: 'SHIFT_CLOSE',
-          refId: shift.id,
-          cashIn: totalRetailAmount,  // ✅ Thu tiền vào quỹ
-          cashOut: 0,
-          notes: 'Thu tiền bán lẻ (giả định toàn bộ là tiền mặt)',
+          productId: debtSale.productId,
+          customerId: debtSale.customerId,
+          quantity: debtSale.quantity,
+          unitPrice: debtSale.unitPrice,
+          amount: totalAmount,
         });
       }
+    }
 
-      // 6. Xử lý DRAFT DATA: Debt Sales, Receipts, Deposits
-      // 6.1. ✅ Xử lý Debt Sales (bán công nợ - KHÁC VỚI BÁN LẺ!)
-      // Frontend chỉ gửi debt sales cho khách hàng thực sự mua nợ
-      // KHÔNG bao gồm bán lẻ (đã xử lý ở bước 5)
-      if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
-        for (const debtSale of closeShiftDto.debtSales) {
-          const totalAmount = debtSale.quantity * debtSale.unitPrice;
+    // 6.2. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
+    if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
+      for (const receipt of closeShiftDto.receipts) {
+        // Lưu receipt
+        const receiptRecord = await manager.save(Receipt, {
+          storeId: receipt.storeId,
+          shiftId: shift.id,
+          receiptType: receipt.receiptType,
+          amount: receipt.amount,
+          paymentMethod: receipt.paymentMethod || 'CASH',
+          notes: receipt.notes,
+        });
 
-          // Lưu vào shift_debt_sales
-          const debtSaleRecord = await manager.save(ShiftDebtSale, {
+        // Lưu chi tiết
+        for (const detail of receipt.details) {
+          await manager.save(ReceiptDetail, {
             shiftId: shift.id,
-            customerId: debtSale.customerId,
-            productId: debtSale.productId,
-            quantity: debtSale.quantity,
-            unitPrice: debtSale.unitPrice,
-            amount: totalAmount,
-            notes: debtSale.notes,
+            receiptId: receiptRecord.id,
+            customerId: detail.customerId,
+            amount: detail.amount,
           });
 
-          // ✅ Ghi công nợ (debit customer - PHÁT SINH NỢ)
-          // Chỉ dành cho bán công nợ, KHÔNG dùng cho bán lẻ
+          // Ghi công nợ (credit customer - giảm nợ)
           await manager.save(DebtLedger, {
-            customerId: debtSale.customerId,
-            storeId: shift.storeId,
-            refType: 'DEBT_SALE',
-            refId: debtSaleRecord.id,
-            debit: totalAmount,
-            credit: 0,
-            notes: debtSale.notes || 'Bán công nợ',
-          });
-
-          // NOTE: Bán công nợ KHÔNG giảm tồn kho bể, KHÔNG ghi cash_ledger
-          // Vì đã tính trong pump readings rồi (bước 4)
-          // Công nợ chỉ là PHÂN LOẠI doanh thu: Bán lẻ vs Bán nợ
-          // - Bán lẻ → cashIn (bước 5)
-          // - Bán nợ → debit customer (không ảnh hưởng cash)
-
-          // Ghi sales (để tracking)
-          await manager.save(Sale, {
             shiftId: shift.id,
-            storeId: shift.storeId,
-            productId: debtSale.productId,
-            customerId: debtSale.customerId,
-            quantity: debtSale.quantity,
-            unitPrice: debtSale.unitPrice,
-            amount: totalAmount,
-          });
-        }
-      }
-
-      // 6.2. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
-      if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
-        for (const receipt of closeShiftDto.receipts) {
-          // Lưu receipt
-          const receiptRecord = await manager.save(Receipt, {
+            customerId: detail.customerId,
             storeId: receipt.storeId,
-            shiftId: shift.id,
-            receiptType: receipt.receiptType,
-            amount: receipt.amount,
-            paymentMethod: receipt.paymentMethod || 'CASH',
-            notes: receipt.notes,
+            refType: 'RECEIPT',
+            refId: receiptRecord.id,
+            debit: 0,
+            credit: detail.amount,
+            notes: receipt.notes || 'Thanh toán nợ',
           });
+        }
 
-          // Lưu chi tiết
-          for (const detail of receipt.details) {
-            await manager.save(ReceiptDetail, {
-              receiptId: receiptRecord.id,
-              customerId: detail.customerId,
-              amount: detail.amount,
-            });
-
-            // Ghi công nợ (credit customer - giảm nợ)
-            await manager.save(DebtLedger, {
-              customerId: detail.customerId,
-              storeId: receipt.storeId,
-              refType: 'RECEIPT',
-              refId: receiptRecord.id,
-              debit: 0,
-              credit: detail.amount,
-              notes: receipt.notes || 'Thanh toán nợ',
-            });
-          }
-
-          // Ghi sổ quỹ (chỉ nếu thu tiền mặt)
-          if (receiptRecord.paymentMethod === 'CASH') {
-            await manager.save(CashLedger, {
-              storeId: receipt.storeId,
-              refType: 'RECEIPT',
-              refId: receiptRecord.id,
-              cashIn: receipt.amount,
-              cashOut: 0,
-              notes: receipt.notes || 'Thu tiền thanh toán nợ',
-            });
-          }
+        // Ghi sổ quỹ (chỉ nếu thu tiền mặt)
+        if (receiptRecord.paymentMethod === 'CASH') {
+          await manager.save(CashLedger, {
+            shiftId: shift.id,
+            storeId: receipt.storeId,
+            refType: 'RECEIPT',
+            refId: receiptRecord.id,
+            cashIn: receipt.amount,
+            cashOut: 0,
+            notes: receipt.notes || 'Thu tiền thanh toán nợ',
+          });
         }
       }
+    }
 
-      // 6.3. ✅ Xử lý Deposits (nộp tiền về công ty)
-      // Tiền rời khỏi quỹ cửa hàng → cashOut
-      // KHÔNG liên quan đến công nợ khách hàng
-      if (closeShiftDto.deposits && closeShiftDto.deposits.length > 0) {
-        for (const deposit of closeShiftDto.deposits) {
-          // Lưu deposit record
-          const depositRecord = await manager.save(CashDeposit, {
-            storeId: deposit.storeId,
-            shiftId: shift.id,
-            amount: deposit.amount,
-            depositDate: new Date(deposit.depositDate),
-            depositTime: deposit.depositTime,
-            receiverName: deposit.receiverName,
-            paymentMethod: deposit.paymentMethod || 'CASH',
-            notes: deposit.notes,
-          });
-
-          // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
-          // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
-          // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
-          if (depositRecord.paymentMethod === 'CASH') {
-            await manager.save(CashLedger, {
-              storeId: deposit.storeId,
-              refType: 'DEPOSIT',
-              refId: depositRecord.id,
-              cashIn: 0,
-              cashOut: deposit.amount,
-              notes: deposit.notes || 'Nộp tiền về công ty',
-            });
-          }
-        }
-      }
-
-      // 6.4. Xử lý Expenses (chi phí)
-      if (closeShiftDto.expenses && closeShiftDto.expenses.length > 0) {
-        const today = new Date();
-
-        for (const expense of closeShiftDto.expenses) {
-          // Lưu expense record
-          const expenseRecord = await manager.save(Expense, {
-            storeId: shift.storeId,
-            shiftId: shift.id,
-            expenseCategoryId: expense.expenseCategoryId,
-            amount: expense.amount,
-            description: expense.description,
-            expenseDate: today,
-            paymentMethod: expense.paymentMethod || 'CASH',
-            createdBy: user?.id,
-          });
-
-          // Ghi sổ quỹ hoặc ngân hàng
-          if (expenseRecord.paymentMethod === 'CASH') {
-            // Chi bằng tiền mặt - ghi vào cash_ledger
-            await manager.save(CashLedger, {
-              storeId: shift.storeId,
-              refType: 'EXPENSE',
-              refId: expenseRecord.id,
-              cashIn: 0,
-              cashOut: expense.amount,
-              notes: expense.description,
-            });
-          }
-          // Nếu BANK_TRANSFER thì không ghi vào cash_ledger (chỉ ghi expense)
-        }
-      }
-
-      // 6.7. TỰ ĐỘNG TẠO PHIẾU XUẤT BÁN từ lượng bơm qua vòi
-      // LƯU Ý: testExport là lượng đổ ra kiểm thử rồi ĐỔ NGƯỢC LẠI vào bể
-      // → KHÔNG tạo phiếu xuất cho testExport vì KHÔNG làm giảm tồn kho
-      // → CHỈ tạo phiếu xuất cho lượng BÁN thực tế (đã trừ testExport)
-
-      // Tổng hợp lượng BÁN theo từng productId (đã trừ testExport)
-      const productSalesMap = new Map<number, number>();
-      for (const reading of pumpReadingsData) {
-        const current = productSalesMap.get(reading.productId) || 0;
-        productSalesMap.set(reading.productId, current + reading.quantity); // quantity đã trừ testExport
-      }
-
-      if (productSalesMap.size > 0) {
-        // Tạo 1 phiếu xuất duy nhất cho tất cả sản phẩm bán trong ca
-        const exportDoc = await manager.save(InventoryDocument, {
-          warehouseId: warehouse.id,
-          docType: 'EXPORT',
-          docDate: new Date(),
-          supplierName: `Xuất bán ca #${shift.shiftNo}`,
-          notes: `Tự động tạo từ lượng bơm qua vòi - Ca ${shift.shiftNo} ngày ${shift.shiftDate}`,
+    // 6.3. ✅ Xử lý Deposits (nộp tiền về công ty)
+    // Tiền rời khỏi quỹ cửa hàng → cashOut
+    // KHÔNG liên quan đến công nợ khách hàng
+    if (closeShiftDto.deposits && closeShiftDto.deposits.length > 0) {
+      for (const deposit of closeShiftDto.deposits) {
+        // Lưu deposit record
+        const depositRecord = await manager.save(CashDeposit, {
+          storeId: deposit.storeId,
+          shiftId: shift.id,
+          amount: deposit.amount,
+          depositDate: new Date(deposit.depositDate),
+          depositTime: deposit.depositTime,
+          receiverName: deposit.receiverName,
+          paymentMethod: deposit.paymentMethod || 'CASH',
+          notes: deposit.notes,
         });
 
-        for (const [productId, totalQuantity] of productSalesMap.entries()) {
-          // Lấy đơn giá từ pump readings (giả sử tất cả pump cùng sản phẩm có cùng giá)
-          const sampleReading = pumpReadingsData.find(r => r.productId === productId);
-          const unitPrice = sampleReading?.unitPrice || 0;
-
-          await manager.save(InventoryDocumentItem, {
-            documentId: exportDoc.id,
-            productId,
-            quantity: totalQuantity,
-            unitPrice,
+        // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
+        // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
+        // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
+        if (depositRecord.paymentMethod === 'CASH') {
+          await manager.save(CashLedger, {
+            storeId: deposit.storeId,
+            refType: 'DEPOSIT',
+            refId: depositRecord.id,
+            cashIn: 0,
+            cashOut: deposit.amount,
+            notes: deposit.notes || 'Nộp tiền về công ty',
+            shiftId: shift.id,
           });
+        }
+      }
+    }
 
-          // Ghi inventory ledger cho phiếu xuất
-          await manager.save(InventoryLedger, {
-            warehouseId: warehouse.id,
-            productId,
-            tankId: null, // Không chỉ định tank cụ thể vì tổng hợp từ nhiều pump
-            refType: 'EXPORT',
-            refId: exportDoc.id,
-            quantityIn: 0,
-            quantityOut: totalQuantity,
+    // 6.4. Xử lý Expenses (chi phí)
+    if (closeShiftDto.expenses && closeShiftDto.expenses.length > 0) {
+      const today = new Date();
+
+      for (const expense of closeShiftDto.expenses) {
+        // Lưu expense record
+        const expenseRecord = await manager.save(Expense, {
+          storeId: shift.storeId,
+          shiftId: shift.id,
+          expenseCategoryId: expense.expenseCategoryId,
+          amount: expense.amount,
+          description: expense.description,
+          expenseDate: today,
+          paymentMethod: expense.paymentMethod || 'CASH',
+          createdBy: user?.id,
+        });
+
+        // Ghi sổ quỹ hoặc ngân hàng
+        if (expenseRecord.paymentMethod === 'CASH') {
+          // Chi bằng tiền mặt - ghi vào cash_ledger
+          await manager.save(CashLedger, {
+            shiftId: shift.id,
+            storeId: shift.storeId,
+            refType: 'EXPENSE',
+            refId: expenseRecord.id,
+            cashIn: 0,
+            cashOut: expense.amount,
+            notes: expense.description,
           });
-
-          console.log(`🛒 Xuất bán: ${totalQuantity} lít sản phẩm ${productId} (đơn giá ${unitPrice})`);
         }
-
-        console.log(`✅ Tạo phiếu xuất tự động từ pump readings - Document ID: ${exportDoc.id}`);
+        // Nếu BANK_TRANSFER thì không ghi vào cash_ledger (chỉ ghi expense)
       }
+    }
 
-      // 7. Đóng ca
-      if (closeShiftDto.closedAt) {
-        shift.closedAt = new Date(closeShiftDto.closedAt);
-        // Validate closedAt > openedAt
-        if (shift.openedAt && shift.closedAt < shift.openedAt) {
-           throw new BadRequestException('Thời gian đóng ca không thể trước thời gian mở ca');
-        }
-      } else {
-        shift.closedAt = new Date();
-      }
+    // 6.7. TỰ ĐỘNG TẠO PHIẾU XUẤT BÁN từ lượng bơm qua vòi
+    // LƯU Ý: testExport là lượng đổ ra kiểm thử rồi ĐỔ NGƯỢC LẠI vào bể
+    // → KHÔNG tạo phiếu xuất cho testExport vì KHÔNG làm giảm tồn kho
+    // → CHỈ tạo phiếu xuất cho lượng BÁN thực tế (đã trừ testExport)
 
-      shift.status = 'CLOSED';
-      const updatedShift = await manager.save(shift);
+    // Tổng hợp lượng BÁN theo từng productId (đã trừ testExport)
+    const productSalesMap = new Map<number, number>();
+    for (const reading of pumpReadingsData) {
+      const current = productSalesMap.get(reading.productId) || 0;
+      productSalesMap.set(reading.productId, current + reading.quantity); // quantity đã trừ testExport
+    }
 
-      // 8. Ghi audit log
-      await manager.save(AuditLog, {
-        tableName: 'shifts',
-        recordId: shift.id,
-        action: 'CLOSE',
-        oldData: { status: oldData.status, closedAt: oldData.closedAt },
-        newData: { status: 'CLOSED', closedAt: shift.closedAt },
-        changedBy: user?.id,
+    if (productSalesMap.size > 0) {
+      // Tạo 1 phiếu xuất duy nhất cho tất cả sản phẩm bán trong ca
+      const exportDoc = await manager.save(InventoryDocument, {
+        warehouseId: warehouse.id,
+        docType: 'EXPORT',
+        docDate: new Date(),
+        refShiftId: shift.id,
+        supplierName: `Xuất bán ca #${shift.shiftNo}`,
+        notes: `Tự động tạo từ lượng bơm qua vòi - Ca ${shift.shiftNo} ngày ${shift.shiftDate}`,
       });
 
-      return updatedShift;
+      for (const [productId, totalQuantity] of productSalesMap.entries()) {
+        // Lấy đơn giá từ pump readings (giả sử tất cả pump cùng sản phẩm có cùng giá)
+        const sampleReading = pumpReadingsData.find(
+          (r) => r.productId === productId,
+        );
+        const unitPrice = sampleReading?.unitPrice || 0;
+
+        await manager.save(InventoryDocumentItem, {
+          documentId: exportDoc.id,
+          productId,
+          quantity: totalQuantity,
+          unitPrice,
+        });
+
+        // Ghi inventory ledger cho phiếu xuất
+        await manager.save(InventoryLedger, {
+          warehouseId: warehouse.id,
+          productId,
+          shiftId: shift.id,
+          tankId: null, // Không chỉ định tank cụ thể vì tổng hợp từ nhiều pump
+          refType: 'EXPORT',
+          refId: exportDoc.id,
+          quantityIn: 0,
+          quantityOut: totalQuantity,
+        });
+
+        console.log(
+          `🛒 Xuất bán: ${totalQuantity} lít sản phẩm ${productId} (đơn giá ${unitPrice})`,
+        );
+      }
+
+      console.log(
+        `✅ Tạo phiếu xuất tự động từ pump readings - Document ID: ${exportDoc.id}`,
+      );
+    }
+
+    // 7. Đóng ca
+    if (closeShiftDto.closedAt) {
+      shift.closedAt = new Date(closeShiftDto.closedAt);
+      // Validate closedAt > openedAt
+      if (shift.openedAt && shift.closedAt < shift.openedAt) {
+        throw new BadRequestException(
+          'Thời gian đóng ca không thể trước thời gian mở ca',
+        );
+      }
+    } else {
+      shift.closedAt = new Date();
+    }
+
+    shift.status = 'CLOSED';
+    const updatedShift = await manager.save(shift);
+
+    // 8. Ghi audit log
+    await manager.save(AuditLog, {
+      tableName: 'shifts',
+      recordId: shift.id,
+      action: 'CLOSE',
+      oldData: { status: oldData.status, closedAt: oldData.closedAt },
+      newData: { status: 'CLOSED', closedAt: shift.closedAt },
+      changedBy: user?.id,
+    });
+
+    return updatedShift;
+  }
+  async closeShift(
+    closeShiftDto: CloseShiftDto,
+    user: any,
+    _shift?: Shift,
+  ): Promise<Shift> {
+    return await this.dataSource.transaction(async (manager) => {
+      return this.closeShiftProcess(manager, closeShiftDto, user, _shift);
     });
   }
 
@@ -508,20 +694,24 @@ export class ShiftsService {
         if (debtSaleEntry) {
           const paymentsAfterSale = await manager
             .createQueryBuilder(DebtLedger, 'dl')
-            .where('dl.customerId = :customerId', { customerId: debtSale.customerId })
+            .where('dl.customerId = :customerId', {
+              customerId: debtSale.customerId,
+            })
             .andWhere('dl.refType = :refType', { refType: 'PAYMENT' })
-            .andWhere('dl.createdAt > :saleTime', { saleTime: debtSaleEntry.createdAt })
+            .andWhere('dl.createdAt > :saleTime', {
+              saleTime: debtSaleEntry.createdAt,
+            })
             .getCount();
 
           if (paymentsAfterSale > 0) {
             throw new BadRequestException(
               `❌ KHÔNG THỂ MỞ LẠI CA!\n` +
-              `Khách hàng "${debtSale.customer?.name}" đã thanh toán công nợ từ ca này.\n` +
-              `Nếu sửa số tiền bán sẽ gây lỗi số dư công nợ.\n\n` +
-              `Giải pháp:\n` +
-              `1. Tạo bút toán điều chỉnh công nợ (ghi chú rõ lý do)\n` +
-              `2. Hoặc hoàn tiền cho khách nếu bán sai số tiền cao hơn\n` +
-              `3. Liên hệ kế toán trưởng để xử lý thủ công`
+                `Khách hàng "${debtSale.customer?.name}" đã thanh toán công nợ từ ca này.\n` +
+                `Nếu sửa số tiền bán sẽ gây lỗi số dư công nợ.\n\n` +
+                `Giải pháp:\n` +
+                `1. Tạo bút toán điều chỉnh công nợ (ghi chú rõ lý do)\n` +
+                `2. Hoặc hoàn tiền cho khách nếu bán sai số tiền cao hơn\n` +
+                `3. Liên hệ kế toán trưởng để xử lý thủ công`,
             );
           }
         }
@@ -533,38 +723,55 @@ export class ShiftsService {
       // Đánh dấu dữ liệu cũ là "đã bị thay thế" thay vì xóa hẳn
 
       // 1. Tìm và xóa phiếu xuất tự động của ca này
-      // Phiếu xuất có notes chứa shift number
-      const exportDocs = await manager
-        .createQueryBuilder('inventory_documents', 'doc')
-        .where('doc.doc_type = :docType', { docType: 'EXPORT' })
-        .andWhere('doc.notes LIKE :pattern', { pattern: `%Ca ${shift.shiftNo}%` })
-        .getMany();
+      // Cập nhật logic: Tìm theo warehouse và (refShiftId HOẶC supplierName)
+      const warehouse = await manager.findOne(Warehouse, {
+        where: { storeId: shift.storeId, type: 'STORE' },
+      });
 
-      for (const doc of exportDocs) {
-        // Xóa inventory_ledger entries của phiếu xuất này
-        await manager
-          .createQueryBuilder()
-          .delete()
-          .from('inventory_ledger')
-          .where('ref_type = :refType', { refType: 'EXPORT' })
-          .andWhere('ref_id = :refId', { refId: doc.id })
-          .execute();
+      if (warehouse) {
+        const exportDocs = await manager
+          .createQueryBuilder(InventoryDocument, 'doc')
+          .where('doc.doc_type = :docType', { docType: 'EXPORT' })
+          .andWhere('doc.warehouse_id = :warehouseId', {
+            warehouseId: warehouse.id,
+          })
+          .andWhere(
+            new Brackets((qb) => {
+              qb.where('doc.ref_shift_id = :shiftId', {
+                shiftId: shift.id,
+              }).orWhere('doc.supplier_name = :supplierName', {
+                supplierName: `Xuất bán ca #${shift.shiftNo}`,
+              });
+            }),
+          )
+          .getMany();
 
-        // Xóa inventory_document_items
-        await manager
-          .createQueryBuilder()
-          .delete()
-          .from('inventory_document_items')
-          .where('document_id = :docId', { docId: doc.id })
-          .execute();
+        for (const doc of exportDocs) {
+          // Xóa inventory_ledger entries của phiếu xuất này
+          await manager
+            .createQueryBuilder()
+            .delete()
+            .from('inventory_ledger')
+            .where('ref_type = :refType', { refType: 'EXPORT' })
+            .andWhere('ref_id = :refId', { refId: doc.id })
+            .execute();
 
-        // Xóa inventory_document
-        await manager
-          .createQueryBuilder()
-          .delete()
-          .from('inventory_documents')
-          .where('id = :docId', { docId: doc.id })
-          .execute();
+          // Xóa inventory_document_items
+          await manager
+            .createQueryBuilder()
+            .delete()
+            .from('inventory_document_items')
+            .where('document_id = :docId', { docId: doc.id })
+            .execute();
+
+          // Xóa inventory_document
+          await manager
+            .createQueryBuilder()
+            .delete()
+            .from('inventory_documents')
+            .where('id = :docId', { docId: doc.id })
+            .execute();
+        }
       }
 
       // 2. Đánh dấu cash_ledger entries
@@ -573,21 +780,21 @@ export class ShiftsService {
         .update('cash_ledger')
         .set({
           supersededByShiftId: () => 'NULL',
-          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`,
         })
         .where('ref_type = :refType', { refType: 'SHIFT_CLOSE' })
         .andWhere('ref_id = :refId', { refId: shiftId })
         .execute();
 
       // 3. Đánh dấu debt_ledger entries (bán công nợ)
-      const debtSaleIds = debtSales.map(ds => ds.id);
+      const debtSaleIds = debtSales.map((ds) => ds.id);
       if (debtSaleIds.length > 0) {
         await manager
           .createQueryBuilder()
           .update('debt_ledger')
           .set({
             supersededByShiftId: () => 'NULL',
-            notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`
+            notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`,
           })
           .where('ref_type = :refType', { refType: 'DEBT_SALE' })
           .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
@@ -610,7 +817,9 @@ export class ShiftsService {
         .where('shift_id = :shiftId', { shiftId })
         .execute();
 
-      console.log(`🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`);
+      console.log(
+        `🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`,
+      );
 
       // 6. Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
       shift.status = 'OPEN';
@@ -626,12 +835,14 @@ export class ShiftsService {
         newData: {
           status: 'OPEN',
           closedAt: null,
-          note: 'Dữ liệu cũ được đánh dấu superseded, giữ nguyên timestamp'
+          note: 'Dữ liệu cũ được đánh dấu superseded, giữ nguyên timestamp',
         },
         changedBy: user?.id,
       });
 
-      console.log(`✅ Shift ${shiftId} reopened. Old data marked as superseded.`);
+      console.log(
+        `✅ Shift ${shiftId} reopened. Old data marked as superseded.`,
+      );
       return reopenedShift;
     });
   }
@@ -652,7 +863,13 @@ export class ShiftsService {
   async getShiftReport(shiftId: number) {
     const shift = await this.shiftRepository.findOne({
       where: { id: shiftId },
-      relations: ['pumpReadings', 'pumpReadings.product', 'sales', 'sales.product', 'store'],
+      relations: [
+        'pumpReadings',
+        'pumpReadings.product',
+        'sales',
+        'sales.product',
+        'store',
+      ],
     });
 
     if (!shift) {
@@ -669,9 +886,13 @@ export class ShiftsService {
         const price = await this.productPriceRepository
           .createQueryBuilder('pp')
           .where('pp.product_id = :productId', { productId: reading.productId })
-          .andWhere('pp.region_id = :regionId', { regionId: shift.store.regionId })
+          .andWhere('pp.region_id = :regionId', {
+            regionId: shift.store.regionId,
+          })
           .andWhere('pp.valid_from <= :now', { now: new Date() })
-          .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', { now: new Date() })
+          .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', {
+            now: new Date(),
+          })
           .getOne();
 
         if (price) {
@@ -680,23 +901,35 @@ export class ShiftsService {
       }
     } else if (shift.sales && shift.sales.length > 0) {
       // Nếu chưa có pump readings nhưng đã có sales (ca đã chốt)
-      totalFromPumps = shift.sales.reduce((sum, sale) => sum + Number(sale.amount), 0);
+      totalFromPumps = shift.sales.reduce(
+        (sum, sale) => sum + Number(sale.amount),
+        0,
+      );
     }
 
     // Lấy doanh số bán công nợ
     const debtSales = await this.getShiftDebtSales(shiftId);
-    const totalDebtSales = debtSales.reduce((sum, sale) => sum + Number(sale.amount), 0);
+    const totalDebtSales = debtSales.reduce(
+      (sum, sale) => sum + Number(sale.amount),
+      0,
+    );
 
     // Bán lẻ = Tổng từ vòi bơm - Công nợ
     const totalRetailSales = totalFromPumps - totalDebtSales;
 
     // Lấy phiếu thu tiền (receipts - thanh toán nợ)
     const receipts = await this.getShiftReceipts(shiftId);
-    const totalReceipts = receipts.reduce((sum, receipt) => sum + Number(receipt.amount), 0);
+    const totalReceipts = receipts.reduce(
+      (sum, receipt) => sum + Number(receipt.amount),
+      0,
+    );
 
     // Lấy phiếu nộp tiền
     const cashDeposits = await this.getShiftCashDeposits(shiftId);
-    const totalDeposits = cashDeposits.reduce((sum, deposit) => sum + Number(deposit.amount), 0);
+    const totalDeposits = cashDeposits.reduce(
+      (sum, deposit) => sum + Number(deposit.amount),
+      0,
+    );
 
     // Tính số dư quỹ thực tế từ cash_ledger
     const cashLedgerBalance = await this.cashLedgerRepository
@@ -707,23 +940,24 @@ export class ShiftsService {
     const actualCashBalance = Number(cashLedgerBalance?.balance || 0);
 
     // Biến động tiền mặt trong ca này
-    const cashMovementInShift = totalRetailSales + totalReceipts - totalDeposits;
+    const cashMovementInShift =
+      totalRetailSales + totalReceipts - totalDeposits;
 
     return {
       shift,
       summary: {
-        totalRetailSales,   // Bán lẻ = Tổng vòi bơm - Công nợ
-        totalDebtSales,     // Bán công nợ
+        totalRetailSales, // Bán lẻ = Tổng vòi bơm - Công nợ
+        totalDebtSales, // Bán công nợ
         totalRevenue: totalFromPumps, // Tổng doanh thu = Tổng từ vòi bơm
-        totalReceipts,      // Thu tiền (thanh toán nợ)
-        totalDeposits,      // Nộp về công ty
+        totalReceipts, // Thu tiền (thanh toán nợ)
+        totalDeposits, // Nộp về công ty
         cashMovement: cashMovementInShift, // Biến động tiền mặt trong ca
-        actualCashBalance,  // Số dư quỹ thực tế (từ cash_ledger)
+        actualCashBalance, // Số dư quỹ thực tế (từ cash_ledger)
         // Legacy field for backward compatibility
         cashBalance: cashMovementInShift,
       },
       pumpReadings: shift.pumpReadings,
-      retailSales: shift.sales.filter(sale => !sale.customerId),
+      retailSales: shift.sales.filter((sale) => !sale.customerId),
       debtSales,
       receipts,
       cashDeposits,
@@ -774,6 +1008,7 @@ export class ShiftsService {
 
       // 2. Ghi debt ledger (phát sinh nợ)
       const debtLedger = manager.create(DebtLedger, {
+        shiftId: shift.id,
         customerId: createDto.customerId,
         storeId: shift.storeId,
         refType: 'SHIFT_DEBT_SALE',
@@ -823,7 +1058,7 @@ export class ShiftsService {
   async deleteDebtSale(id: number) {
     const debtSale = await this.shiftDebtSaleRepository.findOne({
       where: { id },
-      relations: ['shift']
+      relations: ['shift'],
     });
 
     if (!debtSale) {
@@ -832,7 +1067,9 @@ export class ShiftsService {
 
     // Kiểm tra ca đã đóng chưa
     if (debtSale.shift?.status !== 'OPEN') {
-      throw new BadRequestException('Cannot delete debt sale from closed or adjusted shift');
+      throw new BadRequestException(
+        'Cannot delete debt sale from closed or adjusted shift',
+      );
     }
 
     return await this.dataSource.transaction(async (manager) => {
@@ -900,6 +1137,7 @@ export class ShiftsService {
         refId: savedDeposit.id,
         cashIn: 0,
         cashOut: createDto.amount,
+        shiftId: shift.id,
       });
       await manager.save(cashLedger);
 
@@ -963,9 +1201,14 @@ export class ShiftsService {
         throw new BadRequestException('Receipt must have at least one detail');
       }
 
-      const totalDetailAmount = createDto.details.reduce((sum, d) => sum + d.amount, 0);
+      const totalDetailAmount = createDto.details.reduce(
+        (sum, d) => sum + d.amount,
+        0,
+      );
       if (Math.abs(totalDetailAmount - createDto.amount) > 0.01) {
-        throw new BadRequestException('Total detail amount must equal receipt amount');
+        throw new BadRequestException(
+          'Total detail amount must equal receipt amount',
+        );
       }
 
       // 1. Tạo phiếu thu
@@ -981,6 +1224,7 @@ export class ShiftsService {
       // 2. Tạo chi tiết phiếu thu (từng khách hàng)
       for (const detail of createDto.details) {
         const receiptDetail = manager.create(ReceiptDetail, {
+          shiftId: createDto.shiftId,
           receiptId: savedReceipt.id,
           customerId: detail.customerId,
           amount: detail.amount,
@@ -989,6 +1233,7 @@ export class ShiftsService {
 
         // 3. Ghi giảm nợ cho khách
         await manager.save(DebtLedger, {
+          shiftId: createDto.shiftId,
           customerId: detail.customerId,
           storeId: createDto.storeId,
           refType: 'RECEIPT',
@@ -1000,6 +1245,7 @@ export class ShiftsService {
 
       // 4. ⭐ GHI SỔ QUỸ: Thu tiền vào
       await manager.save(CashLedger, {
+        shiftId: createDto.shiftId,
         storeId: createDto.storeId,
         refType: 'RECEIPT',
         refId: savedReceipt.id,
@@ -1043,7 +1289,7 @@ export class ShiftsService {
         {
           currentDate: currentShift.shiftDate,
           currentShiftNo: currentShift.shiftNo,
-        }
+        },
       )
       .orderBy('shift.shift_date', 'DESC')
       .addOrderBy('shift.shift_no', 'DESC')
@@ -1061,7 +1307,7 @@ export class ShiftsService {
 
     // Chuyển đổi thành map: pumpCode -> endValue
     const readingsMap: Record<string, number> = {};
-    previousReadings.forEach(reading => {
+    previousReadings.forEach((reading) => {
       readingsMap[reading.pumpCode] = reading.endValue;
     });
 

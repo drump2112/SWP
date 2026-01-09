@@ -1,17 +1,12 @@
-import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { shiftsApi, type CreateShiftDto } from '../api/shifts';
-import { useAuth } from '../contexts/AuthContext';
-import { showSuccess, showError, showWarning } from '../utils/sweetalert';
-import {
-  PlusIcon,
-  XMarkIcon,
-  ClockIcon,
-  DocumentTextIcon,
-} from '@heroicons/react/24/outline';
-import dayjs from 'dayjs';
-import SearchableSelect from '../components/SearchableSelect';
+import React, { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { shiftsApi, type CreateShiftDto } from "../api/shifts";
+import { useAuth } from "../contexts/AuthContext";
+import { showSuccess, showError, showWarning } from "../utils/sweetalert";
+import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon } from "@heroicons/react/24/outline";
+import dayjs from "dayjs";
+import SearchableSelect from "../components/SearchableSelect";
 
 const ShiftManagementPage: React.FC = () => {
   const { user } = useAuth();
@@ -19,17 +14,17 @@ const ShiftManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [newShiftDate, setNewShiftDate] = useState(dayjs().format('YYYY-MM-DD'));
+  const [newShiftDate, setNewShiftDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [newShiftNo, setNewShiftNo] = useState(1);
-  const [newShiftTime, setNewShiftTime] = useState(dayjs().format('HH:mm'));
-  const [searchTerm, setSearchTerm] = useState('');
+  const [newShiftTime, setNewShiftTime] = useState(dayjs().format("HH:mm"));
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Fetch shifts - Admin xem tất cả, Store xem của mình
   const { data: shifts, isLoading } = useQuery({
-    queryKey: ['shifts', user?.roleCode, user?.storeId],
+    queryKey: ["shifts", user?.roleCode, user?.storeId],
     queryFn: async () => {
       // Admin/Director/Accounting xem tất cả ca
-      if (user?.roleCode === 'ADMIN' || user?.roleCode === 'DIRECTOR' || user?.roleCode === 'ACCOUNTING') {
+      if (user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") {
         return shiftsApi.getAll();
       }
       // Store user chỉ xem ca của mình
@@ -43,15 +38,15 @@ const ShiftManagementPage: React.FC = () => {
   const createShiftMutation = useMutation({
     mutationFn: shiftsApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
       setIsCreateModalOpen(false);
-      setNewShiftDate(dayjs().format('YYYY-MM-DD'));
+      setNewShiftDate(dayjs().format("YYYY-MM-DD"));
       setNewShiftNo(1);
-      setNewShiftTime(dayjs().format('HH:mm'));
-      showSuccess('Đã tạo ca mới thành công!');
+      setNewShiftTime(dayjs().format("HH:mm"));
+      showSuccess("Đã tạo ca mới thành công!");
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Tạo ca thất bại');
+      showError(error.response?.data?.message || "Tạo ca thất bại");
     },
   });
 
@@ -59,11 +54,11 @@ const ShiftManagementPage: React.FC = () => {
   const reopenShiftMutation = useMutation({
     mutationFn: shiftsApi.reopenShift,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shifts'] });
-      showSuccess('Đã mở lại ca thành công!');
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      showSuccess("Đã mở lại ca thành công!");
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Mở lại ca thất bại');
+      showError(error.response?.data?.message || "Mở lại ca thất bại");
     },
   });
 
@@ -73,29 +68,32 @@ const ShiftManagementPage: React.FC = () => {
 
   const handleCreateShift = () => {
     if (!user?.storeId) {
-      showError('Không tìm thấy thông tin cửa hàng');
+      showError("Không tìm thấy thông tin cửa hàng");
       return;
     }
 
     const openedAtDateTime = dayjs(`${newShiftDate} ${newShiftTime}`);
 
     // Tìm ca gần nhất trước ca mới
-    const previousShifts = shifts?.filter((s) => {
-      const shiftDateTime = dayjs(s.shiftDate);
-      return shiftDateTime.isBefore(newShiftDate) ||
-             (shiftDateTime.isSame(newShiftDate, 'day') && s.shiftNo < newShiftNo);
-    }).sort((a, b) => {
-      const dateCompare = dayjs(b.shiftDate).diff(dayjs(a.shiftDate));
-      if (dateCompare !== 0) return dateCompare;
-      return b.shiftNo - a.shiftNo;
-    });
+    const previousShifts = shifts
+      ?.filter((s) => {
+        const shiftDateTime = dayjs(s.shiftDate);
+        return (
+          shiftDateTime.isBefore(newShiftDate) || (shiftDateTime.isSame(newShiftDate, "day") && s.shiftNo < newShiftNo)
+        );
+      })
+      .sort((a, b) => {
+        const dateCompare = dayjs(b.shiftDate).diff(dayjs(a.shiftDate));
+        if (dateCompare !== 0) return dateCompare;
+        return b.shiftNo - a.shiftNo;
+      });
 
     const lastShift = previousShifts?.[0];
 
     if (lastShift && lastShift.closedAt) {
       const lastClosedAt = dayjs(lastShift.closedAt);
       if (openedAtDateTime.isBefore(lastClosedAt) || openedAtDateTime.isSame(lastClosedAt)) {
-        showWarning(`Giờ mở ca phải sau giờ chốt ca trước (${lastClosedAt.format('DD/MM/YYYY HH:mm')})`);
+        showWarning(`Giờ mở ca phải sau giờ chốt ca trước (${lastClosedAt.format("DD/MM/YYYY HH:mm")})`);
         return;
       }
     }
@@ -112,25 +110,25 @@ const ShiftManagementPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'OPEN':
-        return 'bg-green-100 text-green-800';
-      case 'CLOSED':
-        return 'bg-gray-100 text-gray-800';
-      case 'ADJUSTED':
-        return 'bg-yellow-100 text-yellow-800';
+      case "OPEN":
+        return "bg-green-100 text-green-800";
+      case "CLOSED":
+        return "bg-gray-100 text-gray-800";
+      case "ADJUSTED":
+        return "bg-yellow-100 text-yellow-800";
       default:
-        return 'bg-gray-100 text-gray-800';
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case 'OPEN':
-        return 'Đang mở';
-      case 'CLOSED':
-        return 'Đã chốt';
-      case 'ADJUSTED':
-        return 'Điều chỉnh';
+      case "OPEN":
+        return "Đang mở";
+      case "CLOSED":
+        return "Đã chốt";
+      case "ADJUSTED":
+        return "Điều chỉnh";
       default:
         return status;
     }
@@ -138,8 +136,7 @@ const ShiftManagementPage: React.FC = () => {
 
   const filteredShifts = shifts?.filter((shift) => {
     const matchesSearch =
-      shift.shiftNo.toString().includes(searchTerm) ||
-      dayjs(shift.shiftDate).format('DD/MM/YYYY').includes(searchTerm);
+      shift.shiftNo.toString().includes(searchTerm) || dayjs(shift.shiftDate).format("DD/MM/YYYY").includes(searchTerm);
     return matchesSearch;
   });
 
@@ -192,7 +189,7 @@ const ShiftManagementPage: React.FC = () => {
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Ca
                 </th>
-                {(user?.roleCode === 'ADMIN' || user?.roleCode === 'DIRECTOR' || user?.roleCode === 'ACCOUNTING') && (
+                {(user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Cửa hàng
                   </th>
@@ -215,9 +212,7 @@ const ShiftManagementPage: React.FC = () => {
               {filteredShifts?.map((shift) => (
                 <tr key={shift.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-900">
-                      {dayjs(shift.shiftDate).format('DD/MM/YYYY')}
-                    </div>
+                    <div className="text-sm text-gray-900">{dayjs(shift.shiftDate).format("DD/MM/YYYY")}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="flex items-center justify-center">
@@ -225,20 +220,20 @@ const ShiftManagementPage: React.FC = () => {
                       <span className="text-sm font-medium text-gray-900">Ca {shift.shiftNo}</span>
                     </div>
                   </td>
-                  {(user?.roleCode === 'ADMIN' || user?.roleCode === 'DIRECTOR' || user?.roleCode === 'ACCOUNTING') && (
+                  {(user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{shift.store?.name || `CH${shift.storeId}`}</div>
-                      <div className="text-xs text-gray-500">{shift.store?.code || ''}</div>
+                      <div className="text-xs text-gray-500">{shift.store?.code || ""}</div>
                     </td>
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">
-                      {shift.openedAt ? dayjs(shift.openedAt).format('HH:mm') : '-'}
+                      {shift.openedAt ? dayjs(shift.openedAt).format("HH:mm") : "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">
-                      {shift.closedAt ? dayjs(shift.closedAt).format('HH:mm DD/MM') : '-'}
+                      {shift.closedAt ? dayjs(shift.closedAt).format("HH:mm DD/MM") : "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -252,7 +247,7 @@ const ShiftManagementPage: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                     <div className="flex items-center justify-center gap-2">
-                      {shift.status === 'OPEN' && (
+                      {shift.status === "OPEN" && (
                         <button
                           onClick={() => navigate(`/shifts/${shift.id}/operations`)}
                           className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -262,7 +257,7 @@ const ShiftManagementPage: React.FC = () => {
                           Chốt ca
                         </button>
                       )}
-                      {shift.status === 'CLOSED' && (
+                      {shift.status === "CLOSED" && (
                         <>
                           <button
                             onClick={() => navigate(`/shifts/${shift.id}/operations`)}
@@ -271,7 +266,14 @@ const ShiftManagementPage: React.FC = () => {
                             <DocumentTextIcon className="h-4 w-4 mr-1" />
                             Chi tiết
                           </button>
-                          {(user?.roleCode === 'ADMIN' || user?.roleCode === 'SALES') && (
+                          <button
+                            onClick={() => navigate(`/shifts/${shift.id}/operations?mode=edit`)}
+                            className="inline-flex items-center px-3 py-1.5 border border-orange-300 rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100"
+                          >
+                            <PencilIcon className="h-4 w-4 mr-1" />
+                            Sửa
+                          </button>
+                          {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
                             <button
                               onClick={() => handleReopenShift(shift.id)}
                               disabled={reopenShiftMutation.isPending}
@@ -304,7 +306,9 @@ const ShiftManagementPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
           <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl transform transition-all">
             <div className="flex justify-between items-center p-6 border-b border-gray-200">
-              <h3 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Tạo ca mới</h3>
+              <h3 className="text-xl font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Tạo ca mới
+              </h3>
               <button
                 onClick={() => setIsCreateModalOpen(false)}
                 className="text-gray-400 hover:text-gray-500 transition-colors"
@@ -332,9 +336,9 @@ const ShiftManagementPage: React.FC = () => {
                 </label>
                 <SearchableSelect
                   options={[
-                    { value: 1, label: 'Ca 1 - Sáng' },
-                    { value: 2, label: 'Ca 2 - Chiều' },
-                    { value: 3, label: 'Ca 3 - Tối' }
+                    { value: 1, label: "Ca 1 - Sáng" },
+                    { value: 2, label: "Ca 2 - Chiều" },
+                    { value: 3, label: "Ca 3 - Tối" },
                   ]}
                   value={newShiftNo}
                   onChange={(value) => setNewShiftNo(value as number)}
@@ -353,9 +357,7 @@ const ShiftManagementPage: React.FC = () => {
                   onChange={(e) => setNewShiftTime(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Giờ mở ca phải sau giờ chốt ca trước
-                </p>
+                <p className="text-xs text-gray-500 mt-1">Giờ mở ca phải sau giờ chốt ca trước</p>
               </div>
             </div>
 
@@ -373,9 +375,25 @@ const ShiftManagementPage: React.FC = () => {
               >
                 {createShiftMutation.isPending ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     Đang tạo...
                   </>
@@ -396,7 +414,11 @@ const ShiftManagementPage: React.FC = () => {
         <div className="flex">
           <div className="flex-shrink-0">
             <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
           <div className="ml-3">

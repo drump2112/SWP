@@ -1,6 +1,19 @@
-import { IsNotEmpty, IsDateString, IsInt, IsArray, ValidateNested, IsOptional, IsNumber, IsString } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsDateString,
+  IsInt,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+  IsNumber,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateShiftDebtSaleDto, CreateReceiptDto, CreateCashDepositDto } from './shift-operations.dto';
+import {
+  CreateShiftDebtSaleDto,
+  CreateReceiptDto,
+  CreateCashDepositDto,
+} from './shift-operations.dto';
 
 class PumpReadingDto {
   @IsNotEmpty()
@@ -21,6 +34,10 @@ class PumpReadingDto {
 }
 
 class ExpenseDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number;
+
   @IsInt()
   expenseCategoryId: number;
 

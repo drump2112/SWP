@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Customer } from './customer.entity';
 import { Store } from './store.entity';
+import { Shift } from './shift.entity';
 
 @Entity('debt_ledger')
 @Index('idx_debt_ledger_customer', ['customerId', 'createdAt'])
@@ -21,6 +22,9 @@ export class DebtLedger {
 
   @Column({ name: 'store_id', nullable: true })
   storeId: number;
+
+  @Column({ name: 'shift_id', nullable: true })
+  shiftId: number;
 
   @Column({ name: 'ref_type', length: 50, nullable: true })
   refType: string; // DEBT_SALE (Bán nợ), PAYMENT (Thu tiền), RECEIPT (Thu tiền), ADJUST (Điều chỉnh)
@@ -50,4 +54,8 @@ export class DebtLedger {
   @ManyToOne(() => Store)
   @JoinColumn({ name: 'store_id' })
   store: Store;
+
+  @ManyToOne(() => Shift)
+  @JoinColumn({ name: 'shift_id' })
+  shift: Shift;
 }

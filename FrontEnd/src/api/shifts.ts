@@ -1,4 +1,4 @@
-import api from './client';
+import api from "./client";
 
 export interface PumpReadingDto {
   pumpCode: string;
@@ -77,6 +77,7 @@ export interface ShiftReport {
 }
 
 export interface ShiftDebtSaleDto {
+  id?: number | string; // Optional ID for updates
   shiftId: number;
   customerId: number;
   productId: number;
@@ -86,6 +87,7 @@ export interface ShiftDebtSaleDto {
 }
 
 export interface CashDepositDto {
+  id?: number | string; // Optional ID for updates
   storeId: number;
   shiftId?: number;
   amount: number;
@@ -102,6 +104,7 @@ export interface ReceiptDetailDto {
 }
 
 export interface CreateReceiptDto {
+  id?: number | string; // Optional ID for updates
   storeId: number;
   shiftId?: number;
   receiptType: string; // 'DEBT_COLLECTION'
@@ -113,7 +116,7 @@ export interface CreateReceiptDto {
 
 export const shiftsApi = {
   create: async (data: CreateShiftDto): Promise<Shift> => {
-    const response = await api.post('/shifts', data);
+    const response = await api.post("/shifts", data);
     return response.data;
   },
 
@@ -123,7 +126,12 @@ export const shiftsApi = {
   },
 
   closeShift: async (data: CloseShiftDto): Promise<Shift> => {
-    const response = await api.post('/shifts/close', data);
+    const response = await api.post("/shifts/close", data);
+    return response.data;
+  },
+
+  update: async (id: number, data: CloseShiftDto): Promise<Shift> => {
+    const response = await api.put(`/shifts/${id}`, data);
     return response.data;
   },
 
@@ -143,14 +151,14 @@ export const shiftsApi = {
   },
 
   getAll: async (): Promise<Shift[]> => {
-    const response = await api.get('/shifts');
+    const response = await api.get("/shifts");
     return response.data;
   },
 
   // ==================== DEBT SALES ====================
 
   createDebtSale: async (data: ShiftDebtSaleDto) => {
-    const response = await api.post('/shifts/debt-sales', data);
+    const response = await api.post("/shifts/debt-sales", data);
     return response.data;
   },
 
@@ -167,14 +175,14 @@ export const shiftsApi = {
   // ==================== CASH DEPOSITS ====================
 
   createCashDeposit: async (data: CashDepositDto) => {
-    const response = await api.post('/shifts/cash-deposits', data);
+    const response = await api.post("/shifts/cash-deposits", data);
     return response.data;
   },
 
   getCashDeposits: async (storeId: number, fromDate?: string, toDate?: string) => {
     const params = new URLSearchParams();
-    if (fromDate) params.append('fromDate', fromDate);
-    if (toDate) params.append('toDate', toDate);
+    if (fromDate) params.append("fromDate", fromDate);
+    if (toDate) params.append("toDate", toDate);
     const response = await api.get(`/shifts/cash-deposits/store/${storeId}?${params.toString()}`);
     return response.data;
   },
@@ -187,7 +195,7 @@ export const shiftsApi = {
   // ==================== RECEIPTS (PHIẾU THU) ====================
 
   createReceipt: async (data: CreateReceiptDto) => {
-    const response = await api.post('/shifts/receipts', data);
+    const response = await api.post("/shifts/receipts", data);
     return response.data;
   },
 

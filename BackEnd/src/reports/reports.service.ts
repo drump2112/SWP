@@ -616,7 +616,6 @@ export class ReportsService {
         .addGroupBy('pr.unit_price')
         .getRawMany();
 
-      console.log(`Sales by pump for store ${storeId}:`, results);
       return results;
     } catch (error) {
       console.error('Error in getSalesByPumpReport:', error);
