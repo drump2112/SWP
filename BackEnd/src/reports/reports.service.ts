@@ -417,7 +417,16 @@ export class ReportsService {
     const ledgerQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
       .leftJoinAndSelect('cl.store', 'store')
-      .orderBy('cl.created_at', 'ASC');
+      .orderBy('cl.shift_id', 'ASC')
+      .addOrderBy(
+        `CASE 
+          WHEN cl.ref_type = 'SHIFT_CLOSE' THEN 1 
+          WHEN cl.ref_type = 'RECEIPT' THEN 2 
+          WHEN cl.ref_type = 'DEPOSIT' THEN 3 
+          ELSE 4 
+        END`,
+        'ASC',
+      );
 
     if (storeId) {
       ledgerQuery.where('cl.store_id = :storeId', { storeId });

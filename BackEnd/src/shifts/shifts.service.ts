@@ -167,8 +167,10 @@ export class ShiftsService {
         // 2.2. Xóa CASH/DEBT LEDGER
         console.log('🗑️ Deleting Cash/Debt Ledgers...');
         // Xóa các ledger liên quan trực tiếp đến Close Shift (Bán lẻ)
-        await manager.delete(CashLedger, { refType: 'SHIFT_CLOSE', refId: id });
-        await manager.delete(DebtLedger, { refType: 'DEBT_SALE', shiftId: id }); // Hoặc theo refId của ShiftDebtSale
+        await manager.delete(CashLedger, {
+          shiftId: id,
+        });
+        await manager.delete(DebtLedger, { shiftId: id }); // Hoặc theo refId của ShiftDebtSale
 
         // Xóa ledger liên quan đến Receipt/Deposit/Expense
         // (Lưu ý: TypeORM delete hỗ trợ In([]) nên không cần check length > 0, nhưng check cho tối ưu)
