@@ -86,14 +86,6 @@ const ShiftOperationsPage: React.FC = () => {
     queryKey: ["shift-report", shiftId],
     queryFn: async () => {
       const data = await shiftsApi.getReport(Number(shiftId));
-      console.log("📊 Shift report loaded:", {
-        shiftId,
-        status: data.shift?.status,
-        cashDeposits: data.cashDeposits?.length || 0,
-        receipts: data.receipts?.length || 0,
-        debtSales: data.debtSales?.length || 0,
-        pumpReadings: data.pumpReadings?.length || 0,
-      });
       console.log("📋 Receipts data:", data.receipts);
       console.log("💰 Cash deposits data:", data.cashDeposits);
       console.log("🔧 Pump readings data:", data.pumpReadings);
@@ -250,12 +242,10 @@ const ShiftOperationsPage: React.FC = () => {
   // Initialize pump readings
   useEffect(() => {
     if (!pumps || pumps.length === 0) {
-      console.log("⚠️ No pumps data");
       return;
     }
 
     if (report?.shift.status !== "OPEN") {
-      console.log("⚠️ Shift is not OPEN");
       return;
     }
 
@@ -345,7 +335,6 @@ const ShiftOperationsPage: React.FC = () => {
           };
         });
 
-        console.log("✅ Initialized pump readings:", initialReadings);
         setPumpReadings(initialReadings);
 
         if (previousData.hasPreviousShift) {
@@ -387,8 +376,6 @@ const ShiftOperationsPage: React.FC = () => {
     const hasData = Object.keys(pumpReadings).length > 0;
     if (hasData) return;
 
-    console.log("✏️ Initializing Edit Mode data from report...");
-
     // 1. Pump Readings
     const initialReadings: Record<number, PumpReadingDto> = {};
     pumps.forEach((pump: any) => {
@@ -424,7 +411,7 @@ const ShiftOperationsPage: React.FC = () => {
       // Assuming simple one-customer-per-receipt for now based on UI
       setDraftReceipts(
         report.receipts.map((r: any) => {
-          const detail = r.details?.[0]; // Get first detail
+          const detail = r.receiptDetails?.[0]; // Get first detail
           const customerId = detail?.customerId || r.customerId; // Fallback
           return {
             id: r.id, // KEEP REAL ID
@@ -457,15 +444,56 @@ const ShiftOperationsPage: React.FC = () => {
       );
     }
 
+    // 5. Initialize Declared Retail Quantities (Step 2 - Auto Calculate)
+    // In edit mode, we assume the previous "Declared" was exactly "Pump - Debt"
+    const initialDeclared: Record<number, number> = {};
+    const productIds = new Set<number>();
+
+    // Sum pump readings by product
+    const pumpSums: Record<number, number> = {};
+    report.pumpReadings.forEach((r: any) => {
+      const qty = Number(r.endValue) - Number(r.startValue) - (Number(r.testExport) || 0);
+      pumpSums[r.productId] = (pumpSums[r.productId] || 0) + qty;
+      productIds.add(r.productId);
+    });
+
+    // Sum debt sales by product from report
+    const debtSums: Record<number, number> = {};
+    if (report.debtSales) {
+      report.debtSales.forEach((ds: any) => {
+        debtSums[ds.productId] = (debtSums[ds.productId] || 0) + Number(ds.quantity);
+        productIds.add(ds.productId);
+      });
+    }
+
+    productIds.forEach((pid) => {
+      const pQty = pumpSums[pid] || 0;
+      const dQty = debtSums[pid] || 0;
+      const retail = Math.max(0, pQty - dQty);
+      initialDeclared[pid] = Math.round(retail * 1000) / 1000;
+    });
+    setDeclaredRetailQuantities(initialDeclared);
+
+    // 6. Person In Charge (Step 2)
+    // Since we don't save this field specially, we try to match the shift user with internal customers
+    // if (storeCustomers && report.shift?.userId) {
+    //   // Assuming there is a link between user and customer for "Person in Charge"
+    //   // Or usually the one running the shift is the User.
+    //   // If the field "retailCustomerId" is strictly for the internal employee customer record:
+    //   const employee = storeCustomers.find((c: any) => c.email === user?.email || c.name === user?.fullName);
+    //   if (employee) {
+    //     setRetailCustomerId(employee.id);
+    //   }
+    // }
+
     toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
-  }, [isEditMode, report, pumps, shiftId]);
+  }, [isEditMode, report, pumps, shiftId, storeCustomers, user]);
 
   // Fetch prices
   useEffect(() => {
     if (!store?.regionId || !pumps || pumps.length === 0) return;
 
     const fetchPrices = async () => {
-      console.log("🔍 Fetching prices for region:", store.regionId);
       const prices: Record<number, number> = {};
       const uniqueProductIds = [...new Set(pumps.map((p: any) => p.productId))];
 
@@ -473,14 +501,12 @@ const ShiftOperationsPage: React.FC = () => {
         try {
           const priceData = await productsApi.getCurrentPrice(productId, store.regionId);
           prices[productId] = Number(priceData.price);
-          console.log(`✅ Price for product ${productId}:`, priceData.price);
         } catch (error) {
           console.error(`❌ Failed to fetch price for product ${productId}:`, error);
           prices[productId] = 0;
         }
       }
 
-      console.log("💰 All prices loaded:", prices);
       setProductPrices(prices);
     };
 
@@ -879,12 +905,49 @@ const ShiftOperationsPage: React.FC = () => {
       if (paymentMethod === "CASH") {
         setDraftDeposits((prev) => {
           const linkedId = `receipt-${editingReceiptId}`;
-          const exists = prev.some((d) => d.id === linkedId);
+          let targetId = linkedId;
+          let exists = prev.some((d) => d.id === targetId);
+
+          // Nếu không tìm thấy theo ID liên kết và đây là phiếu thu đã có trong DB (không phải draft)
+          // -> Cố gắng tìm phiếu nộp tương ứng dựa trên nội dung
+          if (!exists && !String(editingReceiptId).startsWith("draft_")) {
+            // 1. Tìm theo Note có chứa ID phiếu thu
+            const matchByNote = prev.find((d) => d.notes?.includes(`Phiếu thu #${editingReceiptId}`));
+            if (matchByNote) {
+              targetId = matchByNote.id;
+              exists = true;
+            } else {
+              // 2. Tìm theo số tiền cũ + keyword trong Note
+              const oldReceipt = draftReceipts.find((r) => r.id === editingReceiptId);
+              if (oldReceipt) {
+                const candidates = prev.filter(
+                  (d) =>
+                    d.amount === oldReceipt.amount &&
+                    d.paymentMethod === "CASH" &&
+                    (d.notes?.includes("Phiếu thu") || d.notes?.includes("thu từ khách hàng")) &&
+                    !String(d.id).startsWith("receipt-") // Không lấy các draft khác
+                );
+
+                // Chỉ auto-link nếu tìm thấy chính xác 1 ứng viên để tránh nhầm lẫn
+                if (candidates.length === 1) {
+                  targetId = candidates[0].id;
+                  exists = true;
+                }
+              }
+            }
+          }
 
           if (exists) {
             return prev.map((d) => {
-              if (d.id === linkedId) {
-                return { ...d, amount };
+              if (d.id === targetId) {
+                return {
+                  ...d,
+                  amount,
+                  // Cập nhật note để lần sau dễ tìm kiếm hơn
+                  notes: d.notes?.includes(`#${editingReceiptId}`)
+                    ? d.notes
+                    : `${d.notes || ""} (Phiếu thu #${editingReceiptId})`,
+                };
               }
               return d;
             });
@@ -2485,9 +2548,11 @@ const ShiftOperationsPage: React.FC = () => {
                       // Draft data khi ca đang mở (hoặc đang sửa)
                       draftReceipts.length > 0 ? (
                         draftReceipts.map((receipt) => {
+                          console.log("receipt", receipt);
                           const customerNames = receipt.details
                             .map((d) => {
                               const cust = customers?.find((c) => c.id === d.customerId);
+                              console.log("cust", cust);
                               return cust?.name || "N/A";
                             })
                             .join(", ");
