@@ -2121,7 +2121,7 @@ const ShiftOperationsPage: React.FC = () => {
                   </div>
                 )}
 
-                {showDebtSaleForm && (
+                {canEdit && showDebtSaleForm && (
                   <form
                     data-form="debt-sale"
                     onSubmit={handleDebtSaleSubmit}
@@ -2386,7 +2386,7 @@ const ShiftOperationsPage: React.FC = () => {
                   </div>
                 )}
 
-                {showReceiptForm && (
+                {canEdit && showReceiptForm && (
                   <form
                     key={editingReceiptId || "new"}
                     data-form="receipt"
@@ -2588,7 +2588,7 @@ const ShiftOperationsPage: React.FC = () => {
                   </div>
                 )}
 
-                {showDepositForm && (
+                {canEdit && showDepositForm && (
                   <form
                     key={editingDepositId || "new"}
                     data-form="deposit"
