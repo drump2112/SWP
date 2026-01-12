@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "../api/reports";
 import { storesApi } from "../api/stores";
+import { productsApi } from "../api/products";
 import { useAuth } from "../contexts/AuthContext";
 import {
   ChartBarIcon,
@@ -26,6 +27,7 @@ const SalesReportPage: React.FC = () => {
   const [fromDate, setFromDate] = useState(dayjs().startOf("month").format("YYYY-MM-DD"));
   const [toDate, setToDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(user?.storeId);
+  const [selectedPriceId, setSelectedPriceId] = useState<number | undefined>(undefined);
   const [reportType, setReportType] = useState<"pump" | "product">("pump");
 
   // Fetch stores for admin/accountant/sales
@@ -35,25 +37,43 @@ const SalesReportPage: React.FC = () => {
     enabled: !user?.storeId, // Only fetch if user is not bound to a store
   });
 
+  // Get selected store's regionId
+  const selectedStore = stores?.find(s => s.id === selectedStoreId) || user?.store;
+  const regionId = selectedStore?.regionId;
+
+  // Fetch prices for the selected store's region only
+  const { data: allPrices } = useQuery({
+    queryKey: ['region-prices', regionId],
+    queryFn: () => productsApi.getPricesByRegion(regionId!),
+    enabled: !!regionId,
+  });
+
+  // Reset selected price when store changes
+  useEffect(() => {
+    setSelectedPriceId(undefined);
+  }, [selectedStoreId]);
+
   // Fetch report data
   const { data: pumpReport, isLoading: loadingPump } = useQuery({
-    queryKey: ["sales-report-pump", selectedStoreId, fromDate, toDate],
+    queryKey: ["sales-report-pump", selectedStoreId, fromDate, toDate, selectedPriceId],
     queryFn: () =>
       reportsApi.getSalesByPump({
         storeId: selectedStoreId,
         fromDate,
         toDate,
+        priceId: selectedPriceId,
       }),
     enabled: !!selectedStoreId && reportType === "pump",
   });
 
   const { data: productReport, isLoading: loadingProduct } = useQuery({
-    queryKey: ["sales-report-product", selectedStoreId, fromDate, toDate],
+    queryKey: ["sales-report-product", selectedStoreId, fromDate, toDate, selectedPriceId],
     queryFn: () =>
       reportsApi.getSalesByShift({
         storeId: selectedStoreId,
         fromDate,
         toDate,
+        priceId: selectedPriceId,
       }),
     enabled: !!selectedStoreId && reportType === "product",
   });
@@ -424,7 +444,7 @@ const SalesReportPage: React.FC = () => {
 
       {/* Filters */}
       <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           {/* Store Selector (if applicable) */}
           {!user?.storeId && (
             <div>
@@ -476,6 +496,28 @@ const SalesReportPage: React.FC = () => {
               />
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <CalendarIcon className="h-5 w-5 text-gray-400" />
+              </div>
+            </div>
+          </div>
+
+          {/* Price Period Filter */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Kỳ giá</label>
+            <div className="relative">
+              <select
+                value={selectedPriceId || ""}
+                onChange={(e) => setSelectedPriceId(e.target.value ? Number(e.target.value) : undefined)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="">Tất cả kỳ giá</option>
+                {allPrices?.map((price) => (
+                  <option key={price.id} value={price.id}>
+                    {price.product?.name} - {price.region?.name} ({new Intl.NumberFormat('vi-VN').format(price.price)}đ) - {new Date(price.validFrom).toLocaleDateString('vi-VN')}
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <FunnelIcon className="h-5 w-5 text-gray-400" />
               </div>
             </div>
           </div>

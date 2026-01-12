@@ -419,11 +419,11 @@ export class ReportsService {
       .leftJoinAndSelect('cl.store', 'store')
       .orderBy('cl.shift_id', 'ASC')
       .addOrderBy(
-        `CASE 
-          WHEN cl.ref_type = 'SHIFT_CLOSE' THEN 1 
-          WHEN cl.ref_type = 'RECEIPT' THEN 2 
-          WHEN cl.ref_type = 'DEPOSIT' THEN 3 
-          ELSE 4 
+        `CASE
+          WHEN cl.ref_type = 'SHIFT_CLOSE' THEN 1
+          WHEN cl.ref_type = 'RECEIPT' THEN 2
+          WHEN cl.ref_type = 'DEPOSIT' THEN 3
+          ELSE 4
         END`,
         'ASC',
       );
@@ -602,10 +602,10 @@ export class ReportsService {
   /**
    * Báo cáo xuất hàng theo cột bơm
    */
-  async getSalesByPumpReport(storeId: number, fromDate: Date, toDate: Date) {
+  async getSalesByPumpReport(storeId: number, fromDate: Date, toDate: Date, priceId?: number) {
     try {
       // Simplified query
-      const results = await this.pumpReadingRepository
+      const query = this.pumpReadingRepository
         .createQueryBuilder('pr')
         .leftJoin('pr.shift', 'shift')
         .leftJoin('pr.product', 'product')
@@ -622,8 +622,16 @@ export class ReportsService {
         .andWhere('shift.status = :status', { status: 'CLOSED' })
         .groupBy('pr.pump_code')
         .addGroupBy('product.name')
-        .addGroupBy('pr.unit_price')
-        .getRawMany();
+        .addGroupBy('pr.unit_price');
+
+      // Filter theo kỳ giá nếu có
+      if (priceId) {
+        query
+          .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+          .andWhere('pr.unit_price = pp.price');
+      }
+
+      const results = await query.getRawMany();
 
       return results;
     } catch (error) {
@@ -635,7 +643,7 @@ export class ReportsService {
   /**
    * Báo cáo xuất hàng theo mặt hàng
    */
-  async getSalesByProductReport(storeId: number, fromDate: Date, toDate: Date) {
+  async getSalesByProductReport(storeId: number, fromDate: Date, toDate: Date, priceId?: number) {
     const query = this.pumpReadingRepository
       .createQueryBuilder('pr')
       .leftJoin('pr.shift', 'shift')
@@ -654,13 +662,20 @@ export class ReportsService {
       .addGroupBy('product.name')
       .orderBy('product.name', 'ASC');
 
+    // Filter theo kỳ giá nếu có
+    if (priceId) {
+      query
+        .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+        .andWhere('pr.unit_price = pp.price');
+    }
+
     return query.getRawMany();
   }
 
   /**
    * Báo cáo xuất hàng chi tiết theo từng ca
    */
-  async getSalesByShiftReport(storeId: number, fromDate: Date, toDate: Date) {
+  async getSalesByShiftReport(storeId: number, fromDate: Date, toDate: Date, priceId?: number) {
     const query = this.pumpReadingRepository
       .createQueryBuilder('pr')
       .leftJoin('pr.shift', 'shift')
@@ -690,6 +705,13 @@ export class ReportsService {
       .orderBy('shift.shift_date', 'DESC')
       .addOrderBy('shift.shift_no', 'DESC')
       .addOrderBy('product.name', 'ASC');
+
+    // Filter theo kỳ giá nếu có
+    if (priceId) {
+      query
+        .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+        .andWhere('pr.unit_price = pp.price');
+    }
 
     return query.getRawMany();
   }

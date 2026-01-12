@@ -43,6 +43,16 @@ export class ProductsController {
     return this.productsService.createPrice(createPriceDto);
   }
 
+  /**
+   * Lấy tất cả kỳ giá có sẵn trong hệ thống (dùng cho filter báo cáo)
+   * GET /products/prices/all
+   */
+  @Get('prices/all')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getAllPrices() {
+    return this.productsService.getAllPrices();
+  }
+
   @Get('region/:regionId/prices')
   getPricesByRegion(@Param('regionId') regionId: string) {
     return this.productsService.getPricesByRegion(+regionId);

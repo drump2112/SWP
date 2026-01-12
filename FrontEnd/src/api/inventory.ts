@@ -91,15 +91,15 @@ export const inventoryApi = {
     });
     return response.data;
   },
-  getInventoryReport: async (warehouseId: number, fromDate?: string, toDate?: string) => {
+  getInventoryReport: async (warehouseId: number, fromDate?: string, toDate?: string, priceId?: number) => {
     const response = await client.get<InventoryReportItem[]>(`/inventory/report/${warehouseId}`, {
-      params: { fromDate, toDate },
+      params: { fromDate, toDate, priceId },
     });
     return response.data;
   },
-  getInventoryReportByStore: async (storeId: number, fromDate?: string, toDate?: string) => {
+  getInventoryReportByStore: async (storeId: number, fromDate?: string, toDate?: string, priceId?: number) => {
     const response = await client.get<InventoryReportItem[]>(`/inventory/report-by-store/${storeId}`, {
-      params: { fromDate, toDate },
+      params: { fromDate, toDate, priceId },
     });
     return response.data;
   },

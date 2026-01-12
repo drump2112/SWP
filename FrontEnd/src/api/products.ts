@@ -163,4 +163,12 @@ export const productsApi = {
     const response = await api.delete(`/products/prices/${priceId}`);
     return response.data;
   },
+
+  /**
+   * Lấy tất cả kỳ giá (dùng cho dropdown filter trong báo cáo)
+   */
+  getAllPrices: async (): Promise<ProductPrice[]> => {
+    const response = await api.get('/products/prices/all');
+    return response.data;
+  },
 };

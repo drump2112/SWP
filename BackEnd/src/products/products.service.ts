@@ -222,4 +222,17 @@ export class ProductsService {
     }
     return { message: 'Đã xóa giá thành công' };
   }
+
+  /**
+   * Lấy tất cả kỳ giá (dùng cho dropdown filter trong báo cáo)
+   * Trả về tất cả các kỳ giá đã từng được tạo, sắp xếp theo validFrom mới nhất
+   */
+  async getAllPrices() {
+    return this.productPriceRepository
+      .createQueryBuilder('pp')
+      .leftJoinAndSelect('pp.product', 'product')
+      .leftJoinAndSelect('pp.region', 'region')
+      .orderBy('pp.valid_from', 'DESC')
+      .getMany();
+  }
 }

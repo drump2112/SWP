@@ -37,8 +37,9 @@ export class InventoryController {
     @Param('warehouseId') warehouseId: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('priceId') priceId?: string,
   ) {
-    return this.inventoryService.getInventoryReport(+warehouseId, fromDate, toDate);
+    return this.inventoryService.getInventoryReport(+warehouseId, fromDate, toDate, priceId ? +priceId : undefined);
   }
 
   @Get('report-by-store/:storeId')
@@ -48,11 +49,12 @@ export class InventoryController {
     @Param('storeId') storeId: string,
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
+    @Query('priceId') priceId?: string,
   ) {
     // Nếu user là STORE, tự động dùng storeId của user, bỏ qua tham số
     const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
 
-    return this.inventoryService.getInventoryReportByStore(effectiveStoreId, fromDate, toDate);
+    return this.inventoryService.getInventoryReportByStore(effectiveStoreId, fromDate, toDate, priceId ? +priceId : undefined);
   }
 
   @Get('documents')

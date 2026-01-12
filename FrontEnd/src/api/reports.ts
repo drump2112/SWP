@@ -187,6 +187,7 @@ export const reportsApi = {
     storeId?: number;
     fromDate: string;
     toDate: string;
+    priceId?: number;
   }): Promise<SalesByPumpItem[]> => {
     const { data } = await api.get("/reports/sales/by-pump", { params });
     return data;
@@ -197,12 +198,13 @@ export const reportsApi = {
     storeId?: number;
     fromDate: string;
     toDate: string;
+    priceId?: number;
   }): Promise<SalesByProductItem[]> => {
     const { data } = await api.get("/reports/sales/by-product", { params });
     return data;
   },
 
-  getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string }): Promise<any[]> => {
+  getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string; priceId?: number }): Promise<any[]> => {
     const { data } = await api.get("/reports/sales/by-shift", { params });
     return data;
   },

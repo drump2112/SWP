@@ -110,6 +110,7 @@ export class ReportsController {
     @Query('storeId') storeId: string,
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
+    @Query('priceId') priceId?: string,
   ) {
     const effectiveStoreId =
       user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
@@ -122,6 +123,7 @@ export class ReportsController {
       effectiveStoreId,
       new Date(fromDate),
       new Date(toDate),
+      priceId ? +priceId : undefined,
     );
   }
 
@@ -132,6 +134,7 @@ export class ReportsController {
     @Query('storeId') storeId: string,
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
+    @Query('priceId') priceId?: string,
   ) {
     const effectiveStoreId =
       user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
@@ -139,6 +142,7 @@ export class ReportsController {
       effectiveStoreId,
       new Date(fromDate),
       new Date(toDate),
+      priceId ? +priceId : undefined,
     );
   }
 
@@ -149,6 +153,7 @@ export class ReportsController {
     @Query('storeId') storeId: string,
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
+    @Query('priceId') priceId?: string,
   ) {
     const effectiveStoreId =
       user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
@@ -156,6 +161,7 @@ export class ReportsController {
       effectiveStoreId,
       new Date(fromDate),
       new Date(toDate),
+      priceId ? +priceId : undefined,
     );
   }
 
@@ -274,6 +280,7 @@ export class ReportsController {
    * GET /reports/inventory-import-summary/by-supplier?warehouseId=1&storeId=1&fromDate=2024-01-01&toDate=2024-12-31
    * Báo cáo tổng hợp nhập kho theo nhà cung cấp
    */
+
   @Get('inventory-import-summary/by-supplier')
   @Roles('ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getInventoryImportSummaryBySupplier(
