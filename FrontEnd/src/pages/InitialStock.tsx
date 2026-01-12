@@ -1,5 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { storesApi } from '../api/stores';
+import { productsApi } from '../api/products';
+import api from '../api/client';
+import { toast } from 'react-toastify';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Product {
   id: number;
@@ -16,54 +21,59 @@ interface StockItem {
 }
 
 const InitialStock: React.FC = () => {
-  const [stores, setStores] = useState<any[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const [selectedStoreId, setSelectedStoreId] = useState<number | null>(user?.storeId || null);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [effectiveDate, setEffectiveDate] = useState<string>(
+  const [effectiveDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
   const [notes, setNotes] = useState<string>('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Load stores và products khi mount
-  useEffect(() => {
-    loadStores();
-    loadProducts();
-  }, []);
+  // Fetch stores using React Query
+  const { data: stores, isLoading: isLoadingStores, error: storesError } = useQuery({
+    queryKey: ['stores'],
+    queryFn: storesApi.getAll,
+    enabled: !user?.storeId, // Only load if user is not tied to a store
+  });
 
-  const loadStores = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      console.log('Loading stores from:', `${apiUrl}/stores`);
-      const res = await axios.get(`${apiUrl}/stores`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log('Stores loaded:', res.data);
-      setStores(res.data);
-    } catch (error: any) {
-      console.error('Failed to load stores:', error.response?.data || error.message);
-      setMessage({ type: 'error', text: 'Không thể tải danh sách cửa hàng' });
+  // Fetch products using React Query
+  const { data: products, isLoading: isLoadingProducts, error: productsError } = useQuery({
+    queryKey: ['products'],
+    queryFn: productsApi.getAll,
+  });
+
+  // Show loading/error states
+  React.useEffect(() => {
+    if (storesError) {
+      toast.error('Không thể tải danh sách cửa hàng');
+      console.error('Stores error:', storesError);
     }
-  };
-
-  const loadProducts = async () => {
-    try {
-      const token = localStorage.getItem('access_token');
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      console.log('Loading products from:', `${apiUrl}/products`);
-      const res = await axios.get(`${apiUrl}/products`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      console.log('Products loaded:', res.data);
-      setProducts(res.data);
-    } catch (error: any) {
-      console.error('Failed to load products:', error.response?.data || error.message);
-      setMessage({ type: 'error', text: 'Không thể tải danh sách sản phẩm' });
+    if (productsError) {
+      toast.error('Không thể tải danh sách sản phẩm');
+      console.error('Products error:', productsError);
     }
-  };
+  }, [storesError, productsError]);
+
+  // Submit mutation
+  const submitMutation = useMutation({
+    mutationFn: async (payload: any) => {
+      const response = await api.post('/inventory/simple-initial-stock', payload);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('✅ Nhập tồn đầu thành công!');
+      setStockItems([]);
+      setNotes('');
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    },
+    onError: (error: any) => {
+      const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra';
+      toast.error(`❌ ${errorMsg}`);
+      console.error('Submit error:', error);
+    },
+  });
 
   const addProductRow = () => {
     setStockItems([
@@ -89,7 +99,7 @@ const InitialStock: React.FC = () => {
 
     // Auto-fill product info
     if (field === 'productId') {
-      const product = products.find(p => p.id === Number(value));
+      const product = products?.find(p => p.id === Number(value));
       if (product) {
         updated[index].productCode = product.code;
         updated[index].productName = product.name;
@@ -99,63 +109,36 @@ const InitialStock: React.FC = () => {
     setStockItems(updated);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!selectedStoreId) {
-      setMessage({ type: 'error', text: 'Vui lòng chọn cửa hàng' });
+      toast.error('Vui lòng chọn cửa hàng');
       return;
     }
 
     if (stockItems.length === 0 || stockItems.some(item => !item.productId || item.quantity <= 0)) {
-      setMessage({ type: 'error', text: 'Vui lòng nhập đầy đủ thông tin sản phẩm và số lượng' });
+      toast.error('Vui lòng nhập đầy đủ thông tin sản phẩm và số lượng');
       return;
     }
 
-    setLoading(true);
-    setMessage(null);
+    const payload = {
+      storeId: selectedStoreId,
+      effectiveDate,
+      items: stockItems.map(item => ({
+        productId: Number(item.productId),
+        quantity: Number(item.quantity),
+        notes: item.notes || '',
+      })),
+      notes,
+    };
 
-    try {
-      const token = localStorage.getItem('access_token');
-      const payload = {
-        storeId: selectedStoreId,
-        effectiveDate,
-        items: stockItems.map(item => ({
-          productId: Number(item.productId),
-          quantity: Number(item.quantity),
-          notes: item.notes || '',
-        })),
-        notes,
-      };
-
-      const res = await axios.post(
-        `${import.meta.env.VITE_API_URL}/inventory/simple-initial-stock`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      setMessage({ type: 'success', text: '✅ Nhập tồn đầu thành công!' });
-      setStockItems([]);
-      setNotes('');
-
-      console.log('Response:', res.data);
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra';
-      setMessage({ type: 'error', text: `❌ ${errorMsg}` });
-    } finally {
-      setLoading(false);
-    }
+    submitMutation.mutate(payload);
   };
 
   return (
     <div className="container mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">📦 Nhập Tồn Đầu Kỳ</h1>
-
-      {message && (
-        <div className={`mb-4 p-4 rounded ${message.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-          {message.text}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8">
         {/* Chọn cửa hàng */}
@@ -163,32 +146,26 @@ const InitialStock: React.FC = () => {
           <label className="block text-gray-700 text-sm font-bold mb-2">
             Cửa hàng *
           </label>
-          <select
-            className="shadow border rounded w-full py-2 px-3 text-gray-700"
-            value={selectedStoreId || ''}
-            onChange={(e) => setSelectedStoreId(Number(e.target.value))}
-            required
-          >
-            <option value="">-- Chọn cửa hàng --</option>
-            {stores.map(store => (
-              <option key={store.id} value={store.id}>
-                {store.name} ({store.code})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Ngày hiệu lực */}
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2">
-            Ngày hiệu lực
-          </label>
-          <input
-            type="date"
-            className="shadow border rounded w-full py-2 px-3 text-gray-700"
-            value={effectiveDate}
-            onChange={(e) => setEffectiveDate(e.target.value)}
-          />
+          {user?.storeId ? (
+            <div className="shadow border rounded w-full py-2 px-3 bg-gray-100 text-gray-700">
+              {stores?.find(s => s.id === user.storeId)?.name || 'Cửa hàng của bạn'}
+            </div>
+          ) : (
+            <select
+              className="shadow border rounded w-full py-2 px-3 text-gray-700"
+              value={selectedStoreId || ''}
+              onChange={(e) => setSelectedStoreId(Number(e.target.value))}
+              required
+              disabled={isLoadingStores}
+            >
+              <option value="">-- Chọn cửa hàng --</option>
+              {stores?.map(store => (
+                <option key={store.id} value={store.id}>
+                  {store.name} ({store.code})
+                </option>
+              ))}
+            </select>
+          )}
         </div>
 
         {/* Danh sách sản phẩm */}
@@ -217,10 +194,11 @@ const InitialStock: React.FC = () => {
                   className="shadow border rounded w-full py-2 px-3 text-gray-700"
                   value={item.productId}
                   onChange={(e) => updateStockItem(index, 'productId', e.target.value)}
+                  disabled={isLoadingProducts}
                   required
                 >
                   <option value="0">-- Chọn sản phẩm --</option>
-                  {products.map(product => (
+                  {products?.map(product => (
                     <option key={product.id} value={product.id}>
                       {product.code} - {product.name}
                     </option>
@@ -279,14 +257,14 @@ const InitialStock: React.FC = () => {
         <div className="flex items-center justify-between">
           <button
             type="submit"
-            disabled={loading || !selectedStoreId || stockItems.length === 0}
+            disabled={submitMutation.isPending || !selectedStoreId || stockItems.length === 0}
             className={`font-bold py-2 px-4 rounded ${
-              loading || !selectedStoreId || stockItems.length === 0
+              submitMutation.isPending || !selectedStoreId || stockItems.length === 0
                 ? 'bg-gray-400 cursor-not-allowed'
                 : 'bg-green-500 hover:bg-green-700 text-white'
             }`}
           >
-            {loading ? '⏳ Đang xử lý...' : '💾 Lưu Tồn Đầu'}
+            {submitMutation.isPending ? '⏳ Đang xử lý...' : '💾 Lưu Tồn Đầu'}
           </button>
 
           <span className="text-sm text-gray-600">

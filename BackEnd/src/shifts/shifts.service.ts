@@ -381,10 +381,22 @@ export class ShiftsService {
     // NOTE: Logic hiện tại giả định TOÀN BỘ bán lẻ là tiền mặt
     // Trong thực tế, cần phân biệt: tiền mặt / thẻ / ví điện tử
     // TODO: Thêm payment_method cho mỗi sale hoặc thêm field cash_amount vào CloseShiftDto
-    const totalRetailAmount = salesData.reduce(
+
+    // ✅ FIX: Tính tổng tiền bán công nợ để TRỪ RA khỏi tổng từ vòi bơm
+    // Vì tiền công nợ CHƯA THU, không được ghi vào sổ quỹ
+    const totalDebtSalesAmount = (closeShiftDto.debtSales || []).reduce(
+      (sum, ds) => sum + ds.quantity * ds.unitPrice,
+      0,
+    );
+
+    // Tổng tiền từ vòi bơm (bao gồm cả bán lẻ và bán nợ)
+    const totalFromPumps = salesData.reduce(
       (sum, s) => sum + Number(s.amount),
       0,
     );
+
+    // Tiền bán lẻ THỰC THU = Tổng từ vòi bơm - Bán công nợ
+    const totalRetailAmount = totalFromPumps - totalDebtSalesAmount;
 
     if (totalRetailAmount > 0) {
       await manager.save(CashLedger, {
@@ -392,9 +404,9 @@ export class ShiftsService {
         storeId: shift.storeId,
         refType: 'SHIFT_CLOSE',
         refId: shift.id,
-        cashIn: totalRetailAmount, // ✅ Thu tiền vào quỹ
+        cashIn: totalRetailAmount, // ✅ Thu tiền vào quỹ (CHỈ TIỀN MẶT, KHÔNG BAO GỒM NỢ)
         cashOut: 0,
-        notes: 'Thu tiền bán lẻ (giả định toàn bộ là tiền mặt)',
+        notes: `Thu tiền bán lẻ: ${totalFromPumps.toLocaleString()} - công nợ ${totalDebtSalesAmount.toLocaleString()} = ${totalRetailAmount.toLocaleString()}`,
       });
     }
 

@@ -2055,10 +2055,13 @@ const ShiftOperationsPage: React.FC = () => {
                                 <td className="px-4 py-3 text-right">
                                   <input
                                     type="number"
-                                    step="0.001"
+                                    step="1"
+                                    min="0"
                                     value={declaredRetailQuantities[productId] ?? ""}
                                     onChange={(e) => {
                                       const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                      // Validate không cho số âm
+                                      if (val < 0) return;
                                       setDeclaredRetailQuantities((prev) => ({
                                         ...prev,
                                         [productId]: val,
