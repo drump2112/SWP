@@ -1,0 +1,75 @@
+version: '3.8'
+
+# Docker Compose file để chạy từ pre-built images
+# Dùng file này khi đã có sẵn images (từ Docker Hub hoặc load từ file)
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: fuel-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-123456}
+      POSTGRES_DB: ${DB_DATABASE:-fuel_management}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Auto-init database schema on first start
+      - ./BackEnd/docker-initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - fuel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    # Thay YOUR_DOCKERHUB_USERNAME bằng username thật
+    # Hoặc dùng fuel-management-backend:latest nếu load từ file
+    image: fuel-management-backend:latest
+    # image: YOUR_DOCKERHUB_USERNAME/fuel-management-backend:latest
+    container_name: fuel-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${DB_USERNAME:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-123456}
+      DB_DATABASE: ${DB_DATABASE:-fuel_management}
+      JWT_SECRET: ${JWT_SECRET:-change-this-secret-key-minimum-32-characters}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - fuel-network
+    volumes:
+      - ./uploads:/app/uploads
+
+  frontend:
+    # Thay YOUR_DOCKERHUB_USERNAME bằng username thật
+    # Hoặc dùng fuel-management-frontend:latest nếu load từ file
+    image: fuel-management-frontend:latest
+    # image: YOUR_DOCKERHUB_USERNAME/fuel-management-frontend:latest
+    container_name: fuel-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - fuel-network
+
+volumes:
+  pgdata:
+
+networks:
+  fuel-network:
+    driver: bridge

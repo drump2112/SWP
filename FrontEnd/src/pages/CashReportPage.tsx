@@ -449,35 +449,34 @@ const CashReportPage: React.FC = () => {
           <table className="w-full">
             <thead>
               {/* Opening Balance Row */}
-              <tr className="bg-blue-50">
-                <th className="px-6 py-4 text-center text-sm font-semibold text-gray-900" colSpan={5}>
+              <tr className="bg-blue-50 border-l-4 border-blue-500">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={5}>
                   Số dư đầu kỳ
                 </th>
-                <th className="px-6 py-4 text-center text-sm font-bold text-blue-700">
-                  {report?.openingBalance.toLocaleString('vi-VN')} ₫
+                <th className="px-6 py-4 text-right text-base" colSpan={2}>
+                  <span className="font-bold text-blue-600 text-lg">{report?.openingBalance.toLocaleString('vi-VN')} ₫</span>
                 </th>
-                <th></th>
               </tr>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Ngày giờ
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Loại chứng từ
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Hình thức
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Tiền thu (₫)
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Tiền chi (₫)
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Lũy kế (₫)
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Thao tác
                 </th>
               </tr>
@@ -646,14 +645,13 @@ const CashReportPage: React.FC = () => {
 
               {/* Closing Balance Row */}
               {report?.ledgers && report.ledgers.length > 0 && (
-                <tr className="bg-purple-50 font-bold">
-                  <td className="px-6 py-4 text-center text-sm text-gray-900" colSpan={6}>
+                <tr className="bg-purple-50 border-l-4 border-purple-500">
+                  <td className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={5}>
                     Số dư cuối kỳ
                   </td>
-                  <td className="px-6 py-4 text-center text-sm text-purple-700">
-                    {report?.closingBalance.toLocaleString('vi-VN')} ₫
+                  <td className="px-6 py-4 text-right text-base" colSpan={2}>
+                    <span className="font-bold text-purple-600 text-lg">{report?.closingBalance.toLocaleString('vi-VN')} ₫</span>
                   </td>
-                  <td></td>
                 </tr>
               )}
             </tbody>

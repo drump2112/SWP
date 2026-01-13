@@ -107,6 +107,16 @@ const ShiftOperationsPage: React.FC = () => {
     enabled: !!report?.shift.storeId,
   });
 
+  // Kết hợp khách hàng: EXTERNAL (tất cả) + INTERNAL (chỉ của cửa hàng)
+  const debtCustomers = React.useMemo(() => {
+    if (!customers) return [];
+
+    const externalCustomers = customers.filter((c: any) => c.type === 'EXTERNAL' || !c.type);
+    const internalCustomers = storeCustomers?.filter((c: any) => c.type === 'INTERNAL') || [];
+
+    return [...externalCustomers, ...internalCustomers];
+  }, [customers, storeCustomers]);
+
   // Fetch products
   const { data: products } = useQuery({
     queryKey: ["products"],
@@ -512,6 +522,25 @@ const ShiftOperationsPage: React.FC = () => {
 
     fetchPrices();
   }, [store, pumps]);
+
+  // Load phiếu nhập kho của ca (nếu có)
+  useEffect(() => {
+    if (!shiftId || !report) return;
+
+    const loadImportDocuments = async () => {
+      try {
+        const documents = await inventoryApi.getDocumentsByShift(Number(shiftId));
+        if (documents && documents.length > 0) {
+          setDraftImports(documents);
+          console.log(`✅ Loaded ${documents.length} import document(s) for shift ${shiftId}`);
+        }
+      } catch (error) {
+        console.error("❌ Failed to load import documents:", error);
+      }
+    };
+
+    loadImportDocuments();
+  }, [shiftId, report]);
 
   // Close shift mutation
   const closeShiftMutation = useMutation({
@@ -1113,8 +1142,45 @@ const ShiftOperationsPage: React.FC = () => {
     }
 
     try {
+      // Xử lý compartments: nếu form gửi legacy format (productId, quantity), chuyển thành compartment
+      let compartments: any[] = [];
+
+      if (formData.compartments && formData.compartments.length > 0) {
+        // Format mới: có chi tiết từng ngăn xe téc
+        compartments = formData.compartments.map((c: CompartmentData) => ({
+          compartmentNumber: c.compartmentNumber,
+          productId: c.productId!,
+          compartmentHeight: c.compartmentHeight || 0,
+          truckTemperature: c.truckTemperature || 15,
+          truckVolume: c.truckVolume || 0,
+          warehouseHeight: c.warehouseHeight || 0,
+          actualTemperature: c.actualTemperature || 15,
+          receivedVolume: c.receivedVolume || 0,
+          heightLossTruck: c.heightLossTruck,
+          heightLossWarehouse: c.heightLossWarehouse,
+        }));
+      } else if (formData.productId && formData.quantity) {
+        // Legacy format: chỉ có productId và quantity, tạo 1 compartment mặc định
+        compartments = [{
+          compartmentNumber: 1,
+          productId: formData.productId,
+          compartmentHeight: 0,
+          truckTemperature: 15,
+          truckVolume: formData.quantity,
+          warehouseHeight: 0,
+          actualTemperature: 15,
+          receivedVolume: formData.quantity,
+          heightLossTruck: 0,
+          heightLossWarehouse: 0,
+        }];
+      } else {
+        toast.error("Vui lòng nhập thông tin sản phẩm hoặc chi tiết ngăn xe téc");
+        return;
+      }
+
       const submitData: CreateInventoryDocumentWithTruckDto = {
         storeId: report.shift.storeId,
+        shiftId: report.shift.id, // Liên kết với ca làm việc
         docType: "IMPORT",
         docDate: formData.docDate,
         supplierName: formData.supplierName,
@@ -1122,25 +1188,15 @@ const ShiftOperationsPage: React.FC = () => {
         licensePlate: formData.licensePlate,
         driverName: formData.driverName,
         driverPhone: formData.driverPhone,
-        compartments:
-          formData.compartments?.map((c: CompartmentData) => ({
-            compartmentNumber: c.compartmentNumber,
-            productId: c.productId!,
-            compartmentHeight: c.compartmentHeight,
-            truckTemperature: c.truckTemperature,
-            truckVolume: c.truckVolume,
-            warehouseHeight: c.warehouseHeight,
-            actualTemperature: c.actualTemperature,
-            receivedVolume: c.receivedVolume,
-            heightLossTruck: c.heightLossTruck,
-            heightLossWarehouse: c.heightLossWarehouse,
-          })) || [],
+        compartments,
         notes: formData.notes,
       };
 
       const response = await inventoryApi.createDocumentWithTruck(submitData);
 
-      // Lưu vào draft để hiển thị
+      // Lưu vào draft để hiển thị (dùng compartments đã xử lý, không phải formData.compartments)
+      const totalVolume = compartments.reduce((sum, c) => sum + (c.receivedVolume || 0), 0);
+
       const newItem = {
         id: `draft_${Date.now()}`,
         documentId: response.document?.id,
@@ -1149,10 +1205,10 @@ const ShiftOperationsPage: React.FC = () => {
         supplierName: formData.supplierName,
         invoiceNumber: formData.invoiceNumber,
         licensePlate: formData.licensePlate,
+        driverName: formData.driverName,
         notes: formData.notes,
-        compartments: formData.compartments,
-        totalVolume:
-          formData.compartments?.reduce((sum: number, c: CompartmentData) => sum + (c.receivedVolume || 0), 0) || 0,
+        compartments: compartments, // Dùng compartments đã xử lý (bao gồm cả legacy format)
+        totalVolume: totalVolume,
         calculation: response.calculation,
       };
 
@@ -2196,7 +2252,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
                       <SearchableSelect
-                        options={customers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}` })) || []}
+                        options={debtCustomers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}${c.type === 'INTERNAL' ? ' 🏠' : ''}` })) || []}
                         value={selectedDebtCustomer}
                         onChange={(value) => setSelectedDebtCustomer(value as number)}
                         placeholder="-- Chọn khách hàng --"
@@ -2361,7 +2417,7 @@ const ShiftOperationsPage: React.FC = () => {
                       // Hiển thị draft data khi ca đang mở
                       draftDebtSales.length > 0 ? (
                         draftDebtSales.map((sale) => {
-                          const customer = customers?.find((c) => c.id === sale.customerId);
+                          const customer = debtCustomers?.find((c) => c.id === sale.customerId);
                           const product = products?.find((p) => p.id === sale.productId);
                           return (
                             <tr key={sale.id}>
@@ -2462,7 +2518,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
                       <SearchableSelect
-                        options={customers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}` })) || []}
+                        options={debtCustomers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}${c.type === 'INTERNAL' ? ' 🏠' : ''}` })) || []}
                         value={selectedReceiptCustomer}
                         onChange={(value) => setSelectedReceiptCustomer(value as number)}
                         placeholder="-- Chọn khách hàng --"
@@ -2554,7 +2610,7 @@ const ShiftOperationsPage: React.FC = () => {
                           console.log("receipt", receipt);
                           const customerNames = receipt.details
                             .map((d) => {
-                              const cust = customers?.find((c) => c.id === d.customerId);
+                              const cust = debtCustomers?.find((c) => c.id === d.customerId);
                               console.log("cust", cust);
                               return cust?.name || "N/A";
                             })
@@ -2883,24 +2939,23 @@ const ShiftOperationsPage: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số HĐ</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
                       <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Số ngăn</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng lít</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Trạng thái</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {draftImports.length > 0 ? (
                       draftImports.map((item) => {
-                        const status = item.calculation?.status || "NORMAL";
-                        const statusColor =
-                          status === "EXCESS"
-                            ? "text-green-600"
-                            : status === "SHORTAGE"
-                            ? "text-red-600"
-                            : "text-gray-600";
-                        const statusText =
-                          status === "EXCESS" ? "✅ Thừa" : status === "SHORTAGE" ? "⚠️ Thiếu" : "✔️ Bình thường";
+                        // Lấy danh sách sản phẩm từ compartments
+                        const productNames = item.compartments
+                          ?.map((c: any) => {
+                            const product = products?.find((p) => p.id === c.productId);
+                            return product?.name || `SP#${c.productId}`;
+                          })
+                          .filter((name: string, index: number, self: string[]) => self.indexOf(name) === index) // Loại bỏ trùng lặp
+                          .join(", ") || "-";
 
                         return (
                           <tr key={item.id}>
@@ -2910,14 +2965,12 @@ const ShiftOperationsPage: React.FC = () => {
                             <td className="px-6 py-4 text-sm font-medium text-blue-600">{item.licensePlate || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{item.invoiceNumber || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{productNames}</td>
                             <td className="px-6 py-4 text-sm text-center text-gray-700">
                               {item.compartments?.length || 0} ngăn
                             </td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
                               {Number(item.totalVolume || 0).toLocaleString("vi-VN")} lít
-                            </td>
-                            <td className="px-6 py-4 text-sm text-center">
-                              <span className={`font-medium ${statusColor}`}>{statusText}</span>
                             </td>
                             <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
                               {item.documentId && (
@@ -2943,13 +2996,15 @@ const ShiftOperationsPage: React.FC = () => {
                                   <DocumentArrowDownIcon className="h-5 w-5" />
                                 </button>
                               )}
-                              <button
-                                onClick={() => handleDeleteImport(item.id)}
-                                className="text-red-600 hover:text-red-900"
-                                type="button"
-                              >
-                                <TrashIcon className="h-5 w-5 inline" />
-                              </button>
+                              {(isShiftOpen || isEditMode) && (
+                                <button
+                                  onClick={() => handleDeleteImport(item.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                  type="button"
+                                >
+                                  <TrashIcon className="h-5 w-5 inline" />
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );

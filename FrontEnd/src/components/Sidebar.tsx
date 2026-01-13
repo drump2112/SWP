@@ -104,6 +104,8 @@ const navigation: NavItem[] = [
       { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: CircleStackIcon, roles: ['ADMIN'] },
+      { name: 'Số dư đầu sổ quỹ', href: '/cash/opening-balance', icon: CircleStackIcon, roles: ['ADMIN', 'ACCOUNTING'] },
+      { name: 'Số dư đầu công nợ', href: '/customers/opening-balance', icon: BanknotesIcon, roles: ['ADMIN'] },
     ],
   },
 ];

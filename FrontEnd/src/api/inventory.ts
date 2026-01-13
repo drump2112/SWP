@@ -111,4 +111,8 @@ export const inventoryApi = {
     const response = await client.get<any[]>(`/inventory/documents`, { params: { storeId, type, fromDate, toDate } });
     return response.data;
   },
+  getDocumentsByShift: async (shiftId: number) => {
+    const response = await client.get<any[]>(`/inventory/documents/by-shift/${shiftId}`);
+    return response.data;
+  },
 };

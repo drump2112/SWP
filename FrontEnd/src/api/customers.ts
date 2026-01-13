@@ -51,6 +51,41 @@ export interface CreditStatus {
   warningLevel: 'safe' | 'warning' | 'danger' | 'overlimit';
 }
 
+export interface StoreCreditLimit {
+  customerId: number;
+  customerName: string;
+  customerCode: string;
+  storeId: number;
+  storeName: string;
+  creditLimit: number | null; // Hạn mức riêng (null = dùng mặc định)
+  defaultCreditLimit: number | null; // Hạn mức mặc định từ customer
+  effectiveLimit: number; // Hạn mức hiệu lực
+  currentDebt: number;
+  availableCredit: number;
+  creditUsagePercent: number;
+  isOverLimit: boolean;
+}
+
+export interface CustomerStoreLimitsResponse {
+  customerId: number;
+  customerName: string;
+  customerCode: string;
+  defaultCreditLimit: number | null;
+  storeLimits: StoreCreditLimit[];
+}
+
+export interface DebtLimitValidation {
+  isValid: boolean;
+  customerId: number;
+  storeId: number;
+  creditLimit: number;
+  currentDebt: number;
+  newDebtAmount: number;
+  totalDebt: number;
+  exceedAmount: number;
+  message: string;
+}
+
 export interface ImportCustomersResponse {
   success: number;
   failed: number;
@@ -131,6 +166,53 @@ export const customersApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  // ============ CREDIT LIMIT APIs ============
+
+  getStoreCreditLimits: async (customerId: number): Promise<CustomerStoreLimitsResponse> => {
+    const response = await api.get(`/customers/${customerId}/store-credit-limits`);
+    return response.data;
+  },
+
+  updateStoreCreditLimit: async (
+    customerId: number,
+    storeId: number,
+    creditLimit: number | null
+  ): Promise<CustomerStoreLimitsResponse> => {
+    const response = await api.put(
+      `/customers/${customerId}/stores/${storeId}/credit-limit`,
+      { creditLimit }
+    );
+    return response.data;
+  },
+
+  validateDebtLimit: async (
+    customerId: number,
+    storeId: number,
+    newDebtAmount: number
+  ): Promise<DebtLimitValidation> => {
+    const response = await api.post(`/customers/${customerId}/validate-debt-limit`, {
+      storeId,
+      newDebtAmount,
+    });
+    return response.data;
+  },
+
+  // ============ OPENING BALANCE APIs ============
+
+  importOpeningBalance: async (data: {
+    storeId: number;
+    transactionDate: string;
+    items: { customerCode: string; openingBalance: number; description?: string }[];
+  }): Promise<{
+    success: number;
+    failed: number;
+    errors: { row: number; customerCode: string; message: string }[];
+    debtLedgerIds: number[];
+  }> => {
+    const response = await api.post('/customers/opening-balance/import', data);
     return response.data;
   },
 };

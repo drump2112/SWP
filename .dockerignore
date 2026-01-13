@@ -1,0 +1,12 @@
+node_modules
+.git
+.gitignore
+.idea
+.vscode
+*.md
+*.log
+.DS_Store
+BackEnd/node_modules
+BackEnd/dist
+FrontEnd/node_modules
+FrontEnd/dist

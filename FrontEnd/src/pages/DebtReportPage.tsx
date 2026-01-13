@@ -7,7 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   ChartBarIcon,
   FunnelIcon,
-  DocumentTextIcon,
   ArrowDownTrayIcon,
   PrinterIcon,
 } from '@heroicons/react/24/outline';
@@ -26,7 +25,6 @@ const DebtReportPage: React.FC = () => {
   const { user } = useAuth();
   const [filters, setFilters] = useState<DebtReportParams>({
     storeId: user?.storeId,
-    storeIds: user?.storeId ? [user.storeId] : undefined,
     fromDate: dayjs().startOf('month').format('YYYY-MM-DD'),
     toDate: dayjs().endOf('month').format('YYYY-MM-DD'),
   });
@@ -108,7 +106,7 @@ const DebtReportPage: React.FC = () => {
 
     report.forEach((item: any, index: number) => {
       // Tìm mã cửa hàng
-      const storeId = item.ledgers?.[0]?.storeId || filters.storeId || filters.storeIds?.[0];
+      const storeId = item.ledgers?.[0]?.storeId || filters.storeId;
       const storeCode = stores?.find(s => s.id === storeId)?.code || `CH${storeId || ''}`;
 
       const row = worksheet.addRow([
@@ -190,7 +188,7 @@ const DebtReportPage: React.FC = () => {
     let totalClosing = 0;
 
     const tableRows = report.map((item: any, index: number) => {
-      const storeId = item.ledgers?.[0]?.storeId || filters.storeId || filters.storeIds?.[0];
+      const storeId = item.ledgers?.[0]?.storeId || filters.storeId;
       const storeCode = stores?.find(s => s.id === storeId)?.code || `CH${storeId || ''}`;
 
       totalOpening += Number(item.openingBalance);
@@ -252,11 +250,6 @@ const DebtReportPage: React.FC = () => {
     });
   };
 
-  const handleExportPDF = () => {
-    // TODO: Implement PDF export
-    alert('Chức năng xuất PDF đang phát triển');
-  };
-
   const totalSummary = report?.reduce(
     (acc, item) => ({
       openingBalance: acc.openingBalance + item.openingBalance,
@@ -306,12 +299,12 @@ const DebtReportPage: React.FC = () => {
                   value: store.id.toString(),
                   label: `${store.code} - ${store.name}`
                 })) || [])}
-                value={filters.storeIds?.map(id => id.toString()) || []}
+                value={filters.storeId ? [filters.storeId.toString()] : []}
                 onChange={(value) => {
-                  const selectedIds = Array.isArray(value) && value.length > 0
-                    ? value.filter(v => v !== '').map(v => +v)
+                  const selectedId = Array.isArray(value) && value.length > 0 && value[0] !== ''
+                    ? +value[0]
                     : undefined;
-                  setFilters({ ...filters, storeIds: selectedIds, storeId: undefined });
+                  setFilters({ ...filters, storeId: selectedId });
                 }}
                 placeholder="Tất cả cửa hàng"
                 isMulti
