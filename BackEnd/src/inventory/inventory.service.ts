@@ -507,6 +507,66 @@ export class InventoryService {
     return result;
   }
 
+  /**
+   * Lấy danh sách phiếu nhập kho theo ca làm việc (với chi tiết xe téc)
+   */
+  async getDocumentsByShift(shiftId: number) {
+    // Lấy tất cả documents có refShiftId = shiftId và docType = IMPORT
+    const documents = await this.inventoryDocumentRepository.find({
+      where: {
+        refShiftId: shiftId,
+        docType: 'IMPORT',
+      },
+      relations: ['items', 'items.product'],
+      order: { docDate: 'DESC', id: 'DESC' },
+    });
+
+    const result: any[] = [];
+    for (const doc of documents) {
+      // Lấy thông tin compartments nếu là phiếu nhập xe téc
+      const compartments = await this.truckCompartmentRepository.find({
+        where: { documentId: doc.id },
+        relations: ['product'],
+        order: { compartmentNumber: 'ASC' },
+      });
+
+      // Lấy thông tin calculation
+      const calculation = await this.lossCalculationRepository.findOne({
+        where: { documentId: doc.id },
+      });
+
+      result.push({
+        id: `doc_${doc.id}`,
+        documentId: doc.id,
+        docType: doc.docType,
+        docDate: doc.docDate,
+        supplierName: doc.supplierName,
+        invoiceNumber: doc.invoiceNumber,
+        licensePlate: doc.licensePlate,
+        compartments: compartments.map((c) => ({
+          compartmentNumber: c.compartmentNumber,
+          productId: c.productId,
+          productName: c.product?.name,
+          truckVolume: Number(c.truckVolume),
+          receivedVolume: Number(c.receivedVolume),
+          lossVolume: Number(c.lossVolume || 0),
+        })),
+        totalVolume: compartments.reduce((sum, c) => sum + Number(c.receivedVolume || 0), 0),
+        calculation: calculation ? {
+          status: calculation.excessShortageVolume > 0 ? 'EXCESS' :
+                  calculation.excessShortageVolume < 0 ? 'SHORTAGE' : 'NORMAL',
+          totalTruckVolume: Number(calculation.totalTruckVolume),
+          totalReceivedVolume: Number(calculation.totalReceivedVolume),
+          totalLossVolume: Number(calculation.totalLossVolume),
+          allowedLossVolume: Number(calculation.allowedLossVolume),
+          excessShortageVolume: Number(calculation.excessShortageVolume),
+        } : null,
+      });
+    }
+
+    return result;
+  }
+
   async getAllStoresInventory() {
     const warehouses = await this.warehouseRepository.find({
       where: { type: 'STORE' },
@@ -560,6 +620,7 @@ export class InventoryService {
         supplierName: createDto.supplierName,
         invoiceNumber: createDto.invoiceNumber,
         licensePlate: createDto.licensePlate,
+        refShiftId: createDto.shiftId, // Lưu shift ID nếu có
       });
       const savedDocument = await manager.save(InventoryDocument, document);
 
@@ -639,6 +700,11 @@ export class InventoryService {
       }
 
       // 3. Tính toán tổng hợp cho toàn bộ phiếu
+      // Kiểm tra compartmentCalculations có dữ liệu không
+      if (!compartmentCalculations || compartmentCalculations.length === 0) {
+        throw new Error('No compartments to calculate. Please add at least one compartment.');
+      }
+
       const documentCalculation = this.petroleumCalculationService.calculateDocument(
         compartmentCalculations,
       );

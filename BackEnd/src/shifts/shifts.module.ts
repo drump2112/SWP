@@ -16,6 +16,7 @@ import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
+import { CustomersModule } from '../customers/customers.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ShiftsController } from './shifts.controller';
       Expense,
       Warehouse,
     ]),
+    CustomersModule,
   ],
   controllers: [ShiftsController],
   providers: [ShiftsService],

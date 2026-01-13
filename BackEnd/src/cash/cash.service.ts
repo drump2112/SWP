@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CashLedger } from '../entities/cash-ledger.entity';
+import { OpeningBalanceCashDto } from './dto/opening-balance-cash.dto';
 
 @Injectable()
 export class CashService {
@@ -58,5 +59,83 @@ export class CashService {
     });
 
     return this.cashLedgerRepository.save(cashLedger);
+  }
+
+  /**
+   * Nhập số dư đầu kỳ cho sổ quỹ tiền mặt
+   * Tương tự như nhập tồn đầu kho
+   */
+  async setOpeningBalance(dto: OpeningBalanceCashDto) {
+    const { storeId, openingBalance, effectiveDate, notes } = dto;
+
+    // 1. Lấy số dư hiện tại
+    const currentBalanceResult = await this.getCashBalance(storeId);
+    const currentBalance = currentBalanceResult.balance;
+
+    // 2. Tính chênh lệch
+    const adjustment = openingBalance - currentBalance;
+
+    if (adjustment === 0) {
+      return {
+        success: true,
+        message: 'Số dư đã đúng, không cần điều chỉnh',
+        data: {
+          storeId,
+          currentBalance,
+          targetBalance: openingBalance,
+          adjustment: 0,
+        },
+      };
+    }
+
+    // 3. Kiểm tra xem đã có OPENING_BALANCE trong ngày này chưa
+    const effectiveDateValue = effectiveDate ? new Date(effectiveDate) : new Date();
+    const startOfDay = new Date(effectiveDateValue);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(effectiveDateValue);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existingOpening = await this.cashLedgerRepository.findOne({
+      where: {
+        storeId,
+        refType: 'OPENING_BALANCE',
+      },
+      order: { createdAt: 'DESC' },
+    });
+
+    if (existingOpening) {
+      const existingDate = new Date(existingOpening.createdAt);
+      if (existingDate >= startOfDay && existingDate <= endOfDay) {
+        throw new BadRequestException(
+          `Đã có số dư đầu kỳ cho ngày ${effectiveDateValue.toLocaleDateString('vi-VN')}. Vui lòng xóa hoặc chọn ngày khác.`,
+        );
+      }
+    }
+
+    // 4. Tạo bút toán điều chỉnh
+    const cashLedger = this.cashLedgerRepository.create({
+      storeId,
+      refType: 'OPENING_BALANCE',
+      refId: undefined,
+      cashIn: adjustment > 0 ? adjustment : 0,
+      cashOut: adjustment < 0 ? Math.abs(adjustment) : 0,
+      createdAt: effectiveDateValue,
+    });
+
+    const savedLedger = await this.cashLedgerRepository.save(cashLedger);
+
+    return {
+      success: true,
+      message: adjustment > 0 ? 'Đã tăng số dư quỹ' : 'Đã giảm số dư quỹ',
+      data: {
+        storeId,
+        previousBalance: currentBalance,
+        targetBalance: openingBalance,
+        adjustment,
+        cashLedgerId: savedLedger.id,
+        effectiveDate: effectiveDateValue,
+        notes,
+      },
+    };
   }
 }

@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { IsInt, IsNotEmpty, IsString, IsDateString, IsArray, ValidateNested, IsOptional, IsNumber, Min, Max, ArrayMinSize } from 'class-validator';
 import { Type } from 'class-transformer';
 
 /**
@@ -11,6 +11,7 @@ export class TruckCompartmentDto {
   compartmentNumber: number; // Số ngăn: 1-7
 
   @IsInt()
+  @IsNotEmpty({ message: 'Product ID is required for each compartment' })
   productId: number; // Loại xăng dầu trong ngăn này
 
   @IsNumber()
@@ -62,6 +63,10 @@ export class CreateInventoryDocumentWithTruckDto {
   @IsOptional()
   storeId?: number;
 
+  @IsInt()
+  @IsOptional()
+  shiftId?: number; // ID ca làm việc (nếu tạo trong ca)
+
   @IsString()
   @IsNotEmpty()
   docType: string; // IMPORT, EXPORT, TRANSFER, ADJUST
@@ -91,6 +96,7 @@ export class CreateInventoryDocumentWithTruckDto {
   driverPhone?: string; // SĐT tài xế
 
   @IsArray()
+  @ArrayMinSize(1, { message: 'At least one compartment is required' })
   @ValidateNested({ each: true })
   @Type(() => TruckCompartmentDto)
   compartments: TruckCompartmentDto[]; // Chi tiết từng ngăn xe téc (tối đa 7 ngăn)

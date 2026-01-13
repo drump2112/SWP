@@ -7,7 +7,6 @@ import {
 } from 'typeorm';
 import { Receipt } from './receipt.entity';
 import { Customer } from './customer.entity';
-
 @Entity('receipt_details')
 export class ReceiptDetail {
   @PrimaryGeneratedColumn()

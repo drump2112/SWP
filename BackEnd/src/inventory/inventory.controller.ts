@@ -148,6 +148,15 @@ export class InventoryController {
     return this.inventoryService.getStockReportByProduct(+storeId);
   }
 
+  /**
+   * GET /inventory/documents/by-shift/:shiftId
+   * Lấy danh sách phiếu nhập kho theo ca làm việc
+   */
+  @Get('documents/by-shift/:shiftId')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getDocumentsByShift(@Param('shiftId') shiftId: string) {
+    return this.inventoryService.getDocumentsByShift(+shiftId);
+  }
 
   @Get('test-error')
   testError() {

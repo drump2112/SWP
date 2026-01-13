@@ -185,6 +185,11 @@ export class PetroleumCalculationService {
     receivedVolume: number;
     productCode: string;
   }>) {
+    // Kiểm tra mảng compartments có rỗng không
+    if (!compartments || compartments.length === 0) {
+      throw new Error('Compartments array is empty or undefined');
+    }
+
     let totalTruckVolume = 0;
     let totalActualVolume = 0;
     let totalReceivedVolume = 0;
@@ -192,6 +197,12 @@ export class PetroleumCalculationService {
 
     // Lấy hệ số từ ngăn đầu tiên (giả định tất cả các ngăn cùng loại sản phẩm)
     const firstCompartment = compartments[0];
+
+    // Kiểm tra firstCompartment có tồn tại không
+    if (!firstCompartment || !firstCompartment.productCode) {
+      throw new Error('First compartment or productCode is missing');
+    }
+
     const expansionCoeff = this.getExpansionCoefficient(firstCompartment.productCode);
     const lossCoeff = this.getLossCoefficient(firstCompartment.productCode);
 

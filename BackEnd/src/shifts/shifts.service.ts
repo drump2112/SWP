@@ -21,6 +21,9 @@ import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { Customer } from '../entities/customer.entity';
+import { InventoryTruckCompartment } from '../entities/inventory-truck-compartment.entity';
+import { InventoryLossCalculation } from '../entities/inventory-loss-calculation.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import {
@@ -29,6 +32,7 @@ import {
   CreateReceiptDto,
 } from './dto/shift-operations.dto';
 import { In, Brackets } from 'typeorm';
+import { CustomersService } from '../customers/customers.service';
 
 @Injectable()
 export class ShiftsService {
@@ -62,6 +66,7 @@ export class ShiftsService {
     @InjectRepository(Warehouse)
     private warehouseRepository: Repository<Warehouse>,
     private dataSource: DataSource,
+    private customersService: CustomersService,
   ) {}
 
   async create(createShiftDto: CreateShiftDto): Promise<Shift> {
@@ -139,13 +144,12 @@ export class ShiftsService {
       const receiptIds = receipts.map((r) => r.id);
 
       // Lấy ID InventoryDocument (Cực kỳ quan trọng vì nó hay dính Ledger)
-      // Giả sử bạn tìm doc theo logic nào đó (ví dụ text trong note hoặc refShiftId)
-      // Nếu bảng InventoryDocument chưa có cột shiftId, bạn phải tìm qua bảng trung gian hoặc logic khác
-      // Ở đây tôi giả định bạn đã thêm refShiftId hoặc tìm cách nào đó lấy được docIds
-      // const linkedDocs = await manager.find(InventoryDocument, {
-      //   where: { notes: Like(`%Ca ${id}%`) }, // Ví dụ tìm theo note nếu chưa có cột shiftId
-      // });
-      const docIds = []; //linkedDocs.map((d) => d.id);
+      // Lấy tất cả inventory documents liên quan đến shift này qua refShiftId
+      const linkedDocs = await manager.find(InventoryDocument, {
+        where: { refShiftId: id },
+        select: ['id'],
+      });
+      const docIds = linkedDocs.map((d) => d.id);
 
       // ==========================================
       // 2. DELETE LEAF NODES (Xóa dữ liệu phụ thuộc/con trước)
@@ -154,11 +158,24 @@ export class ShiftsService {
         // 2.1. Xóa INVENTORY LEDGER (Thủ phạm số 1 gây rollback)
         // Ledger kho thường tham chiếu đến Document, không phải Shift
         if (docIds.length > 0) {
-          console.log('🗑️ Deleting Inventory Ledgers & Items...');
+          console.log('🗑️ Deleting Inventory Ledgers, Items, Truck Compartments & Loss Calculations...');
+
+          // Xóa truck compartments (cho phiếu nhập xe téc)
+          await manager.delete(InventoryTruckCompartment, {
+            documentId: In(docIds),
+          });
+
+          // Xóa loss calculations (cho phiếu nhập xe téc)
+          await manager.delete(InventoryLossCalculation, {
+            documentId: In(docIds),
+          });
+
+          // Xóa inventory ledger (cho cả IMPORT và EXPORT)
           await manager.delete(InventoryLedger, {
-            refType: 'EXPORT',
             refId: In(docIds),
           });
+
+          // Xóa inventory document items
           await manager.delete(InventoryDocumentItem, {
             documentId: In(docIds),
           });
@@ -414,6 +431,63 @@ export class ShiftsService {
     // 6.1. ✅ Xử lý Debt Sales (bán công nợ - KHÁC VỚI BÁN LẺ!)
     // Frontend chỉ gửi debt sales cho khách hàng thực sự mua nợ
     // KHÔNG bao gồm bán lẻ (đã xử lý ở bước 5)
+
+    // ✅ VALIDATION: Kiểm tra hạn mức công nợ TRƯỚC KHI lưu
+    if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
+      const validationErrors: string[] = [];
+
+      // Group debt sales by customer để tính tổng nợ mới cho mỗi khách
+      const debtByCustomer = new Map<number, number>();
+      for (const debtSale of closeShiftDto.debtSales) {
+        const totalAmount = debtSale.quantity * debtSale.unitPrice;
+        const currentTotal = debtByCustomer.get(debtSale.customerId) || 0;
+        debtByCustomer.set(debtSale.customerId, currentTotal + totalAmount);
+      }
+
+      // Validate từng khách hàng
+      for (const [customerId, newDebtAmount] of debtByCustomer) {
+        try {
+          const validation = await this.customersService.validateDebtLimit(
+            customerId,
+            shift.storeId,
+            newDebtAmount,
+          );
+
+          if (!validation.isValid) {
+            // Lấy tên khách hàng để hiển thị lỗi rõ ràng hơn
+            const customer = await manager.findOne(Customer, {
+              where: { id: customerId },
+              select: ['id', 'name', 'code'],
+            });
+
+            validationErrors.push(
+              `❌ Khách hàng "${customer?.name || customerId}" (${customer?.code || ''}): ` +
+              `Vượt hạn mức ${validation.exceedAmount.toLocaleString('vi-VN')}đ. ` +
+              `Hạn mức: ${validation.creditLimit.toLocaleString('vi-VN')}đ, ` +
+              `Nợ hiện tại: ${validation.currentDebt.toLocaleString('vi-VN')}đ, ` +
+              `Nợ mới: ${newDebtAmount.toLocaleString('vi-VN')}đ, ` +
+              `Tổng nợ: ${validation.totalDebt.toLocaleString('vi-VN')}đ`
+            );
+          }
+        } catch (error) {
+          validationErrors.push(
+            `❌ Lỗi kiểm tra hạn mức cho khách hàng ${customerId}: ${error.message}`
+          );
+        }
+      }
+
+      // Nếu có lỗi validation, throw error và dừng chốt ca
+      if (validationErrors.length > 0) {
+        throw new BadRequestException(
+          `KHÔNG THỂ CHỐT CA - Vượt hạn mức công nợ:\n\n${validationErrors.join('\n\n')}\n\n` +
+          `Vui lòng:\n` +
+          `1. Giảm số lượng bán nợ cho khách hàng vượt hạn mức\n` +
+          `2. Thu tiền trước khi bán thêm\n` +
+          `3. Hoặc liên hệ Admin để tăng hạn mức`
+        );
+      }
+    }
+
     if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
       for (const debtSale of closeShiftDto.debtSales) {
         const totalAmount = debtSale.quantity * debtSale.unitPrice;

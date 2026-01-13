@@ -85,13 +85,12 @@ export class ProductsService {
   }
 
   async getPricesByRegion(regionId: number) {
-    const now = new Date();
     return this.productPriceRepository
       .createQueryBuilder('pp')
       .leftJoinAndSelect('pp.product', 'product')
+      .leftJoinAndSelect('pp.region', 'region')
       .where('pp.region_id = :regionId', { regionId })
-      .andWhere('pp.valid_from <= :now', { now })
-      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', { now })
+      .orderBy('pp.valid_from', 'DESC')
       .getMany();
   }
 

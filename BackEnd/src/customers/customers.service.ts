@@ -6,10 +6,13 @@ import { Customer } from '../entities/customer.entity';
 import { CustomerStore } from '../entities/customer-store.entity';
 import { DebtLedger } from '../entities/debt-ledger.entity';
 import { Sale } from '../entities/sale.entity';
+import { Store } from '../entities/store.entity';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
 import { ImportCustomersResponseDto } from './dto/import-customers.dto';
+import { UpdateStoreCreditLimitDto } from './dto/update-store-credit-limit.dto';
+import { ImportOpeningBalanceDto, ImportOpeningBalanceResponseDto } from './dto/import-opening-balance.dto';
 
 @Injectable()
 export class CustomersService {
@@ -22,6 +25,8 @@ export class CustomersService {
     private debtLedgerRepository: Repository<DebtLedger>,
     @InjectRepository(Sale)
     private saleRepository: Repository<Sale>,
+    @InjectRepository(Store)
+    private storeRepository: Repository<Store>,
     private dataSource: DataSource,
   ) {}
 
@@ -271,17 +276,15 @@ export class CustomersService {
   }
 
   async getAllCreditStatus(storeId?: number) {
-    // 1. Lấy danh sách khách hàng (có thể filter theo store nếu cần thiết,
-    // nhưng hiện tại customer là global, chỉ debt là theo store)
-    // Tuy nhiên, để tính debt chính xác theo store, ta cần join với debt_ledger
-
-    const query = this.customerRepository.createQueryBuilder('c')
+    // 1. Lấy danh sách khách hàng
+    // Nếu có storeId, chỉ lấy khách hàng của store đó (qua customer_stores)
+    let query = this.customerRepository.createQueryBuilder('c')
       .select([
         'c.id as "customerId"',
         'c.name as "customerName"',
         'c.code as "customerCode"',
         'c.type as "customerType"',
-        'c.credit_limit as "creditLimit"'
+        'c.credit_limit as "defaultCreditLimit"'
       ])
       .addSelect(subQuery => {
         return subQuery
@@ -291,14 +294,24 @@ export class CustomersService {
           .andWhere(storeId ? 'dl.store_id = :storeId' : '1=1', { storeId });
       }, 'currentDebt');
 
-    // Nếu có storeId, có thể muốn chỉ lấy những khách hàng đã từng giao dịch ở store đó?
-    // Hoặc lấy tất cả khách hàng nhưng debt chỉ tính ở store đó.
-    // Ở đây ta lấy tất cả khách hàng.
+    // Nếu có storeId, join với customer_stores để lấy creditLimit riêng
+    if (storeId) {
+      query = query
+        .leftJoin('customer_stores', 'cs', 'cs.customer_id = c.id AND cs.store_id = :storeId', { storeId })
+        .addSelect('cs.credit_limit', 'storeCreditLimit')
+        .where('cs.store_id = :storeId', { storeId });
+    }
 
     const results = await query.getRawMany();
 
     return results.map(row => {
-      const creditLimit = Number(row.creditLimit || 0);
+      // Ưu tiên creditLimit của store, nếu không có thì dùng mặc định
+      const storeCreditLimit = row.storeCreditLimit;
+      const defaultCreditLimit = Number(row.defaultCreditLimit || 0);
+      const creditLimit = storeCreditLimit !== null && storeCreditLimit !== undefined
+        ? Number(storeCreditLimit)
+        : defaultCreditLimit;
+
       const currentDebt = Number(row.currentDebt || 0);
       const availableCredit = creditLimit - currentDebt;
       const creditUsagePercent = creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
@@ -528,4 +541,265 @@ export class CustomersService {
 
     return response;
   }
+
+  // ============ CREDIT LIMIT MANAGEMENT ============
+
+  /**
+   * Lấy danh sách hạn mức của khách hàng tại các cửa hàng
+   */
+  async getStoreCreditLimits(customerId: number) {
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (!customer) {
+      throw new NotFoundException(`Khách hàng #${customerId} không tồn tại`);
+    }
+
+    // Lấy TẤT CẢ stores trong hệ thống
+    const allStores = await this.storeRepository.find({
+      order: { id: 'ASC' },
+    });
+
+    // Lấy customer_stores hiện có
+    const customerStores = await this.customerStoreRepository.find({
+      where: { customerId },
+    });
+
+    // Map để tra cứu nhanh
+    const customerStoreMap = new Map(
+      customerStores.map(cs => [cs.storeId, cs])
+    );
+
+    // Tạo storeLimits cho TẤT CẢ stores
+    const storeLimits = await Promise.all(
+      allStores.map(async (store) => {
+        const cs = customerStoreMap.get(store.id);
+        const debtBalance = await this.getDebtBalance(customerId, store.id);
+        const creditLimit = cs?.creditLimit ?? null;
+        const effectiveLimit = creditLimit ?? customer.creditLimit ?? 0;
+        const currentDebt = debtBalance.balance;
+        const availableCredit = Math.max(0, effectiveLimit - currentDebt);
+
+        return {
+          customerId,
+          customerName: customer.name,
+          customerCode: customer.code,
+          storeId: store.id,
+          storeName: store.name,
+          creditLimit, // Hạn mức riêng (null nếu chưa set)
+          defaultCreditLimit: customer.creditLimit, // Hạn mức mặc định
+          effectiveLimit, // Hạn mức hiệu lực
+          currentDebt,
+          availableCredit,
+          creditUsagePercent: effectiveLimit > 0 ? (currentDebt / effectiveLimit) * 100 : 0,
+          isOverLimit: currentDebt > effectiveLimit,
+        };
+      })
+    );
+
+    return {
+      customerId,
+      customerName: customer.name,
+      customerCode: customer.code,
+      defaultCreditLimit: customer.creditLimit,
+      storeLimits,
+    };
+  }
+
+  /**
+   * Cập nhật hạn mức của khách hàng tại một cửa hàng
+   */
+  async updateStoreCreditLimit(
+    customerId: number,
+    storeId: number,
+    dto: UpdateStoreCreditLimitDto
+  ) {
+    // Validate customer exists
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException(`Khách hàng #${customerId} không tồn tại`);
+    }
+
+    // Validate store exists
+    const store = await this.storeRepository.findOne({
+      where: { id: storeId },
+    });
+    if (!store) {
+      throw new NotFoundException(`Cửa hàng #${storeId} không tồn tại`);
+    }
+
+    // Find or create customer_store record
+    let customerStore = await this.customerStoreRepository.findOne({
+      where: { customerId, storeId },
+    });
+
+    if (!customerStore) {
+      // Tạo mới nếu chưa có
+      customerStore = this.customerStoreRepository.create({
+        customerId,
+        storeId,
+        creditLimit: dto.creditLimit ?? null,
+      });
+    } else {
+      // Update existing
+      customerStore.creditLimit = dto.creditLimit ?? null;
+    }
+
+    await this.customerStoreRepository.save(customerStore);
+
+    // Return updated info
+    return this.getStoreCreditLimits(customerId);
+  }
+
+  /**
+   * Lấy hạn mức hiệu lực của khách hàng tại một cửa hàng
+   */
+  async getEffectiveCreditLimit(customerId: number, storeId: number): Promise<number> {
+    const customerStore = await this.customerStoreRepository.findOne({
+      where: { customerId, storeId },
+    });
+
+    // Ưu tiên hạn mức riêng của store
+    if (customerStore?.creditLimit !== null && customerStore?.creditLimit !== undefined) {
+      return customerStore.creditLimit;
+    }
+
+    // Fallback về hạn mức mặc định của customer
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    return customer?.creditLimit ?? 0;
+  }
+
+  /**
+   * Validate xem debt mới có vượt hạn mức không
+   */
+  async validateDebtLimit(customerId: number, storeId: number, newDebtAmount: number) {
+    // Lấy nợ hiện tại
+    const currentBalance = await this.getDebtBalance(customerId, storeId);
+    const currentDebt = currentBalance.balance;
+
+    // Lấy hạn mức hiệu lực
+    const creditLimit = await this.getEffectiveCreditLimit(customerId, storeId);
+
+    // Tính tổng nợ sau khi thêm mới
+    const totalDebt = currentDebt + newDebtAmount;
+
+    const isValid = totalDebt <= creditLimit;
+
+    return {
+      isValid,
+      customerId,
+      storeId,
+      creditLimit,
+      currentDebt,
+      newDebtAmount,
+      totalDebt,
+      exceedAmount: isValid ? 0 : totalDebt - creditLimit,
+      message: isValid
+        ? 'Trong hạn mức'
+        : `Vượt hạn mức ${(totalDebt - creditLimit).toLocaleString('vi-VN')}đ`,
+    };
+  }
+
+  /**
+   * Nhập số dư đầu kỳ công nợ cho cửa hàng
+   * Mỗi cửa hàng nhập riêng số dư đầu kỳ của khách hàng tại cửa hàng đó
+   */
+  async importOpeningBalance(dto: ImportOpeningBalanceDto): Promise<ImportOpeningBalanceResponseDto> {
+    const { storeId, transactionDate, items } = dto;
+
+    // Kiểm tra store tồn tại
+    const store = await this.storeRepository.findOne({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException(`Cửa hàng ${storeId} không tồn tại`);
+    }
+
+    const errors: { row: number; customerCode: string; message: string }[] = [];
+    const debtLedgerIds: number[] = [];
+    let successCount = 0;
+    let failedCount = 0;
+
+    // Sử dụng transaction để đảm bảo tính nhất quán
+    await this.dataSource.transaction(async (manager) => {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const rowNumber = i + 2; // Row 1 là header, bắt đầu từ row 2
+
+        try {
+          // 1. Tìm khách hàng theo code
+          const customer = await manager.findOne(Customer, {
+            where: { code: item.customerCode },
+          });
+
+          if (!customer) {
+            errors.push({
+              row: rowNumber,
+              customerCode: item.customerCode,
+              message: `Không tìm thấy khách hàng với mã ${item.customerCode}`,
+            });
+            failedCount++;
+            continue;
+          }
+
+          // 2. Kiểm tra khách hàng có liên kết với cửa hàng không
+          let customerStore = await manager.findOne(CustomerStore, {
+            where: { customerId: customer.id, storeId },
+          });
+
+          // Nếu chưa có liên kết, tự động tạo mới
+          if (!customerStore) {
+            customerStore = new CustomerStore();
+            customerStore.customerId = customer.id;
+            customerStore.storeId = storeId;
+            await manager.save(customerStore);
+          }
+
+          // 3. Kiểm tra số dư phải > 0
+          if (item.openingBalance <= 0) {
+            errors.push({
+              row: rowNumber,
+              customerCode: item.customerCode,
+              message: 'Số dư đầu kỳ phải lớn hơn 0',
+            });
+            failedCount++;
+            continue;
+          }
+
+          // 4. Tạo record vào debt_ledger
+          const debtLedger = new DebtLedger();
+          debtLedger.customerId = customer.id;
+          debtLedger.storeId = storeId;
+          debtLedger.refType = 'OPENING_BALANCE';
+          debtLedger.debit = item.openingBalance; // Khách nợ = debit
+          debtLedger.credit = 0;
+          debtLedger.notes = item.description || 'Số dư đầu kỳ công nợ';
+          debtLedger.createdAt = new Date(transactionDate);
+
+          const savedLedger = await manager.save(debtLedger);
+          debtLedgerIds.push(savedLedger.id);
+          successCount++;
+        } catch (error) {
+          errors.push({
+            row: rowNumber,
+            customerCode: item.customerCode,
+            message: error.message || 'Lỗi không xác định',
+          });
+          failedCount++;
+        }
+      }
+    });
+
+    return {
+      success: successCount,
+      failed: failedCount,
+      errors,
+      debtLedgerIds,
+    };
+  }
 }
+

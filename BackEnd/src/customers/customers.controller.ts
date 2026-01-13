@@ -4,6 +4,8 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
+import { UpdateStoreCreditLimitDto } from './dto/update-store-credit-limit.dto';
+import { ImportOpeningBalanceDto } from './dto/import-opening-balance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -96,5 +98,44 @@ export class CustomersController {
   @Roles('STORE', 'SALES', 'ADMIN')
   createDebtSale(@Body() createDebtSaleDto: CreateDebtSaleDto) {
     return this.customersService.createDebtSale(createDebtSaleDto);
+  }
+
+  // ============ CREDIT LIMIT ENDPOINTS ============
+
+  @Get(':customerId/store-credit-limits')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getStoreCreditLimits(@Param('customerId') customerId: string) {
+    return this.customersService.getStoreCreditLimits(+customerId);
+  }
+
+  @Put(':customerId/stores/:storeId/credit-limit')
+  @Roles('SALES', 'ADMIN')
+  updateStoreCreditLimit(
+    @Param('customerId') customerId: string,
+    @Param('storeId') storeId: string,
+    @Body() dto: UpdateStoreCreditLimitDto
+  ) {
+    return this.customersService.updateStoreCreditLimit(+customerId, +storeId, dto);
+  }
+
+  @Post(':customerId/validate-debt-limit')
+  @Roles('STORE', 'SALES', 'ADMIN')
+  validateDebtLimit(
+    @Param('customerId') customerId: string,
+    @Body() body: { storeId: number; newDebtAmount: number }
+  ) {
+    return this.customersService.validateDebtLimit(
+      +customerId,
+      body.storeId,
+      body.newDebtAmount
+    );
+  }
+
+  // ============ OPENING BALANCE ENDPOINTS ============
+
+  @Post('opening-balance/import')
+  @Roles('ADMIN')
+  importOpeningBalance(@Body() dto: ImportOpeningBalanceDto) {
+    return this.customersService.importOpeningBalance(dto);
   }
 }
