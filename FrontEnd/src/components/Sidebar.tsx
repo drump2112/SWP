@@ -16,6 +16,8 @@ import {
   DocumentChartBarIcon,
   BanknotesIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -131,6 +133,7 @@ const Sidebar: React.FC = () => {
   };
 
   const [openMenus, setOpenMenus] = useState<string[]>(getInitialOpenMenus());
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
 
   // Hàm kiểm tra quyền truy cập
   const hasPermission = (item: NavItem): boolean => {
@@ -197,25 +200,49 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col w-64 min-h-screen shadow-2xl"
+      className={`flex flex-col min-h-screen shadow-2xl transition-all duration-300 ease-in-out relative z-50 ${
+        isCollapsed ? 'w-20' : 'w-64'
+      }`}
       style={{
         background: 'linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%)',
+        overflow: 'visible',
       }}
     >
+      {/* Toggle Button */}
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className="absolute -right-3 top-8 z-50 bg-white rounded-full p-1.5 shadow-lg border border-gray-200 hover:bg-blue-50 transition-all duration-200 hover:shadow-xl"
+        title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}
+      >
+        {isCollapsed ? (
+          <ChevronRightIcon className="h-4 w-4 text-blue-600" />
+        ) : (
+          <ChevronLeftIcon className="h-4 w-4 text-blue-600" />
+        )}
+      </button>
+
       {/* Logo Section */}
       <div
-        className="flex items-center justify-center px-4 py-3 relative overflow-hidden"
+        className={`flex items-center justify-center py-3 relative overflow-hidden ${
+          isCollapsed ? 'px-2' : 'px-4'
+        }`}
         style={{
           background: 'rgba(255, 255, 255, 0.95)',
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 -1px 0 rgba(49, 94, 172, 0.2)'
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-white opacity-60" />
-        <img src="/logo.png" alt="QLXD System" className="h-10 w-auto drop-shadow-xl relative z-10" />
+        {isCollapsed ? (
+          <div className="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center relative z-10">
+            <span className="text-white font-bold text-lg">QL</span>
+          </div>
+        ) : (
+          <img src="/logo.png" alt="QLXD System" className="h-10 w-auto drop-shadow-xl relative z-10" />
+        )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto overflow-x-visible custom-scrollbar" style={{ overflowX: 'visible' }}>
         {filteredNavigation.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isMenuOpen = openMenus.includes(item.name);
@@ -223,14 +250,15 @@ const Sidebar: React.FC = () => {
           const Icon = item.icon;
 
           return (
-            <div key={item.name}>
+            <div key={item.name} className="relative menu-item-wrapper">
               {hasChildren ? (
-                <>
+                <div className="relative">
                   <button
-                    onClick={() => toggleMenu(item.name)}
+                    id={`menu-${item.name}`}
+                    onClick={() => !isCollapsed && toggleMenu(item.name)}
                     className={`
-                      w-full group flex items-center justify-between px-4 py-3 text-sm font-semibold rounded-lg
-                      transition-all duration-200 ease-in-out relative overflow-hidden
+                      w-full group flex items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'} py-3 text-sm font-semibold rounded-lg
+                      transition-all duration-200 ease-in-out relative overflow-visible
                       ${itemActive
                         ? 'text-blue-900 shadow-lg transform scale-[1.02]'
                         : 'text-gray-700 hover:text-blue-900 hover:shadow-md'
@@ -252,81 +280,118 @@ const Sidebar: React.FC = () => {
                         e.currentTarget.style.background = 'transparent';
                       }
                     }}
+                    title={isCollapsed ? item.name : ''}
                   >
                     {itemActive && (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
                     )}
                     <div className="flex items-center">
                       <Icon
-                        className={`mr-3 h-6 w-6 transition-transform duration-200 ${
+                        className={`${isCollapsed ? '' : 'mr-3'} h-6 w-6 transition-transform duration-200 ${
                           itemActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-110'
                         }`}
                       />
-                      <span className="tracking-wide">{item.name}</span>
+                      {!isCollapsed && <span className="tracking-wide">{item.name}</span>}
                     </div>
-                    <div className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-0' : '-rotate-90'}`}>
-                      <ChevronDownIcon className="h-5 w-5" />
-                    </div>
+                    {!isCollapsed && (
+                      <div className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-0' : '-rotate-90'}`}>
+                        <ChevronDownIcon className="h-5 w-5" />
+                      </div>
+                    )}
                   </button>
 
                   {/* Submenu with animation */}
-                  <div
-                    className={`
-                      ml-4 mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out
-                      ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
-                    `}
-                  >
-                    {item.children && item.children.map((child) => {
-                      const childActive = isActive(child.href);
-                      const ChildIcon = child.icon;
-                      return (
-                        <Link
-                          key={child.name}
-                          to={child.href}
-                          className={`
-                            group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg
-                            transition-all duration-200 ease-in-out relative
-                            ${childActive
-                              ? 'text-blue-900 shadow-md transform translate-x-1'
-                              : 'text-gray-600 hover:text-blue-900 hover:translate-x-1'
-                            }
-                          `}
-                          style={{
-                            background: childActive
-                              ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)'
-                              : 'transparent',
-                            borderLeft: childActive ? '3px solid rgba(59, 130, 246, 0.9)' : '3px solid transparent',
-                            backdropFilter: childActive ? 'blur(10px)' : 'none',
-                          }}
-                          onMouseEnter={(e) => {
-                            if (!childActive) {
-                              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
-                              e.currentTarget.style.borderLeft = '3px solid rgba(59, 130, 246, 0.5)';
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!childActive) {
-                              e.currentTarget.style.background = 'transparent';
-                              e.currentTarget.style.borderLeft = '3px solid transparent';
-                            }
-                          }}
-                        >
-                          <ChildIcon
-                            className={`mr-3 h-5 w-5 transition-transform duration-200 ${
-                              childActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-105'
-                            }`}
-                          />
-                          <span className="tracking-wide">{child.name}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </>
+                  {!isCollapsed && (
+                    <div
+                      className={`
+                        ml-4 mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out
+                        ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
+                      `}
+                    >
+                      {item.children && item.children.map((child) => {
+                        const childActive = isActive(child.href);
+                        const ChildIcon = child.icon;
+                        return (
+                          <Link
+                            key={child.name}
+                            to={child.href}
+                            className={`
+                              group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg
+                              transition-all duration-200 ease-in-out relative
+                              ${childActive
+                                ? 'text-blue-900 shadow-md transform translate-x-1'
+                                : 'text-gray-600 hover:text-blue-900 hover:translate-x-1'
+                              }
+                            `}
+                            style={{
+                              background: childActive
+                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)'
+                                : 'transparent',
+                              borderLeft: childActive ? '3px solid rgba(59, 130, 246, 0.9)' : '3px solid transparent',
+                              backdropFilter: childActive ? 'blur(10px)' : 'none',
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!childActive) {
+                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
+                                e.currentTarget.style.borderLeft = '3px solid rgba(59, 130, 246, 0.5)';
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!childActive) {
+                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.borderLeft = '3px solid transparent';
+                              }
+                            }}
+                          >
+                            <ChildIcon
+                              className={`mr-3 h-5 w-5 transition-transform duration-200 ${
+                                childActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-105'
+                              }`}
+                            />
+                            <span className="tracking-wide">{child.name}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Tooltip for collapsed state */}
+                  {isCollapsed && item.children && item.children.length > 0 && (
+                    <div className="submenu-tooltip">
+                      <div className="bg-white rounded-lg shadow-2xl border border-gray-200 py-1 min-w-[220px]">
+                        <div className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-white border-b border-gray-100">
+                          {item.name}
+                        </div>
+                        <div className="py-1">
+                          {item.children.map((child) => {
+                            const childActive = isActive(child.href);
+                            const ChildIcon = child.icon;
+                            return (
+                              <Link
+                                key={child.name}
+                                to={child.href}
+                                className={`flex items-center px-4 py-2.5 text-sm transition-all duration-150
+                                  ${childActive
+                                    ? 'bg-blue-50 text-blue-900 font-semibold border-l-4 border-blue-600'
+                                    : 'text-gray-700 hover:bg-blue-50 hover:text-blue-900 border-l-4 border-transparent'
+                                  }
+                                `}
+                              >
+                                <ChildIcon className={`mr-3 h-4 w-4 flex-shrink-0 ${childActive ? 'text-blue-600' : 'text-gray-500'}`} />
+                                <span className="whitespace-nowrap">{child.name}</span>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <Link
                   to={item.href}
                   className={`
-                    group flex items-center px-4 py-3 text-sm font-semibold rounded-lg
+                    group flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-semibold rounded-lg
                     transition-all duration-200 ease-in-out relative overflow-hidden
                     ${itemActive
                       ? 'text-blue-900 shadow-lg transform scale-[1.02]'
@@ -349,16 +414,17 @@ const Sidebar: React.FC = () => {
                       e.currentTarget.style.background = 'transparent';
                     }
                   }}
+                  title={isCollapsed ? item.name : ''}
                 >
                   {itemActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
                   )}
                   <Icon
-                    className={`mr-3 h-6 w-6 transition-transform duration-200 ${
+                    className={`${isCollapsed ? '' : 'mr-3'} h-6 w-6 transition-transform duration-200 ${
                       itemActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-110'
                     }`}
                   />
-                  <span className="tracking-wide">{item.name}</span>
+                  {!isCollapsed && <span className="tracking-wide">{item.name}</span>}
                 </Link>
               )}
             </div>
@@ -386,6 +452,25 @@ const Sidebar: React.FC = () => {
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background: rgba(59, 130, 246, 0.6);
+        }
+
+        /* Submenu tooltip styles */
+        .submenu-tooltip {
+          position: absolute;
+          left: 100%;
+          top: 0;
+          margin-left: 8px;
+          z-index: 999999 !important;
+          opacity: 0;
+          visibility: hidden;
+          pointer-events: none;
+          transition: opacity 0.2s, visibility 0.2s;
+        }
+
+        .menu-item-wrapper:hover .submenu-tooltip {
+          opacity: 1 !important;
+          visibility: visible !important;
+          pointer-events: auto !important;
         }
       `}</style>
     </div>

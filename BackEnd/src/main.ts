@@ -11,8 +11,18 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: true, // Must specify exact origin for credentials
+    origin: [
+      'http://localhost:5173', // Vite dev server
+      'http://localhost:80',
+      'http://swpdongda.com',
+      'http://swpdongda.com:80',
+      'https://swpdongda.com',
+      'https://www.swpdongda.com',
+      'http://www.swpdongda.com',
+    ],
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   // Global validation pipe

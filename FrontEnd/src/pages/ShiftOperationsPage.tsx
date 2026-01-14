@@ -10,6 +10,7 @@ import {
   type CloseShiftDto,
 } from "../api/shifts";
 import { customersApi } from "../api/customers";
+import { usersApi } from "../api/users";
 import { productsApi } from "../api/products";
 import { pumpsApi } from "../api/pumps";
 import { storesApi } from "../api/stores";
@@ -67,6 +68,10 @@ const ShiftOperationsPage: React.FC = () => {
   const [selectedDebtCustomer, setSelectedDebtCustomer] = useState<number | null>(null);
   const [selectedDebtProduct, setSelectedDebtProduct] = useState<number | null>(null);
   const [selectedReceiptCustomer, setSelectedReceiptCustomer] = useState<number | null>(null);
+
+  // State cho Người Giao và Người Nhận
+  const [handoverUserId, setHandoverUserId] = useState<number | null>(null);
+  const [receiverUserId, setReceiverUserId] = useState<number | null>(null);
 
   // Editing state
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
@@ -142,6 +147,18 @@ const ShiftOperationsPage: React.FC = () => {
     },
     enabled: !!report?.shift.storeId,
   });
+
+  // Fetch users cho select Người Giao/Nhận
+  const { data: users } = useQuery({
+    queryKey: ["users"],
+    queryFn: usersApi.getAll,
+  });
+
+  // Filter users theo cửa hàng của ca làm việc
+  const storeUsers = React.useMemo(() => {
+    if (!users || !report?.shift.storeId) return [];
+    return users.filter((u: any) => u.storeId === report.shift.storeId);
+  }, [users, report?.shift.storeId]);
 
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
   useEffect(() => {
@@ -1180,7 +1197,6 @@ const ShiftOperationsPage: React.FC = () => {
 
       const submitData: CreateInventoryDocumentWithTruckDto = {
         storeId: report.shift.storeId,
-        shiftId: report.shift.id, // Liên kết với ca làm việc
         docType: "IMPORT",
         docDate: formData.docDate,
         supplierName: formData.supplierName,
@@ -1406,17 +1422,17 @@ const ShiftOperationsPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl shadow-lg p-6 text-white">
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-lg p-6 border border-gray-200">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/shifts")} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
-              <ArrowLeftIcon className="h-6 w-6" />
+            <button onClick={() => navigate("/shifts")} className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
+              <ArrowLeftIcon className="h-6 w-6 text-gray-700" />
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-white">Ca #{report?.shift.shiftNo}</h1>
+              <h1 className="text-3xl font-bold text-gray-800">Ca #{report?.shift.shiftNo}</h1>
               <div className="flex items-center gap-3 mt-2">
-                <p className="text-blue-100">Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}</p>
-                <span className="text-blue-200">•</span>
+                <p className="text-gray-600">Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}</p>
+                <span className="text-gray-400">•</span>
                 {isEditMode ? (
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-500 text-white shadow-sm">
                     <PencilIcon className="w-3 h-3 mr-1.5" />
@@ -1442,6 +1458,34 @@ const ShiftOperationsPage: React.FC = () => {
               </div>
             </div>
           </div>
+
+          {/* Người Giao và Người Nhận */}
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-2 min-w-[200px]">
+              <label className="text-sm text-gray-700 font-medium">Người Giao</label>
+              <SearchableSelect
+                options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
+                value={handoverUserId}
+                onChange={(value) => setHandoverUserId(value as number | null)}
+                placeholder="-- Chọn người giao --"
+                isClearable
+                isDisabled={!canEdit}
+              />
+            </div>
+
+            <div className="flex flex-col gap-2 min-w-[200px]">
+              <label className="text-sm text-gray-700 font-medium">Người Nhận</label>
+              <SearchableSelect
+                options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
+                value={receiverUserId}
+                onChange={(value) => setReceiverUserId(value as number | null)}
+                placeholder="-- Chọn người nhận --"
+                isClearable
+                isDisabled={!canEdit}
+              />
+            </div>
+          </div>
+
           {canEdit && (
             <button
               onClick={handleCloseShift}
@@ -1539,7 +1583,7 @@ const ShiftOperationsPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              B1 - Vòi bơm
+              B1 - Số má cột bơm
             </button>
             <button
               onClick={async () => {
@@ -1623,7 +1667,7 @@ const ShiftOperationsPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              B5 - Nhập kho
+              B5 - Nhập hàng
             </button>
             <button
               onClick={async () => {
@@ -1644,7 +1688,7 @@ const ShiftOperationsPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              B6 - Xuất kho
+              B6 - Xuất hàng
             </button>
             <button
               onClick={async () => {

@@ -16,7 +16,7 @@ const Header: React.FC = () => {
   console.log('🔍 User data:', user);
 
   return (
-    <header className="bg-white border-b-2 border-gray-200 shadow-md">
+    <header className="bg-white border-b-2 border-gray-200 shadow-md relative z-20">
       <div className="flex items-center justify-between h-16 px-6">
         <h1 className="text-2xl font-bold">
           <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">TÂY NAM</span>

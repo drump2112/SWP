@@ -9,10 +9,10 @@ COPY package*.json ./
 # Install dependencies
 RUN npm install
 
-# Copy source code
+# Copy source code and environment files
 COPY . .
 
-# Build the application
+# Build the application (automatically uses .env.production if exists)
 RUN npm run build
 
 # Stage 2: Production with Nginx
