@@ -112,6 +112,17 @@ class InventoryExportDto {
   notes?: string;
 }
 
+class RetailSaleDto {
+  @IsInt()
+  productId: number;
+
+  @IsNumber()
+  quantity: number;
+
+  @IsNumber()
+  unitPrice: number;
+}
+
 export class CloseShiftDto {
   @IsInt()
   @IsNotEmpty()
@@ -161,4 +172,22 @@ export class CloseShiftDto {
   @IsOptional()
   @IsDateString()
   closedAt?: string;
+
+  @IsOptional()
+  @IsString()
+  handoverName?: string; // Tên người giao ca
+
+  @IsOptional()
+  @IsString()
+  receiverName?: string; // Tên người nhận ca
+
+  @IsOptional()
+  @IsInt()
+  retailCustomerId?: number; // Customer ID (type INTERNAL) được gán bán lẻ
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RetailSaleDto)
+  retailSales?: RetailSaleDto[]; // Bán lẻ thực tế để gán cho retailCustomerId
 }

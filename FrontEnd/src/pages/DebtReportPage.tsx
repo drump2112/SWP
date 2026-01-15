@@ -9,9 +9,13 @@ import {
   FunnelIcon,
   ArrowDownTrayIcon,
   PrinterIcon,
+  BuildingStorefrontIcon,
+  UsersIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
+import DateRangePicker from '../components/DateRangePicker';
 import {
   createReportWorkbook,
   addReportHeader,
@@ -269,29 +273,52 @@ const DebtReportPage: React.FC = () => {
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-4">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
-          <ChartBarIcon className="h-8 w-8 text-blue-600" />
-          Báo Cáo Công Nợ Khách Hàng
-        </h1>
-        <p className="text-gray-600 mt-2">
-          Theo dõi công nợ, phát sinh và dư cuối kỳ của khách hàng
-        </p>
+      <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <ChartBarIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Báo Cáo Công Nợ Khách Hàng</h1>
+              <p className="text-sm text-gray-600">Theo dõi công nợ, phát sinh và dư cuối kỳ của khách hàng</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={!report || report.length === 0}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+              Xuất Excel
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={!report || report.length === 0}
+              className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+            >
+              <PrinterIcon className="h-4 w-4 mr-1" />
+              In
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <FunnelIcon className="h-5 w-5 text-gray-500" />
-          <h2 className="text-lg font-semibold text-gray-900">Bộ lọc</h2>
+      <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+        <div className="flex items-center gap-2 mb-3">
+          <FunnelIcon className="h-4 w-4 text-gray-600" />
+          <h2 className="text-base font-semibold text-gray-800">Bộ lọc</h2>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {!user?.storeId && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <BuildingStorefrontIcon className="h-4 w-4 inline mr-1" />
                 Cửa hàng
               </label>
               <SearchableSelect
@@ -314,7 +341,8 @@ const DebtReportPage: React.FC = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <UsersIcon className="h-4 w-4 inline mr-1" />
               Khách hàng
             </label>
             <SearchableSelect
@@ -334,46 +362,19 @@ const DebtReportPage: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Từ ngày
+          <div className="lg:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <CalendarIcon className="h-4 w-4 inline mr-1" />
+              Khoảng thời gian
             </label>
-            <input
-              type="date"
-              value={filters.fromDate || ''}
-              onChange={(e) => setFilters({ ...filters, fromDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+            <DateRangePicker
+              fromDate={filters.fromDate || ''}
+              toDate={filters.toDate || ''}
+              onFromDateChange={(date) => setFilters({ ...filters, fromDate: date })}
+              onToDateChange={(date) => setFilters({ ...filters, toDate: date })}
+              label=""
             />
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Đến ngày
-            </label>
-            <input
-              type="date"
-              value={filters.toDate || ''}
-              onChange={(e) => setFilters({ ...filters, toDate: e.target.value })}
-              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
-            />
-          </div>
-        </div>
-
-        <div className="mt-4 flex gap-3">
-          <button
-            onClick={handleExportExcel}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-sm"
-          >
-            <ArrowDownTrayIcon className="h-5 w-5 mr-2" />
-            Xuất Excel
-          </button>
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-sm"
-          >
-            <PrinterIcon className="h-5 w-5 mr-2" />
-            In báo cáo
-          </button>
         </div>
       </div>
 

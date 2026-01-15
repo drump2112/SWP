@@ -716,6 +716,107 @@ export class ReportsService {
     return query.getRawMany();
   }
 
+  /**
+   * Báo cáo xuất hàng theo khách hàng
+   * Bao gồm cả bán công nợ (debt sales) và bán lẻ (nếu có gán cho khách hàng nội bộ)
+   */
+  async getSalesByCustomerReport(params: {
+    storeId?: number;
+    customerId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+    priceId?: number;
+  }) {
+    const { storeId, customerId, fromDate, toDate, priceId } = params;
+
+    // Query từ shift_debt_sales (bán công nợ)
+    const debtSalesQuery = this.shiftDebtSaleRepository
+      .createQueryBuilder('sds')
+      .leftJoin('sds.shift', 'shift')
+      .leftJoin('sds.customer', 'customer')
+      .leftJoin('sds.product', 'product')
+      .select('customer.id', 'customerId')
+      .addSelect('customer.code', 'customerCode')
+      .addSelect('customer.name', 'customerName')
+      .addSelect('customer.type', 'customerType')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(sds.quantity)', 'totalQuantity')
+      .addSelect('AVG(sds.unit_price)', 'unitPrice')
+      .addSelect('SUM(sds.quantity * sds.unit_price)', 'totalAmount')
+      .addSelect("'DEBT'", 'saleType')
+      .where('shift.status = :status', { status: 'CLOSED' });
+
+    // Filter theo storeId
+    if (storeId) {
+      debtSalesQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+
+    // Filter theo customerId
+    if (customerId) {
+      debtSalesQuery.andWhere('sds.customer_id = :customerId', { customerId });
+    }
+
+    // Filter theo khoảng thời gian
+    if (fromDate) {
+      debtSalesQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      debtSalesQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+
+    // Filter theo priceId nếu có
+    if (priceId) {
+      debtSalesQuery
+        .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+        .andWhere('sds.unit_price = pp.price');
+    }
+
+    debtSalesQuery
+      .groupBy('customer.id')
+      .addGroupBy('customer.code')
+      .addGroupBy('customer.name')
+      .addGroupBy('customer.type')
+      .addGroupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy('customer.name', 'ASC')
+      .addOrderBy('product.name', 'ASC');
+
+    const results = await debtSalesQuery.getRawMany();
+
+    // Format kết quả theo khách hàng
+    const customerMap = new Map<number, any>();
+
+    results.forEach((row) => {
+      const customerId = row.customerId;
+      if (!customerMap.has(customerId)) {
+        customerMap.set(customerId, {
+          customerId: row.customerId,
+          customerCode: row.customerCode,
+          customerName: row.customerName,
+          customerType: row.customerType,
+          products: [],
+          totalQuantity: 0,
+          totalAmount: 0,
+        });
+      }
+
+      const customer = customerMap.get(customerId);
+      customer.products.push({
+        productId: row.productId,
+        productName: row.productName,
+        quantity: parseFloat(row.totalQuantity),
+        unitPrice: parseFloat(row.unitPrice),
+        amount: parseFloat(row.totalAmount),
+        saleType: row.saleType,
+      });
+      customer.totalQuantity += parseFloat(row.totalQuantity);
+      customer.totalAmount += parseFloat(row.totalAmount);
+    });
+
+    return Array.from(customerMap.values());
+  }
+
   // ==================== Báo cáo phiếu nhập kho ====================
 
   /**

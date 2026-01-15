@@ -19,6 +19,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerCreditPage from './pages/CustomerCreditPage';
 import DebtReportPage from './pages/DebtReportPage';
 import SalesReportPage from './pages/SalesReportPage';
+import SalesReportByCustomerPage from './pages/SalesReportByCustomerPage';
 import CashReportPage from './pages/CashReportPage';
 import InventoryImportPage from './pages/InventoryImportPage';
 import InventoryReportPage from './pages/InventoryReportPage';
@@ -239,6 +240,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <SalesReportPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/sales-by-customer"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <SalesReportByCustomerPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

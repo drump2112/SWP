@@ -149,15 +149,27 @@ const ShiftOperationsPage: React.FC = () => {
   });
 
   // Fetch users cho select Người Giao/Nhận
-  const { data: users } = useQuery({
+  const { data: users, isLoading: isLoadingUsers, error: usersError } = useQuery({
     queryKey: ["users"],
     queryFn: usersApi.getAll,
   });
 
+  // Debug users loading
+  React.useEffect(() => {
+    if (usersError) {
+      console.error("❌ Error loading users:", usersError);
+    }
+    if (users) {
+      console.log("✅ Loaded users:", users.length, users);
+    }
+  }, [users, usersError]);
+
   // Filter users theo cửa hàng của ca làm việc
   const storeUsers = React.useMemo(() => {
     if (!users || !report?.shift.storeId) return [];
-    return users.filter((u: any) => u.storeId === report.shift.storeId);
+    const filtered = users.filter((u: any) => u.storeId === report.shift.storeId);
+    console.log(`🔍 Filtered users for store ${report.shift.storeId}:`, filtered.length, filtered);
+    return filtered;
   }, [users, report?.shift.storeId]);
 
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
@@ -389,6 +401,17 @@ const ShiftOperationsPage: React.FC = () => {
 
     fetchPreviousReadings();
   }, [pumps, report?.shift.status, shiftId]);
+
+  // Initialize handoverName và receiverName từ report
+  useEffect(() => {
+    if (report?.shift) {
+      // Tìm user tương ứng để set value cho select
+      const handoverUser = storeUsers?.find((u) => u.fullName === report.shift.handoverName);
+      const receiverUser = storeUsers?.find((u) => u.fullName === report.shift.receiverName);
+      setHandoverUserId(handoverUser?.id || null);
+      setReceiverUserId(receiverUser?.id || null);
+    }
+  }, [report, storeUsers]);
 
   // Initialize for Edit Mode
   useEffect(() => {
@@ -707,10 +730,10 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
-    // Validation 1.5: Kiểm tra có giá cho tất cả sản phẩm
+    // Validation 1.5: Kiểm tra có giá cho tất cả mặt hàng
     const missingPrices = readingsArray.filter((r) => !productPrices[r.productId] || productPrices[r.productId] === 0);
     if (missingPrices.length > 0) {
-      toast.error("Có sản phẩm chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.", {
+      toast.error("Có mặt hàng chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.", {
         position: "top-right",
         autoClose: 3000,
       });
@@ -747,7 +770,7 @@ const ShiftOperationsPage: React.FC = () => {
       const declaredQty = declaredRetailQuantities[productId];
 
       if (declaredQty === undefined || declaredQty === null) {
-        toast.error(`Vui lòng nhập "Bán lẻ thực tế" cho sản phẩm ${product?.name || productId} ở Tab 2!`, {
+        toast.error(`Vui lòng nhập "Bán lẻ thực tế" cho mặt hàng ${product?.name || productId} ở Tab 2!`, {
           position: "top-right",
           autoClose: 5000,
         });
@@ -851,9 +874,18 @@ const ShiftOperationsPage: React.FC = () => {
 
     const closedAt = result.value;
 
-    // ✅ FIX: Bán lẻ KHÔNG tạo debt sales
-    // Bán lẻ = Thu tiền mặt ngay → Backend đã ghi vào cash_ledger
-    // declaredRetailQuantities chỉ dùng để đối chiếu số lượng
+    // ✅ Tạo retailSales từ declaredRetailQuantities + retailCustomerId
+    // Để gán lượng bán lẻ cho người phụ trách ca (customer type INTERNAL)
+    const retailSales = Object.entries(declaredRetailQuantities)
+      .filter(([_, quantity]) => quantity > 0)
+      .map(([productId, quantity]) => {
+        const price = productPrices[Number(productId)] || 0;
+        return {
+          productId: Number(productId),
+          quantity: quantity,
+          unitPrice: price,
+        };
+      });
 
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
@@ -887,6 +919,10 @@ const ShiftOperationsPage: React.FC = () => {
         receiverName: d.receiverName,
         notes: d.notes,
       })),
+      handoverName: handoverUserId ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName : undefined,
+      receiverName: receiverUserId ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName : undefined,
+      retailCustomerId: retailCustomerId || undefined, // Người phụ trách ca
+      retailSales: retailSales.length > 0 ? retailSales : undefined, // Bán lẻ thực tế
     };
 
     if (isEditMode) {
@@ -1191,7 +1227,7 @@ const ShiftOperationsPage: React.FC = () => {
           heightLossWarehouse: 0,
         }];
       } else {
-        toast.error("Vui lòng nhập thông tin sản phẩm hoặc chi tiết ngăn xe téc");
+        toast.error("Vui lòng nhập thông tin mặt hàng hoặc chi tiết ngăn xe téc");
         return;
       }
 
@@ -1248,7 +1284,7 @@ const ShiftOperationsPage: React.FC = () => {
     const unitPrice = formData.get("unitPrice") ? Number(formData.get("unitPrice")) : 0;
 
     if (!productId || productId <= 0) {
-      toast.error("Vui lòng chọn sản phẩm", { position: "top-right", autoClose: 3000 });
+      toast.error("Vui lòng chọn mặt hàng", { position: "top-right", autoClose: 3000 });
       return;
     }
 
@@ -1583,7 +1619,7 @@ const ShiftOperationsPage: React.FC = () => {
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
-              B1 - Số má cột bơm
+              B1 - Số máy cột bơm
             </button>
             <button
               onClick={async () => {
@@ -1746,7 +1782,7 @@ const ShiftOperationsPage: React.FC = () => {
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vòi bơm</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                            Sản phẩm
+                            Mặt hàng
                           </th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
@@ -1948,7 +1984,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vòi bơm</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Sản phẩm</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">mặt hàng</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số cuối</th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
@@ -2109,7 +2145,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-50 text-xs uppercase text-gray-500">
-                          <th className="px-4 py-2 text-left">Sản phẩm</th>
+                          <th className="px-4 py-2 text-left">mặt hàng</th>
                           <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
                           <th className="px-4 py-2 text-right">Bán nợ (2)</th>
                           <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (3) *</th>
@@ -2202,7 +2238,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <table className="w-full border-collapse">
                       <thead>
                         <tr className="bg-gray-50 text-xs uppercase text-gray-500">
-                          <th className="px-4 py-2 text-left">Sản phẩm</th>
+                          <th className="px-4 py-2 text-left">mặt hàng</th>
                           <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
                           <th className="px-4 py-2 text-right">Bán nợ (2)</th>
                           <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (Tính toán) (3)</th>
@@ -2306,7 +2342,7 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">mặt hàng *</label>
                       <SearchableSelect
                         options={products?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
                         value={selectedDebtProduct}
@@ -2314,14 +2350,14 @@ const ShiftOperationsPage: React.FC = () => {
                           setSelectedDebtProduct(value as number);
                           if (value && productPrices[value as number]) {
                             setDebtSaleFormPrice(productPrices[value as number]);
-                            // Tính lại thành tiền khi đổi sản phẩm
+                            // Tính lại thành tiền khi đổi mặt hàng
                             setDebtSaleFormAmount(debtSaleFormQuantity * productPrices[value as number]);
                           } else {
                             setDebtSaleFormPrice(0);
                             setDebtSaleFormAmount(0);
                           }
                         }}
-                        placeholder="-- Chọn sản phẩm --"
+                        placeholder="-- Chọn mặt hàng --"
                         required
                       />
                       <input type="hidden" name="productId" value={selectedDebtProduct || ""} required />
@@ -2387,7 +2423,7 @@ const ShiftOperationsPage: React.FC = () => {
                         readOnly
                         value={debtSaleFormPrice || ""}
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
-                        placeholder="Tự động theo sản phẩm"
+                        placeholder="Tự động theo mặt hàng"
                       />
                     </div>
 
@@ -2447,7 +2483,7 @@ const ShiftOperationsPage: React.FC = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
@@ -2958,7 +2994,7 @@ const ShiftOperationsPage: React.FC = () => {
           {activeTab === "import" && (
             <div className="space-y-6">
               <div className="border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Kho Xăng Dầu (Xe Téc)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Hàng Xăng Dầu</h3>
 
                 {isShiftOpen && (
                   <div className="mb-4">
@@ -2983,8 +3019,7 @@ const ShiftOperationsPage: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số HĐ</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
-                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Số ngăn</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng lít</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
@@ -2992,7 +3027,7 @@ const ShiftOperationsPage: React.FC = () => {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {draftImports.length > 0 ? (
                       draftImports.map((item) => {
-                        // Lấy danh sách sản phẩm từ compartments
+                        // Lấy danh sách mặt hàng từ compartments
                         const productNames = item.compartments
                           ?.map((c: any) => {
                             const product = products?.find((p) => p.id === c.productId);
@@ -3010,9 +3045,6 @@ const ShiftOperationsPage: React.FC = () => {
                             <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{item.invoiceNumber || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-700">{productNames}</td>
-                            <td className="px-6 py-4 text-sm text-center text-gray-700">
-                              {item.compartments?.length || 0} ngăn
-                            </td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
                               {Number(item.totalVolume || 0).toLocaleString("vi-VN")} lít
                             </td>
@@ -3124,12 +3156,12 @@ const ShiftOperationsPage: React.FC = () => {
                       <h4 className="text-sm font-medium text-gray-900 mb-2">Chi tiết hàng hóa (Xuất nhanh)</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Sản phẩm</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">mặt hàng</label>
                           <select
                             name="productId"
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
-                            <option value="">-- Chọn sản phẩm --</option>
+                            <option value="">-- Chọn mặt hàng --</option>
                             {products?.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
@@ -3249,13 +3281,13 @@ const ShiftOperationsPage: React.FC = () => {
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">mặt hàng *</label>
                       <select
                         name="productId"
                         required
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                       >
-                        <option value="">-- Chọn sản phẩm --</option>
+                        <option value="">-- Chọn mặt hàng --</option>
                         {products?.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
@@ -3315,7 +3347,7 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tồn hệ thống</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thực tế</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chênh lệch</th>

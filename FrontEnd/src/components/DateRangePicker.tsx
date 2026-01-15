@@ -44,7 +44,8 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm hover:bg-gray-50"
+          className="block w-full pl-10 pr-3 py-2.5 border border-gray-300 rounded-lg leading-5 bg-white text-left focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm hover:bg-gray-50 min-h-[42px]"
+          style={{ minHeight: '42px' }}
         >
           <span className={fromDate && toDate ? 'text-gray-900' : 'text-gray-500'}>
             {formatDateDisplay(fromDate, toDate)}

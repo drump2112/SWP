@@ -40,7 +40,7 @@ const SalesReportPage: React.FC = () => {
 
   // Get selected store's regionId
   const selectedStore = stores?.find(s => s.id === selectedStoreId) || user?.store;
-  const regionId = selectedStore?.regionId;
+  const regionId = (selectedStore as any)?.regionId;
 
   // Fetch prices for the selected store's region only
   const { data: allPrices } = useQuery({
@@ -416,30 +416,34 @@ const SalesReportPage: React.FC = () => {
   };
 
   return (
-    <div className="px-4 sm:px-6 lg:px-8 py-8">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <ChartBarIcon className="h-8 w-8 text-blue-600" />
-            Báo cáo xuất hàng
-          </h1>
-          <p className="mt-2 text-sm text-gray-600">Xem báo cáo xuất hàng theo cột bơm hoặc mặt hàng</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={handleExportExcel}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-          >
-            <ArrowDownTrayIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            Xuất Excel
-          </button>
-          <button
-            onClick={handlePrint}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <PrinterIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            In báo cáo
-          </button>
+    <div className="p-6 space-y-4">
+      <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <ChartBarIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Báo cáo xuất hàng</h1>
+              <p className="text-sm text-gray-600">Xem báo cáo xuất hàng theo cột bơm hoặc mặt hàng</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all text-sm"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+              Xuất Excel
+            </button>
+            <button
+              onClick={handlePrint}
+              className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all text-sm"
+            >
+              <PrinterIcon className="h-4 w-4 mr-1" />
+              In báo cáo
+            </button>
+          </div>
         </div>
       </div>
 

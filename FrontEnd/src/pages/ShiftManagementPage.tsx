@@ -201,6 +201,12 @@ const ShiftManagementPage: React.FC = () => {
                   Giờ chốt
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Người Giao
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Người Nhận
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Trạng thái
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -234,6 +240,16 @@ const ShiftManagementPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">
                       {shift.closedAt ? dayjs(shift.closedAt).format("HH:mm DD/MM") : "-"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="text-sm text-gray-700">
+                      {shift.handoverName || "-"}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="text-sm text-gray-700">
+                      {shift.receiverName || "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">

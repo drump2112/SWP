@@ -16,4 +16,12 @@ export class CreateShiftDto {
   @IsString()
   @IsOptional()
   openedAt?: string;
+
+  @IsString()
+  @IsOptional()
+  handoverName?: string; // Tên người giao ca
+
+  @IsString()
+  @IsOptional()
+  receiverName?: string; // Tên người nhận ca
 }

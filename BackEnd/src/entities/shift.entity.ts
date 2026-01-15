@@ -44,6 +44,12 @@ export class Shift {
   @Column({ name: 'is_active', type: 'boolean', default: true })
   isActive: boolean; // false nếu đã bị supersede bởi version mới
 
+  @Column({ name: 'handover_name', type: 'varchar', length: 255, nullable: true })
+  handoverName: string | null; // Tên người giao ca
+
+  @Column({ name: 'receiver_name', type: 'varchar', length: 255, nullable: true })
+  receiverName: string | null; // Tên người nhận ca
+
   @ManyToOne(() => Store, (store) => store.shifts)
   @JoinColumn({ name: 'store_id' })
   store: Store;

@@ -93,7 +93,7 @@ const CustomerCreditPage: React.FC = () => {
       case 'warning':
         return 'Cảnh báo: Đã sử dụng 75% hạn mức';
       case 'danger':
-        return 'Nguy hiểm: Đã sử dụng 90% hạn mức';
+        return 'Cảnh báo: Đã sử dụng 75% hạn mức'; // Treat as warning
       case 'overlimit':
         return 'Vượt hạn mức: Không nên bán công nợ thêm';
       default:
@@ -372,10 +372,8 @@ const CustomerCreditPage: React.FC = () => {
                       className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 ${
                         selectedCustomerStatus.warningLevel === 'safe'
                           ? 'bg-green-500'
-                          : selectedCustomerStatus.warningLevel === 'warning'
+                          : selectedCustomerStatus.warningLevel === 'warning' || selectedCustomerStatus.warningLevel === 'danger'
                           ? 'bg-yellow-500'
-                          : selectedCustomerStatus.warningLevel === 'danger'
-                          ? 'bg-orange-500'
                           : 'bg-red-500'
                       }`}
                     ></div>
@@ -387,18 +385,14 @@ const CustomerCreditPage: React.FC = () => {
                 </div>
 
                 {/* Markers */}
-                <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     <span className="text-xs text-gray-600">An toàn (&lt;75%)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                    <span className="text-xs text-gray-600">Cảnh báo (75-90%)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                    <span className="text-xs text-gray-600">Nguy hiểm (90-100%)</span>
+                    <span className="text-xs text-gray-600">Cảnh báo (75-100%)</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>

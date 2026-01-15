@@ -38,46 +38,6 @@ const navigation: NavItem[] = [
     roles: ['ADMIN', 'DIRECTOR', 'STORE']
   },
   {
-    name: 'Cửa hàng',
-    href: '/stores',
-    icon: BuildingStorefrontIcon,
-    roles: ['ADMIN', 'DIRECTOR']
-  },
-  {
-    name: 'Tài khoản',
-    href: '/users',
-    icon: UsersIcon,
-    roles: ['ADMIN', 'DIRECTOR']
-  },
-  {
-    name: 'Khách hàng',
-    href: '/customers',
-    icon: UserGroupIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING']
-  },
-  {
-    name: 'Quản lý sản phẩm',
-    href: '/products',
-    icon: CubeIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'SALES'],
-    children: [
-      { name: 'Sản phẩm', href: '/products', icon: CubeIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
-      { name: 'Quản lý giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
-    ],
-  },
-  // Quản lý kho đã ẩn - quản lý tồn tách riêng
-  /*
-  {
-    name: 'Quản lý kho',
-    href: '/inventory',
-    icon: CircleStackIcon,
-    roles: ['ADMIN', 'DIRECTOR'],
-    children: [
-      { name: 'Nhập hàng', href: '/inventory/import', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
-    ],
-  },
-  */
-  {
     name: 'Báo cáo',
     href: '/reports',
     icon: ChartBarIcon,
@@ -86,16 +46,24 @@ const navigation: NavItem[] = [
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Xuất hàng theo KH', href: '/reports/sales-by-customer', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
       { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
     ],
   },
   {
-    name: 'Hóa đơn',
-    href: '/receipts',
+    name: 'Danh mục',
+    href: '/categories',
     icon: DocumentTextIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING']
+    roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'],
+    children: [
+      { name: 'Cửa hàng', href: '/stores', icon: BuildingStorefrontIcon, roles: ['ADMIN', 'DIRECTOR'] },
+      { name: 'Mặt hàng', href: '/products', icon: CubeIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
+      { name: 'Giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
+      { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'] },
+      { name: 'Tài khoản', href: '/users', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR'] },
+    ],
   },
   {
     name: 'Cài đặt',
@@ -108,6 +76,7 @@ const navigation: NavItem[] = [
       { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: CircleStackIcon, roles: ['ADMIN'] },
       { name: 'Số dư đầu sổ quỹ', href: '/cash/opening-balance', icon: CircleStackIcon, roles: ['ADMIN', 'ACCOUNTING'] },
       { name: 'Số dư đầu công nợ', href: '/customers/opening-balance', icon: BanknotesIcon, roles: ['ADMIN'] },
+      { name: 'Hóa đơn', href: '/receipts', icon: DocumentTextIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
     ],
   },
 ];
@@ -200,12 +169,13 @@ const Sidebar: React.FC = () => {
 
   return (
     <div
-      className={`flex flex-col min-h-screen shadow-2xl transition-all duration-300 ease-in-out relative z-50 ${
+      className={`flex flex-col min-h-screen shadow-2xl transition-all duration-300 ease-in-out relative ${
         isCollapsed ? 'w-20' : 'w-64'
       }`}
       style={{
         background: 'linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%)',
         overflow: 'visible',
+        zIndex: 1000,
       }}
     >
       {/* Toggle Button */}
@@ -242,7 +212,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto overflow-x-visible custom-scrollbar" style={{ overflowX: 'visible' }}>
+      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar" style={{ overflowX: 'visible' }}>
         {filteredNavigation.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isMenuOpen = openMenus.includes(item.name);
@@ -273,6 +243,14 @@ const Sidebar: React.FC = () => {
                     onMouseEnter={(e) => {
                       if (!itemActive) {
                         e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                      }
+                      // Update tooltip position
+                      if (isCollapsed) {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const tooltip = e.currentTarget.parentElement?.querySelector('.submenu-tooltip') as HTMLElement;
+                        if (tooltip) {
+                          tooltip.style.top = `${rect.top}px`;
+                        }
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -456,11 +434,9 @@ const Sidebar: React.FC = () => {
 
         /* Submenu tooltip styles */
         .submenu-tooltip {
-          position: absolute;
-          left: 100%;
-          top: 0;
-          margin-left: 8px;
-          z-index: 999999 !important;
+          position: fixed;
+          left: calc(80px + 8px); /* width of collapsed sidebar + margin */
+          z-index: 9999 !important;
           opacity: 0;
           visibility: hidden;
           pointer-events: none;

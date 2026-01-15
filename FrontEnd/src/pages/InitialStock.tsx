@@ -51,7 +51,7 @@ const InitialStock: React.FC = () => {
       console.error('Stores error:', storesError);
     }
     if (productsError) {
-      toast.error('Không thể tải danh sách sản phẩm');
+      toast.error('Không thể tải danh sách mặt hàng');
       console.error('Products error:', productsError);
     }
   }, [storesError, productsError]);
@@ -118,7 +118,7 @@ const InitialStock: React.FC = () => {
     }
 
     if (stockItems.length === 0 || stockItems.some(item => !item.productId || item.quantity <= 0)) {
-      toast.error('Vui lòng nhập đầy đủ thông tin sản phẩm và số lượng');
+      toast.error('Vui lòng nhập đầy đủ thông tin mặt hàng và số lượng');
       return;
     }
 
@@ -168,7 +168,7 @@ const InitialStock: React.FC = () => {
           )}
         </div>
 
-        {/* Danh sách sản phẩm */}
+        {/* Danh sách mặt hàng */}
         <div className="mb-6">
           <div className="flex justify-between items-center mb-2">
             <label className="block text-gray-700 text-sm font-bold">
@@ -197,7 +197,7 @@ const InitialStock: React.FC = () => {
                   disabled={isLoadingProducts}
                   required
                 >
-                  <option value="0">-- Chọn sản phẩm --</option>
+                  <option value="0">-- Chọn mặt hàng --</option>
                   {products?.map(product => (
                     <option key={product.id} value={product.id}>
                       {product.code} - {product.name}

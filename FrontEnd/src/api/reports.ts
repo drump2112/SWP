@@ -147,6 +147,23 @@ export interface SalesByProductItem {
   totalAmount: number;
 }
 
+export interface SalesByCustomerItem {
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  customerType: 'INTERNAL' | 'EXTERNAL';
+  products: Array<{
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    saleType: 'DEBT' | 'RETAIL';
+  }>;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
 export const reportsApi = {
   // Báo cáo doanh thu bán hàng
   getSalesReport: async (params: SalesReportParams): Promise<SalesReportItem[]> => {
@@ -206,6 +223,18 @@ export const reportsApi = {
 
   getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string; priceId?: number }): Promise<any[]> => {
     const { data } = await api.get("/reports/sales/by-shift", { params });
+    return data;
+  },
+
+  // Báo cáo xuất hàng theo khách hàng (hỗ trợ lọc khách hàng nội bộ)
+  getSalesByCustomer: async (params: {
+    storeId?: number;
+    customerId?: number;
+    fromDate?: string;
+    toDate?: string;
+    priceId?: number;
+  }): Promise<SalesByCustomerItem[]> => {
+    const { data } = await api.get("/reports/sales/by-customer", { params });
     return data;
   },
 };

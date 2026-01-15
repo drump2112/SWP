@@ -111,6 +111,8 @@ export class ShiftsService {
       ...shiftData,
       openedAt: openedAt ? new Date(openedAt) : new Date(),
       status: 'OPEN',
+      handoverName: createShiftDto.handoverName || null,
+      receiverName: createShiftDto.receiverName || null,
     });
 
     return this.shiftRepository.save(shift);
@@ -444,9 +446,20 @@ export class ShiftsService {
         debtByCustomer.set(debtSale.customerId, currentTotal + totalAmount);
       }
 
-      // Validate từng khách hàng
+      // Validate từng khách hàng (bỏ qua khách hàng nội bộ - INTERNAL)
       for (const [customerId, newDebtAmount] of debtByCustomer) {
         try {
+          // Lấy thông tin khách hàng để kiểm tra type
+          const customer = await manager.findOne(Customer, {
+            where: { id: customerId },
+            select: ['id', 'name', 'code', 'type'],
+          });
+
+          // Bỏ qua validate nếu là khách hàng nội bộ
+          if (customer?.type === 'INTERNAL') {
+            continue;
+          }
+
           const validation = await this.customersService.validateDebtLimit(
             customerId,
             shift.storeId,
@@ -454,12 +467,6 @@ export class ShiftsService {
           );
 
           if (!validation.isValid) {
-            // Lấy tên khách hàng để hiển thị lỗi rõ ràng hơn
-            const customer = await manager.findOne(Customer, {
-              where: { id: customerId },
-              select: ['id', 'name', 'code'],
-            });
-
             validationErrors.push(
               `❌ Khách hàng "${customer?.name || customerId}" (${customer?.code || ''}): ` +
               `Vượt hạn mức ${validation.exceedAmount.toLocaleString('vi-VN')}đ. ` +
@@ -532,6 +539,39 @@ export class ShiftsService {
           unitPrice: debtSale.unitPrice,
           amount: totalAmount,
         });
+      }
+    }
+
+    // 6.1.5. Xử lý Retail Sales (bán lẻ gán cho người phụ trách ca)
+    // Gán lượng bán lẻ thực tế cho customer type INTERNAL để tracking trong báo cáo
+    if (closeShiftDto.retailSales && closeShiftDto.retailSales.length > 0 && closeShiftDto.retailCustomerId) {
+      for (const retailSale of closeShiftDto.retailSales) {
+        const totalAmount = retailSale.quantity * retailSale.unitPrice;
+
+        // Lưu vào shift_debt_sales (nhưng KHÔNG tạo debt ledger vì đã thu tiền mặt)
+        const retailSaleRecord = await manager.save(ShiftDebtSale, {
+          shiftId: shift.id,
+          customerId: closeShiftDto.retailCustomerId, // Người phụ trách ca (INTERNAL)
+          productId: retailSale.productId,
+          quantity: retailSale.quantity,
+          unitPrice: retailSale.unitPrice,
+          amount: totalAmount,
+          notes: 'Bán lẻ - Thu tiền mặt',
+        });
+
+        // Ghi sales (để tracking)
+        await manager.save(Sale, {
+          shiftId: shift.id,
+          storeId: shift.storeId,
+          productId: retailSale.productId,
+          customerId: closeShiftDto.retailCustomerId,
+          quantity: retailSale.quantity,
+          unitPrice: retailSale.unitPrice,
+          amount: totalAmount,
+        });
+
+        // NOTE: KHÔNG tạo debt_ledger vì bán lẻ đã thu tiền mặt (ghi ở bước 5)
+        // Chỉ tracking vào shift_debt_sales để báo cáo "Xuất hàng theo KH" có thể lọc được
       }
     }
 
@@ -723,6 +763,14 @@ export class ShiftsService {
       }
     } else {
       shift.closedAt = new Date();
+    }
+
+    // Lưu thông tin người giao và người nhận
+    if (closeShiftDto.handoverName) {
+      shift.handoverName = closeShiftDto.handoverName;
+    }
+    if (closeShiftDto.receiverName) {
+      shift.receiverName = closeShiftDto.receiverName;
     }
 
     shift.status = 'CLOSED';

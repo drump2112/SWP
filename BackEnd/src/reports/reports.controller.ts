@@ -80,6 +80,10 @@ export class ReportsController {
     );
   }
 
+  /**
+   * GET /reports/sales/listing
+   * Báo cáo tổng hợp doanh thu
+   */
   @Get('sales/listing')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesListing(
@@ -103,6 +107,10 @@ export class ReportsController {
     );
   }
 
+  /**
+   * GET /reports/sales/by-pump
+   * Báo cáo doanh thu theo vòi bơm
+   */
   @Get('sales/by-pump')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesByPumpReport(
@@ -127,6 +135,10 @@ export class ReportsController {
     );
   }
 
+  /**
+   * GET /reports/sales/by-product
+   * Báo cáo doanh thu theo sản phẩm
+   */
   @Get('sales/by-product')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesByProductReport(
@@ -146,6 +158,10 @@ export class ReportsController {
     );
   }
 
+  /**
+   * GET /reports/sales/by-shift
+   * Báo cáo doanh thu theo ca làm việc
+   */
   @Get('sales/by-shift')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getSalesByShiftReport(
@@ -163,6 +179,34 @@ export class ReportsController {
       new Date(toDate),
       priceId ? +priceId : undefined,
     );
+  }
+
+  /**
+   * GET /reports/sales/by-customer
+   * Báo cáo xuất hàng theo khách hàng (hỗ trợ lọc khách hàng nội bộ)
+   * - Hỗ trợ lọc theo customerId (nội bộ hoặc bên ngoài)
+   * - Có thể kết hợp với storeId, fromDate, toDate
+   */
+  @Get('sales/by-customer')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByCustomerReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId?: string,
+    @Query('customerId') customerId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('priceId') priceId?: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+
+    return this.reportsService.getSalesByCustomerReport({
+      storeId: effectiveStoreId,
+      customerId: customerId ? +customerId : undefined,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+      priceId: priceId ? +priceId : undefined,
+    });
   }
 
   /**

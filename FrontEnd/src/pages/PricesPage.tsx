@@ -79,13 +79,13 @@ const PricesPage: React.FC = () => {
 
     const validItems = priceItems.filter(item => item.productId > 0 && item.price > 0);
     if (validItems.length === 0) {
-      showError('Vui lòng thêm ít nhất một sản phẩm với giá hợp lệ');
+      showError('Vui lòng thêm ít nhất một mặt hàng với giá hợp lệ');
       return;
     }
 
     const regionName = regions?.find(r => r.id === selectedRegionId)?.name;
     const confirmed = await showConfirm(
-      `Bạn có chắc chắn muốn áp dụng giá mới cho ${validItems.length} sản phẩm trong khu vực "${regionName}"?\n\nGiá cũ sẽ tự động được đóng lại.`,
+      `Bạn có chắc chắn muốn áp dụng giá mới cho ${validItems.length} mặt hàng trong khu vực "${regionName}"?\n\nGiá cũ sẽ tự động được đóng lại.`,
       'Xác nhận áp dụng giá',
       'question',
       'Áp dụng',
@@ -129,7 +129,7 @@ const PricesPage: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
           <TagIcon className="h-8 w-8 text-blue-600" />
-          Quản lý giá sản phẩm theo khu vực
+          Quản lý giá mặt hàng theo khu vực
         </h1>
         <p className="text-gray-600 mt-2">
           Áp dụng giá cho khu vực sẽ tự động áp dụng cho tất cả cửa hàng trong khu vực đó
@@ -211,7 +211,7 @@ const PricesPage: React.FC = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Sản phẩm
+                          mặt hàng
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Giá bán
@@ -319,13 +319,13 @@ const PricesPage: React.FC = () => {
               </div>
 
               <div className="mb-4 flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Danh sách sản phẩm và giá</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Danh sách mặt hàng và giá</h3>
                 <button
                   onClick={handleAddPriceItem}
                   className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
                 >
                   <PlusIcon className="h-4 w-4" />
-                  Thêm sản phẩm
+                  Thêm mặt hàng
                 </button>
               </div>
 
@@ -333,18 +333,18 @@ const PricesPage: React.FC = () => {
                 {priceItems.length === 0 ? (
                   <div className="text-center py-8 bg-gray-50 rounded-lg">
                     <TagIcon className="h-12 w-12 text-gray-300 mx-auto mb-2" />
-                    <p className="text-gray-500">Chưa có sản phẩm nào. Nhấn "Thêm sản phẩm" để bắt đầu</p>
+                    <p className="text-gray-500">Chưa có mặt hàng nào. Nhấn "Thêm mặt hàng" để bắt đầu</p>
                   </div>
                 ) : (
                   priceItems.map((item, index) => (
                     <div key={index} className="flex gap-3 items-start bg-gray-50 p-4 rounded-lg">
                       <div className="flex-1">
                         <label className="block text-xs font-medium text-gray-700 mb-1">
-                          Sản phẩm
+                          mặt hàng
                         </label>
                         <SearchableSelect
                           options={[
-                            { value: 0, label: '-- Chọn sản phẩm --' },
+                            { value: 0, label: '-- Chọn mặt hàng --' },
                             ...(products?.map(product => ({
                               value: product.id,
                               label: `${product.name} (${product.code})`
@@ -352,7 +352,7 @@ const PricesPage: React.FC = () => {
                           ]}
                           value={item.productId}
                           onChange={(value) => handlePriceItemChange(index, 'productId', Number(value))}
-                          placeholder="Chọn sản phẩm"
+                          placeholder="Chọn mặt hàng"
                         />
                       </div>
 

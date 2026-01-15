@@ -216,7 +216,7 @@ const InventoryImportPage: React.FC = () => {
                       <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
-                            Sản phẩm
+                            mặt hàng
                           </th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-1/4">
                             Bể chứa (nếu có)
@@ -241,7 +241,7 @@ const InventoryImportPage: React.FC = () => {
                                   options={productOptions}
                                   value={item.productId}
                                   onChange={(val) => handleItemChange(index, 'productId', val)}
-                                  placeholder="Chọn sản phẩm"
+                                  placeholder="Chọn mặt hàng"
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">

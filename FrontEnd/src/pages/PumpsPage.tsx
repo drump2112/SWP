@@ -219,7 +219,7 @@ const PumpsPage: React.FC = () => {
                   Bồn bể
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Sản phẩm
+                  mặt hàng
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Trạng thái
@@ -375,18 +375,20 @@ const PumpsPage: React.FC = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sản phẩm <span className="text-red-500">*</span>
+                    mặt hàng <span className="text-red-500">*</span>
                   </label>
                   <SearchableSelect
                     options={products?.filter(p => p.isFuel).map(product => ({ value: product.id, label: product.name })) || []}
                     value={selectedProductId}
                     onChange={(value) => setSelectedProductId(value as number)}
-                    placeholder="Chọn sản phẩm"
+                    placeholder="Chọn mặt hàng"
                     required
                   />
                   <input type="hidden" name="productId" value={selectedProductId || ''} required />
                 </div>
+                <div className="flex items-center justify-between">
 
+                </div>
                 <div className="flex items-center">
                   <input
                     type="checkbox"

@@ -11,7 +11,8 @@ import {
   STYLES,
 } from "../utils/report-exporter";
 import { printReport, formatNumber } from '../utils/report-printer';
-import { ArrowDownTrayIcon, PrinterIcon } from "@heroicons/react/24/outline";
+import { ArrowDownTrayIcon, PrinterIcon, ChartBarIcon } from "@heroicons/react/24/outline";
+import SearchableSelect from '../components/SearchableSelect';
 import dayjs from "dayjs";
 
 const StockReport: React.FC = () => {
@@ -318,26 +319,36 @@ const StockReport: React.FC = () => {
     : null;
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">📊 Báo Cáo Tồn Kho</h1>
-        <div className="flex gap-3">
-          <button
-            onClick={handleExportExcel}
-            disabled={isAllStores ? !allStoresReport?.length : !report}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <ArrowDownTrayIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            Xuất Excel
-          </button>
-          <button
-            onClick={handlePrint}
-            disabled={isAllStores ? !allStoresReport?.length : !report}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            <PrinterIcon className="-ml-1 mr-2 h-5 w-5" aria-hidden="true" />
-            In báo cáo
-          </button>
+    <div className="p-6 space-y-4">
+      <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <ChartBarIcon className="h-5 w-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">Báo Cáo Tồn Kho</h1>
+              <p className="text-sm text-gray-600">Theo dõi tồn kho hiện tại của các mặt hàng</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={isAllStores ? !allStoresReport?.length : !report}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+            >
+              <ArrowDownTrayIcon className="h-4 w-4 mr-1" />
+              Xuất Excel
+            </button>
+            <button
+              onClick={handlePrint}
+              disabled={isAllStores ? !allStoresReport?.length : !report}
+              className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
+            >
+              <PrinterIcon className="h-4 w-4 mr-1" />
+              In báo cáo
+            </button>
+          </div>
         </div>
       </div>
 
@@ -347,22 +358,24 @@ const StockReport: React.FC = () => {
           Chọn cửa hàng
           {isStoreUser && <span className="ml-2 text-xs text-gray-500">(Chỉ xem cửa hàng của bạn)</span>}
         </label>
-        <select
-          className="shadow border rounded w-full md:w-1/2 py-2 px-3 text-gray-700 disabled:bg-gray-100 disabled:cursor-not-allowed"
-          value={isAllStores ? 'all' : (selectedStoreId || "")}
-          onChange={(e) => handleStoreChange(e.target.value)}
-          disabled={isStoreUser}
-        >
-          <option value="">-- Chọn cửa hàng --</option>
-          {!isStoreUser && <option value="all">Tất cả cửa hàng</option>}
-          {stores
-            .filter((store: any) => !isStoreUser || store.id === user?.storeId)
-            .map((store: any) => (
-              <option key={store.id} value={store.id}>
-                {store.name} ({store.code})
-              </option>
-            ))}
-        </select>
+        <div className="w-full md:w-1/2">
+          <SearchableSelect
+            options={[
+              { value: '', label: '-- Chọn cửa hàng --' },
+              ...(!isStoreUser ? [{ value: 'all', label: 'Tất cả cửa hàng' }] : []),
+              ...stores
+                .filter((store: any) => !isStoreUser || store.id === user?.storeId)
+                .map((store: any) => ({
+                  value: store.id.toString(),
+                  label: `${store.name} (${store.code})`
+                }))
+            ]}
+            value={isAllStores ? 'all' : (selectedStoreId?.toString() || '')}
+            onChange={(value) => handleStoreChange(String(value))}
+            placeholder="-- Chọn cửa hàng --"
+            isDisabled={isStoreUser}
+          />
+        </div>
       </div>
 
       {/* Loading */}
@@ -396,7 +409,7 @@ const StockReport: React.FC = () => {
                     Mã SP
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Tên Sản Phẩm
+                    Tên mặt hàng
                   </th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Tồn Kho
@@ -483,7 +496,7 @@ const StockReport: React.FC = () => {
                       Mã SP
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tên Sản Phẩm
+                      Tên mặt hàng
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Tồn Kho
@@ -540,7 +553,7 @@ const StockReport: React.FC = () => {
           <ul className="list-disc list-inside space-y-1 text-sm">
             <li>Báo cáo hiển thị tổng tồn kho theo từng mặt hàng</li>
             <li>
-              <strong>Không phân biệt bể chứa</strong> - chỉ tổng hợp theo sản phẩm
+              <strong>Không phân biệt bể chứa</strong> - chỉ tổng hợp theo mặt hàng
             </li>
             <li>Tồn kho được tính từ tất cả giao dịch nhập/xuất trong hệ thống</li>
             <li>Dữ liệu cập nhật theo thời gian thực</li>

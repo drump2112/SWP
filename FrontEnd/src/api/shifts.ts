@@ -28,6 +28,12 @@ export interface InventoryExportDto {
   notes?: string;
 }
 
+export interface RetailSaleDto {
+  productId: number;
+  quantity: number;
+  unitPrice: number;
+}
+
 export interface CloseShiftDto {
   shiftId: number;
   pumpReadings: PumpReadingDto[];
@@ -37,6 +43,10 @@ export interface CloseShiftDto {
   inventoryImports?: InventoryImportDto[];
   inventoryExports?: InventoryExportDto[];
   closedAt?: string;
+  handoverName?: string;
+  receiverName?: string;
+  retailCustomerId?: number; // Customer ID (type INTERNAL) được gán bán lẻ
+  retailSales?: RetailSaleDto[]; // Bán lẻ thực tế để gán cho retailCustomerId
 }
 
 export interface CreateShiftDto {
@@ -44,6 +54,8 @@ export interface CreateShiftDto {
   shiftDate: string;
   shiftNo: number;
   openedAt?: string;
+  handoverName?: string;
+  receiverName?: string;
 }
 
 export interface Shift {
@@ -54,6 +66,8 @@ export interface Shift {
   openedAt: string;
   closedAt?: string;
   status: string; // OPEN, CLOSED, ADJUSTED
+  handoverName?: string;
+  receiverName?: string;
   store?: any;
 }
 

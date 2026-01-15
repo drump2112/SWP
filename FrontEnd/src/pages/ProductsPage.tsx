@@ -21,10 +21,10 @@ const ProductsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setIsModalOpen(false);
       setEditingProduct(null);
-      showSuccess('Đã thêm sản phẩm thành công!');
+      showSuccess('Đã thêm mặt hàng thành công!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Không thể thêm sản phẩm');
+      showError(error.response?.data?.message || 'Không thể thêm mặt hàng');
     },
   });
 
@@ -35,10 +35,10 @@ const ProductsPage: React.FC = () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       setIsModalOpen(false);
       setEditingProduct(null);
-      showSuccess('Đã cập nhật sản phẩm thành công!');
+      showSuccess('Đã cập nhật mặt hàng thành công!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Không thể cập nhật sản phẩm');
+      showError(error.response?.data?.message || 'Không thể cập nhật mặt hàng');
     },
   });
 
@@ -46,10 +46,10 @@ const ProductsPage: React.FC = () => {
     mutationFn: productsApi.delete,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      showSuccess('Đã xóa sản phẩm thành công!');
+      showSuccess('Đã xóa mặt hàng thành công!');
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || 'Không thể xóa sản phẩm');
+      showError(error.response?.data?.message || 'Không thể xóa mặt hàng');
     },
   });
 
@@ -77,7 +77,7 @@ const ProductsPage: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     const confirmed = await showConfirm(
-      'Bạn có chắc chắn muốn xóa sản phẩm này?',
+      'Bạn có chắc chắn muốn xóa mặt hàng này?',
       'Xác nhận xóa',
       'warning',
       'Xóa',
@@ -112,9 +112,9 @@ const ProductsPage: React.FC = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent flex items-center gap-2">
           <CubeIcon className="h-8 w-8 text-blue-600" />
-          Quản lý sản phẩm
+          Quản lý mặt hàng
         </h1>
-        <p className="text-gray-600 mt-2">Quản lý danh sách sản phẩm trong hệ thống</p>
+        <p className="text-gray-600 mt-2">Quản lý danh sách mặt hàng trong hệ thống</p>
       </div>
 
       <div className="bg-white rounded-lg shadow">
@@ -123,7 +123,7 @@ const ProductsPage: React.FC = () => {
             <div className="w-full sm:w-96">
               <input
                 type="text"
-                placeholder="Tìm kiếm theo tên hoặc mã sản phẩm..."
+                placeholder="Tìm kiếm theo tên hoặc mã mặt hàng..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
@@ -134,7 +134,7 @@ const ProductsPage: React.FC = () => {
               className="flex items-center gap-2 px-4 py-2 text-white rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 transition-all shadow-sm"
             >
               <PlusIcon className="h-5 w-5" />
-              Thêm sản phẩm
+              Thêm mặt hàng
             </button>
           </div>
         </div>
@@ -147,7 +147,7 @@ const ProductsPage: React.FC = () => {
                   Mã SP
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Tên sản phẩm
+                  Tên mặt hàng
                 </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Đơn vị
@@ -203,7 +203,7 @@ const ProductsPage: React.FC = () => {
 
           {filteredProducts?.length === 0 && (
             <div className="text-center py-12">
-              <p className="text-gray-500">Không tìm thấy sản phẩm nào</p>
+              <p className="text-gray-500">Không tìm thấy mặt hàng nào</p>
             </div>
           )}
         </div>
@@ -215,7 +215,7 @@ const ProductsPage: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
             <div className="flex justify-between items-center p-6 border-b">
               <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                {editingProduct ? 'Chỉnh sửa sản phẩm' : 'Thêm sản phẩm mới'}
+                {editingProduct ? 'Chỉnh sửa mặt hàng' : 'Thêm mặt hàng mới'}
               </h2>
               <button
                 onClick={handleCloseModal}
@@ -229,7 +229,7 @@ const ProductsPage: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mã sản phẩm <span className="text-red-500">*</span>
+                    Mã mặt hàng <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -237,13 +237,13 @@ const ProductsPage: React.FC = () => {
                     defaultValue={editingProduct?.code}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
-                    placeholder="Nhập mã sản phẩm"
+                    placeholder="Nhập mã mặt hàng"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tên sản phẩm <span className="text-red-500">*</span>
+                    Tên mặt hàng <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -251,7 +251,7 @@ const ProductsPage: React.FC = () => {
                     defaultValue={editingProduct?.name}
                     required
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
-                    placeholder="Nhập tên sản phẩm"
+                    placeholder="Nhập tên mặt hàng"
                   />
                 </div>
 
