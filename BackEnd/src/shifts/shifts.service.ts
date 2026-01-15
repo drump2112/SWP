@@ -542,39 +542,6 @@ export class ShiftsService {
       }
     }
 
-    // 6.1.5. Xử lý Retail Sales (bán lẻ gán cho người phụ trách ca)
-    // Gán lượng bán lẻ thực tế cho customer type INTERNAL để tracking trong báo cáo
-    if (closeShiftDto.retailSales && closeShiftDto.retailSales.length > 0 && closeShiftDto.retailCustomerId) {
-      for (const retailSale of closeShiftDto.retailSales) {
-        const totalAmount = retailSale.quantity * retailSale.unitPrice;
-
-        // Lưu vào shift_debt_sales (nhưng KHÔNG tạo debt ledger vì đã thu tiền mặt)
-        const retailSaleRecord = await manager.save(ShiftDebtSale, {
-          shiftId: shift.id,
-          customerId: closeShiftDto.retailCustomerId, // Người phụ trách ca (INTERNAL)
-          productId: retailSale.productId,
-          quantity: retailSale.quantity,
-          unitPrice: retailSale.unitPrice,
-          amount: totalAmount,
-          notes: 'Bán lẻ - Thu tiền mặt',
-        });
-
-        // Ghi sales (để tracking)
-        await manager.save(Sale, {
-          shiftId: shift.id,
-          storeId: shift.storeId,
-          productId: retailSale.productId,
-          customerId: closeShiftDto.retailCustomerId,
-          quantity: retailSale.quantity,
-          unitPrice: retailSale.unitPrice,
-          amount: totalAmount,
-        });
-
-        // NOTE: KHÔNG tạo debt_ledger vì bán lẻ đã thu tiền mặt (ghi ở bước 5)
-        // Chỉ tracking vào shift_debt_sales để báo cáo "Xuất hàng theo KH" có thể lọc được
-      }
-    }
-
     // 6.2. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
     if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
       for (const receipt of closeShiftDto.receipts) {

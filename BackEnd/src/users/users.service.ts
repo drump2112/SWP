@@ -31,6 +31,14 @@ export class UsersService {
     });
   }
 
+  async findByStore(storeId: number) {
+    return this.userRepository.find({
+      where: { storeId },
+      relations: ['role', 'store'],
+      select: ['id', 'username', 'fullName', 'roleId', 'storeId', 'isActive', 'createdAt']
+    });
+  }
+
   async findOne(id: number) {
     return this.userRepository.findOne({
       where: { id },

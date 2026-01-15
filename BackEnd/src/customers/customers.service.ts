@@ -759,12 +759,12 @@ export class CustomersService {
             await manager.save(customerStore);
           }
 
-          // 3. Kiểm tra số dư phải > 0
-          if (item.openingBalance <= 0) {
+          // 3. Kiểm tra số dư không được bằng 0
+          if (item.openingBalance === 0) {
             errors.push({
               row: rowNumber,
               customerCode: item.customerCode,
-              message: 'Số dư đầu kỳ phải lớn hơn 0',
+              message: 'Số dư đầu kỳ không được bằng 0',
             });
             failedCount++;
             continue;
@@ -775,8 +775,14 @@ export class CustomersService {
           debtLedger.customerId = customer.id;
           debtLedger.storeId = storeId;
           debtLedger.refType = 'OPENING_BALANCE';
-          debtLedger.debit = item.openingBalance; // Khách nợ = debit
-          debtLedger.credit = 0;
+          // Dương = khách nợ (debit), âm = khách được nợ (credit)
+          if (item.openingBalance > 0) {
+            debtLedger.debit = item.openingBalance;
+            debtLedger.credit = 0;
+          } else {
+            debtLedger.debit = 0;
+            debtLedger.credit = Math.abs(item.openingBalance);
+          }
           debtLedger.notes = item.description || 'Số dư đầu kỳ công nợ';
           debtLedger.createdAt = new Date(transactionDate);
 
@@ -799,6 +805,77 @@ export class CustomersService {
       failed: failedCount,
       errors,
       debtLedgerIds,
+    };
+  }
+
+  /**
+   * Lấy danh sách các bản ghi Opening Balance đã nhập
+   */
+  async getOpeningBalanceRecords(storeId?: number) {
+    const queryBuilder = this.debtLedgerRepository
+      .createQueryBuilder('dl')
+      .leftJoinAndSelect('dl.customer', 'c')
+      .leftJoinAndSelect('dl.store', 's')
+      .where('dl.ref_type = :refType', { refType: 'OPENING_BALANCE' })
+      .orderBy('dl.created_at', 'DESC');
+
+    if (storeId) {
+      queryBuilder.andWhere('dl.store_id = :storeId', { storeId });
+    }
+
+    const records = await queryBuilder.getMany();
+
+    return records.map((record) => ({
+      id: record.id,
+      customerId: record.customerId,
+      customerCode: record.customer?.code,
+      customerName: record.customer?.name,
+      storeId: record.storeId,
+      storeName: record.store?.name,
+      // Dương = khách nợ (debit), âm = khách được nợ (credit)
+      balance: Number(record.debit) - Number(record.credit),
+      notes: record.notes,
+      createdAt: record.createdAt,
+    }));
+  }
+
+  /**
+   * Cập nhật số dư đầu kỳ
+   */
+  async updateOpeningBalance(id: number, newBalance: number, notes?: string, createdAt?: string) {
+    const record = await this.debtLedgerRepository.findOne({
+      where: { id, refType: 'OPENING_BALANCE' },
+    });
+
+    if (!record) {
+      throw new NotFoundException('Không tìm thấy bản ghi số dư đầu kỳ');
+    }
+
+    if (newBalance === 0) {
+      throw new BadRequestException('Số dư đầu kỳ không được bằng 0');
+    }
+
+    // Dương = khách nợ (debit), âm = khách được nợ (credit)
+    if (newBalance > 0) {
+      record.debit = newBalance;
+      record.credit = 0;
+    } else {
+      record.debit = 0;
+      record.credit = Math.abs(newBalance);
+    }
+    if (notes !== undefined) {
+      record.notes = notes;
+    }
+    if (createdAt !== undefined) {
+      record.createdAt = new Date(createdAt);
+    }
+
+    await this.debtLedgerRepository.save(record);
+
+    return {
+      message: 'Cập nhật số dư đầu kỳ thành công',
+      id: record.id,
+      newBalance,
     };
   }
 }

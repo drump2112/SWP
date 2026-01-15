@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Query } from '@nestjs/common';
 import { CashService } from './cash.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -37,5 +37,26 @@ export class CashController {
   @Roles('ADMIN', 'ACCOUNTING')
   setOpeningBalance(@Body() dto: OpeningBalanceCashDto) {
     return this.cashService.setOpeningBalance(dto);
+  }
+
+  /**
+   * GET /cash/opening-balance
+   * Lấy danh sách các bản ghi số dư đầu kỳ
+   * Có thể filter theo storeId
+   */
+  @Get('opening-balance')
+  @Roles('ADMIN', 'ACCOUNTING', 'DIRECTOR')
+  getOpeningBalanceRecords(@Query('storeId') storeId?: string) {
+    return this.cashService.getOpeningBalanceRecords(storeId ? +storeId : undefined);
+  }
+
+  /**
+   * PUT /cash/opening-balance
+   * Cập nhật số dư đầu kỳ đã tạo
+   */
+  @Put('opening-balance')
+  @Roles('ADMIN', 'ACCOUNTING')
+  updateOpeningBalance(@Body() body: { id: number; openingBalance: number; notes?: string; effectiveDate?: string }) {
+    return this.cashService.updateOpeningBalance(body.id, body.openingBalance, body.notes, body.effectiveDate);
   }
 }

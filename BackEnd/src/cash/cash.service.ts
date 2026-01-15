@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CashLedger } from '../entities/cash-ledger.entity';
+import { Store } from '../entities/store.entity';
 import { OpeningBalanceCashDto } from './dto/opening-balance-cash.dto';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class CashService {
   constructor(
     @InjectRepository(CashLedger)
     private cashLedgerRepository: Repository<CashLedger>,
+    @InjectRepository(Store)
+    private storeRepository: Repository<Store>,
   ) {}
 
   async getCashBalance(storeId: number) {
@@ -135,6 +138,84 @@ export class CashService {
         cashLedgerId: savedLedger.id,
         effectiveDate: effectiveDateValue,
         notes,
+      },
+    };
+  }
+
+  /**
+   * Lấy danh sách các bản ghi số dư đầu kỳ
+   */
+  async getOpeningBalanceRecords(storeId?: number) {
+    const queryBuilder = this.cashLedgerRepository
+      .createQueryBuilder('cl')
+      .leftJoinAndSelect('cl.store', 'store')
+      .where('cl.refType = :refType', { refType: 'OPENING_BALANCE' });
+
+    if (storeId) {
+      queryBuilder.andWhere('cl.storeId = :storeId', { storeId });
+    }
+
+    queryBuilder.orderBy('cl.createdAt', 'DESC');
+
+    const records = await queryBuilder.getMany();
+
+    return records.map(record => ({
+      id: record.id,
+      storeId: record.storeId,
+      storeName: record.store?.name,
+      cashIn: Number(record.cashIn),
+      cashOut: Number(record.cashOut),
+      netAmount: Number(record.cashIn) - Number(record.cashOut),
+      effectiveDate: record.createdAt,
+      createdAt: record.createdAt,
+    }));
+  }
+
+  /**
+   * Cập nhật số dư đầu kỳ
+   */
+  async updateOpeningBalance(id: number, newOpeningBalance: number, notes?: string, effectiveDate?: string) {
+    // 1. Tìm record cũ
+    const oldRecord = await this.cashLedgerRepository.findOne({
+      where: { id, refType: 'OPENING_BALANCE' },
+    });
+
+    if (!oldRecord) {
+      throw new BadRequestException('Không tìm thấy bản ghi số dư đầu kỳ');
+    }
+
+    // 2. Tính số dư đầu kỳ cũ
+    const oldOpeningBalance = Number(oldRecord.cashIn) - Number(oldRecord.cashOut);
+
+    // 3. Tính adjustment mới
+    const adjustment = newOpeningBalance - oldOpeningBalance;
+
+    if (adjustment === 0 && !effectiveDate) {
+      return {
+        success: true,
+        message: 'Số dư không thay đổi',
+      };
+    }
+
+    // 4. Cập nhật record
+    oldRecord.cashIn = adjustment > 0 ? Number(oldRecord.cashIn) + adjustment : Number(oldRecord.cashIn);
+    oldRecord.cashOut = adjustment < 0 ? Number(oldRecord.cashOut) + Math.abs(adjustment) : Number(oldRecord.cashOut);
+
+    // Cập nhật ngày hiệu lực nếu có
+    if (effectiveDate) {
+      oldRecord.createdAt = new Date(effectiveDate);
+    }
+
+    await this.cashLedgerRepository.save(oldRecord);
+
+    return {
+      success: true,
+      message: 'Cập nhật số dư đầu kỳ thành công',
+      data: {
+        id,
+        oldOpeningBalance,
+        newOpeningBalance,
+        adjustment,
       },
     };
   }

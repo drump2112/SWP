@@ -22,6 +22,12 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  @Get('by-store/:storeId')
+  @Roles('ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING', 'STORE')
+  findByStore(@Param('storeId') storeId: string) {
+    return this.usersService.findByStore(+storeId);
+  }
+
   @Get(':id')
   @Roles('ADMIN', 'DIRECTOR')
   findOne(@Param('id') id: string) {

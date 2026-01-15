@@ -914,4 +914,114 @@ export class InventoryService {
       })),
     };
   }
+
+  /**
+   * Lấy danh sách bản ghi tồn đầu
+   * Lấy từ inventory_ledger với ref_type = 'ADJUSTMENT' (đây là cách nhập tồn đầu)
+   * Group theo warehouse_id vì mỗi cửa hàng chỉ có 1 bản ghi tồn đầu (gồm nhiều mặt hàng)
+   */
+  async getInitialStockRecords(storeId?: number) {
+    const query = `
+      SELECT
+        w.store_id as "id",
+        COALESCE(led.ref_id, 0) as "documentId",
+        w.store_id as "storeId",
+        s.name as "storeName",
+        w.id as "warehouseId",
+        MIN(led.created_at) as "effectiveDate",
+        doc.supplier_name as "notes",
+        MIN(led.created_at) as "createdAt",
+        json_agg(
+          json_build_object(
+            'productId', led.product_id,
+            'productCode', p.code,
+            'productName', p.name,
+            'quantity', led.quantity_in,
+            'tankId', led.tank_id
+          ) ORDER BY p.code
+        ) as items
+      FROM inventory_ledger led
+      INNER JOIN warehouses w ON w.id = led.warehouse_id
+      INNER JOIN stores s ON s.id = w.store_id
+      LEFT JOIN inventory_documents doc ON doc.id = led.ref_id
+      LEFT JOIN products p ON p.id = led.product_id
+      WHERE led.ref_type = 'ADJUSTMENT'
+        AND led.shift_id IS NULL
+        ${storeId ? 'AND w.store_id = $1' : ''}
+      GROUP BY w.store_id, s.name, w.id, led.ref_id, doc.supplier_name
+      ORDER BY MIN(led.created_at) DESC, s.name
+    `;
+
+    const params = storeId ? [storeId] : [];
+    const records = await this.dataSource.query(query, params);
+
+    return records;
+  }
+
+  /**
+   * Cập nhật tồn đầu kỳ
+   */
+  async updateInitialStock(dto: any) {
+    const { documentId, storeId, items, notes, effectiveDate } = dto;
+
+    return this.dataSource.transaction(async (manager) => {
+      // Lấy warehouse của store
+      const warehouse = await manager.findOne(Warehouse, {
+        where: { storeId, type: 'STORE' },
+      });
+
+      if (!warehouse) {
+        throw new NotFoundException(`Không tìm thấy kho cho cửa hàng`);
+      }
+
+      // Xóa tất cả ledger cũ của warehouse với ref_type = 'ADJUSTMENT' và shift_id IS NULL
+      await manager.query(
+        `DELETE FROM inventory_ledger
+         WHERE warehouse_id = $1
+           AND ref_type = 'ADJUSTMENT'
+           AND shift_id IS NULL`,
+        [warehouse.id]
+      );
+
+      // Tìm hoặc tạo document nếu cần
+      let document: InventoryDocument | null = null;
+      if (documentId && documentId > 0) {
+        document = await manager.findOne(InventoryDocument, {
+          where: { id: documentId },
+        });
+      }
+
+      // Tạo lại ledger mới với ngày hiệu lực nếu có
+      const ledgerDate = effectiveDate ? new Date(effectiveDate) : new Date();
+      for (const item of items) {
+        const ledger = manager.create(InventoryLedger, {
+          warehouseId: warehouse.id,
+          productId: item.productId,
+          tankId: item.tankId,
+          refType: 'ADJUSTMENT',
+          refId: document?.id,
+          quantityIn: item.quantity,
+          quantityOut: 0,
+          createdAt: ledgerDate,
+        });
+        await manager.save(InventoryLedger, ledger);
+      }
+
+      // Cập nhật notes và effectiveDate trong document nếu có
+      if (document) {
+        if (notes !== undefined) {
+          document.supplierName = notes;
+        }
+        if (effectiveDate) {
+          document.effectiveDate = new Date(effectiveDate);
+        }
+        await manager.save(InventoryDocument, document);
+      }
+
+      return {
+        message: 'Cập nhật tồn đầu thành công',
+        documentId: document?.id || null,
+      };
+    });
+  }
 }

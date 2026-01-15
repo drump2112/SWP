@@ -15,6 +15,7 @@ import { InventoryDocument } from '../entities/inventory-document.entity';
 import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { Product } from '../entities/product.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { ProductPrice } from '../entities/product-price.entity';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 
@@ -36,6 +37,7 @@ import { ReportsController } from './reports.controller';
       InventoryDocumentItem,
       Product,
       Warehouse,
+      ProductPrice,
     ]),
   ],
   controllers: [ReportsController],

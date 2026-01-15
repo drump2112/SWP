@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
@@ -27,22 +27,58 @@ export class CustomersController {
     return this.customersService.findAll(storeId ? +storeId : undefined);
   }
 
+  // ============ OPENING BALANCE ENDPOINTS ============
+  // MUST be before @Get(':id') to avoid route conflict
+
+  @Get('opening-balance')
+  @Roles('ADMIN', 'ACCOUNTING', 'DIRECTOR')
+  getOpeningBalanceRecords(@Query('storeId') storeId?: string) {
+    return this.customersService.getOpeningBalanceRecords(storeId ? +storeId : undefined);
+  }
+
+  @Post('opening-balance/import')
+  @Roles('ADMIN')
+  importOpeningBalance(@Body() dto: ImportOpeningBalanceDto) {
+    return this.customersService.importOpeningBalance(dto);
+  }
+
+  @Put('opening-balance/:id')
+  @Roles('ADMIN', 'ACCOUNTING')
+  updateOpeningBalance(
+    @Param('id') id: string,
+    @Body() body: { balance: number; notes?: string; createdAt?: string }
+  ) {
+    return this.customersService.updateOpeningBalance(+id, body.balance, body.notes, body.createdAt);
+  }
+
   @Get(':id')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   findOne(@Param('id') id: string) {
-    return this.customersService.findOne(+id);
+    const numId = +id;
+    if (isNaN(numId)) {
+      throw new BadRequestException(`Invalid customer ID: ${id}`);
+    }
+    return this.customersService.findOne(numId);
   }
 
   @Put(':id')
   @Roles('SALES', 'ADMIN')
   update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
-    return this.customersService.update(+id, updateCustomerDto);
+    const numId = +id;
+    if (isNaN(numId)) {
+      throw new BadRequestException(`Invalid customer ID: ${id}`);
+    }
+    return this.customersService.update(numId, updateCustomerDto);
   }
 
   @Delete(':id')
   @Roles('ADMIN')
   remove(@Param('id') id: string) {
-    return this.customersService.remove(+id);
+    const numId = +id;
+    if (isNaN(numId)) {
+      throw new BadRequestException(`Invalid customer ID: ${id}`);
+    }
+    return this.customersService.remove(numId);
   }
 
   @Get(':id/balance')
@@ -129,13 +165,5 @@ export class CustomersController {
       body.storeId,
       body.newDebtAmount
     );
-  }
-
-  // ============ OPENING BALANCE ENDPOINTS ============
-
-  @Post('opening-balance/import')
-  @Roles('ADMIN')
-  importOpeningBalance(@Body() dto: ImportOpeningBalanceDto) {
-    return this.customersService.importOpeningBalance(dto);
   }
 }

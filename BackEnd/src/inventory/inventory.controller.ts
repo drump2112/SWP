@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Query, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Query, Res, BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { InventoryService } from './inventory.service';
 import { InventoryExportService } from './inventory-export.service';
@@ -173,5 +173,26 @@ export class InventoryController {
   @Roles('ADMIN')
   setSimpleInitialStock(@Body() dto: SimpleInitialStockDto) {
     return this.inventoryService.setSimpleInitialStock(dto);
+  }
+
+  /**
+   * GET /inventory/initial-stock-records
+   * Lấy danh sách bản ghi tồn đầu theo cửa hàng
+   * Query params: storeId (optional)
+   */
+  @Get('initial-stock-records')
+  @Roles('ADMIN', 'ACCOUNTING')
+  getInitialStockRecords(@Query('storeId') storeId?: string) {
+    return this.inventoryService.getInitialStockRecords(storeId ? +storeId : undefined);
+  }
+
+  /**
+   * PUT /inventory/initial-stock
+   * Cập nhật tồn đầu kỳ
+   */
+  @Put('initial-stock')
+  @Roles('ADMIN', 'ACCOUNTING')
+  updateInitialStock(@Body() dto: any) {
+    return this.inventoryService.updateInitialStock(dto);
   }
 }

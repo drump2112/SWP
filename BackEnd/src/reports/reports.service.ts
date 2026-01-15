@@ -16,6 +16,7 @@ import { InventoryDocument } from '../entities/inventory-document.entity';
 import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { Product } from '../entities/product.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { ProductPrice } from '../entities/product-price.entity';
 
 @Injectable()
 export class ReportsService {
@@ -50,6 +51,8 @@ export class ReportsService {
     private productRepository: Repository<Product>,
     @InjectRepository(Warehouse)
     private warehouseRepository: Repository<Warehouse>,
+    @InjectRepository(ProductPrice)
+    private productPriceRepository: Repository<ProductPrice>,
   ) {}
 
   // ==================== BÁO CÁO CÔNG NỢ ====================
@@ -718,7 +721,8 @@ export class ReportsService {
 
   /**
    * Báo cáo xuất hàng theo khách hàng
-   * Bao gồm cả bán công nợ (debt sales) và bán lẻ (nếu có gán cho khách hàng nội bộ)
+   * - Công nợ: Lấy từ shift_debt_sales
+   * - Bán lẻ: Tính từ pump_readings - shift_debt_sales (nhóm theo product)
    */
   async getSalesByCustomerReport(params: {
     storeId?: number;
@@ -729,7 +733,30 @@ export class ReportsService {
   }) {
     const { storeId, customerId, fromDate, toDate, priceId } = params;
 
-    // Query từ shift_debt_sales (bán công nợ)
+    console.log('🔍 getSalesByCustomerReport params:', { storeId, customerId, fromDate, toDate, priceId });
+
+    // Nếu có priceId, query để lấy thông tin price
+    let priceInfo: { productId: number; price: number } | null = null;
+    if (priceId) {
+      const price = await this.productPriceRepository
+        .createQueryBuilder('pp')
+        .select('pp.product_id', 'productId')
+        .addSelect('pp.price', 'price')
+        .where('pp.id = :priceId', { priceId })
+        .getRawOne();
+
+      if (price) {
+        priceInfo = {
+          productId: price.productId,
+          price: parseFloat(price.price)
+        };
+        console.log('🔍 Price filter:', priceInfo);
+      } else {
+        console.log('⚠️ Price not found for priceId:', priceId);
+      }
+    }
+
+    // 1. Query bán công nợ từ shift_debt_sales
     const debtSalesQuery = this.shiftDebtSaleRepository
       .createQueryBuilder('sds')
       .leftJoin('sds.shift', 'shift')
@@ -747,17 +774,12 @@ export class ReportsService {
       .addSelect("'DEBT'", 'saleType')
       .where('shift.status = :status', { status: 'CLOSED' });
 
-    // Filter theo storeId
     if (storeId) {
       debtSalesQuery.andWhere('shift.store_id = :storeId', { storeId });
     }
-
-    // Filter theo customerId
     if (customerId) {
       debtSalesQuery.andWhere('sds.customer_id = :customerId', { customerId });
     }
-
-    // Filter theo khoảng thời gian
     if (fromDate) {
       debtSalesQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
     }
@@ -765,29 +787,183 @@ export class ReportsService {
       debtSalesQuery.andWhere('shift.shift_date <= :toDate', { toDate });
     }
 
-    // Filter theo priceId nếu có
-    if (priceId) {
-      debtSalesQuery
-        .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
-        .andWhere('sds.unit_price = pp.price');
-    }
-
     debtSalesQuery
-      .groupBy('customer.id')
-      .addGroupBy('customer.code')
-      .addGroupBy('customer.name')
-      .addGroupBy('customer.type')
-      .addGroupBy('product.id')
-      .addGroupBy('product.name')
+      .groupBy('customer.id, customer.code, customer.name, customer.type, product.id, product.name')
       .orderBy('customer.name', 'ASC')
       .addOrderBy('product.name', 'ASC');
 
-    const results = await debtSalesQuery.getRawMany();
+    // Nếu có priceInfo, áp dụng filter
+    if (priceInfo) {
+      debtSalesQuery.andWhere('sds.product_id = :productId', { productId: priceInfo.productId });
+      debtSalesQuery.andWhere('CAST(sds.unit_price AS DECIMAL(18,2)) = :price', { price: priceInfo.price });
+    }
+
+    // Execute debt query sau khi đã áp dụng tất cả filters
+    const debtResults = await debtSalesQuery.getRawMany();
+
+    // 2. Query bán lẻ: Tính từ pump_readings - debt_sales (theo product)
+    // Lưu ý: pump_readings có product_id riêng, không cần join qua pump
+    const retailSalesQuery = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('shift.store', 'store')
+      .leftJoin('pr.product', 'product') // Join trực tiếp từ pump_reading.product_id
+      .select('store.id', 'customerId')
+      .addSelect('store.code', 'customerCode')
+      .addSelect('store.name', 'customerName')
+      .addSelect("'INTERNAL'", 'customerType')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(pr.end_value - pr.start_value)', 'pumpQuantity')
+      .addSelect('AVG(pr.unit_price)', 'unitPrice')
+      .where('shift.status = :status', { status: 'CLOSED' })
+      .andWhere('pr.product_id IS NOT NULL'); // Chỉ lấy pump readings có product
+
+    if (storeId) {
+      retailSalesQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+    if (customerId) {
+      retailSalesQuery.andWhere('store.id = :customerId', { customerId });
+    }
+    if (fromDate) {
+      retailSalesQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      retailSalesQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+
+    retailSalesQuery
+      .groupBy('store.id, store.code, store.name, product.id, product.name')
+      .orderBy('store.name', 'ASC')
+      .addOrderBy('product.name', 'ASC');
+
+    // Nếu có priceInfo, áp dụng filter
+    if (priceInfo) {
+      retailSalesQuery.andWhere('product.id = :productId', { productId: priceInfo.productId });
+      retailSalesQuery.andWhere('CAST(pr.unit_price AS DECIMAL(18,2)) = :price', { price: priceInfo.price });
+    }
+
+    // Execute query sau khi đã áp dụng tất cả filters
+    const pumpResults = await retailSalesQuery.getRawMany();
+
+    console.log('========================================');
+    console.log('🔍 RETAIL SALES QUERY RESULTS');
+    console.log('========================================');
+    console.log('🔍 DEBUG pumpResults count:', pumpResults.length);
+    console.log('🔍 DEBUG pumpResults:', JSON.stringify(pumpResults, null, 2));
+    pumpResults.forEach((p, idx) => {
+      console.log(`  [${idx}] Store: ${p.customerName}, Product: ${p.productName} (ID: ${p.productId}), Qty: ${p.pumpQuantity}`);
+    });
+    console.log('🔍 DEBUG debtResults count:', debtResults.length);
+    console.log('🔍 DEBUG debtResults:', JSON.stringify(debtResults, null, 2));
+
+    // Tính debt cho từng shift + product
+    const debtByShiftProduct = new Map<string, number>();
+    debtResults.forEach(debt => {
+      // Cần query lại để lấy shiftId cho mỗi debt
+      // Hoặc đơn giản hơn: tính tổng debt theo product, không theo shift
+    });
+
+    // Cách đơn giản hơn: Query debt theo store + product (không cần theo shift)
+    const debtByStoreProductQuery = this.shiftDebtSaleRepository
+      .createQueryBuilder('sds')
+      .leftJoin('sds.shift', 'shift')
+      .leftJoin('sds.customer', 'customer')
+      .leftJoin('sds.product', 'product')
+      .select('shift.store_id', 'storeId')
+      .addSelect('product.id', 'productId')
+      .addSelect('SUM(sds.quantity)', 'debtQuantity')
+      .where('shift.status = :status', { status: 'CLOSED' });
+
+    if (storeId) {
+      debtByStoreProductQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+    if (fromDate) {
+      debtByStoreProductQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      debtByStoreProductQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+    if (priceInfo) {
+      debtByStoreProductQuery.andWhere('sds.product_id = :productId', { productId: priceInfo.productId });
+      debtByStoreProductQuery.andWhere('sds.unit_price = :price', { price: priceInfo.price });
+    }
+
+    debtByStoreProductQuery.groupBy('shift.store_id, product.id');
+
+    const debtByStoreProduct = await debtByStoreProductQuery.getRawMany();
+
+    console.log('🔍 DEBUG debtByStoreProduct:', JSON.stringify(debtByStoreProduct, null, 2));
+
+    // Map để lookup debt nhanh
+    const debtMap = new Map<string, number>();
+    const debtByStoreMap = new Map<number, number>(); // Tổng debt theo store (tất cả products)
+
+    debtByStoreProduct.forEach(d => {
+      const key = `${d.storeId}_${d.productId}`;
+      const debtQty = parseFloat(d.debtQuantity) || 0;
+      debtMap.set(key, debtQty);
+
+      // Cộng dồn tổng debt cho mỗi store
+      const currentTotal = debtByStoreMap.get(d.storeId) || 0;
+      debtByStoreMap.set(d.storeId, currentTotal + debtQty);
+
+      console.log(`🔍 debtMap.set("${key}", ${debtQty})`);
+    });
+
+    // Tính retail = pump - debt cho mỗi product (pump đã được SUM trong query)
+    const retailResults: any[] = [];
+    pumpResults.forEach(p => {
+      const key = `${p.customerId}_${p.productId}`;
+      const pumpQty = parseFloat(p.pumpQuantity) || 0;
+
+      // Nếu productId = null, trừ đi TỔNG TẤT CẢ debt của store đó
+      let debtQty = 0;
+      if (p.productId === null) {
+        debtQty = debtByStoreMap.get(p.customerId) || 0;
+        console.log(`🔍 productId=null, using total debt for store ${p.customerId}: ${debtQty}`);
+      } else {
+        debtQty = debtMap.get(key) || 0;
+      }
+
+      const retailQty = pumpQty - debtQty;
+      console.log(`🔍 RETAIL: ${p.customerName} - ${p.productName}: pump=${pumpQty}, debt=${debtQty}, retail=${retailQty}`);
+
+      // Luôn thêm vào kết quả, ngay cả khi retailQty <= 0
+      // Frontend sẽ quyết định có hiển thị hay không
+      retailResults.push({
+        customerId: p.customerId,
+        customerCode: p.customerCode,
+        customerName: p.customerName,
+        customerType: p.customerType,
+        productId: p.productId,
+        productName: p.productName,
+        totalQuantity: retailQty,
+        unitPrice: parseFloat(p.unitPrice) || 0,
+        totalAmount: retailQty * parseFloat(p.unitPrice || 0),
+        saleType: 'RETAIL'
+      });
+    });
+
+    console.log('========================================');
+    console.log('🔍 RETAIL RESULTS AFTER CALCULATION');
+    console.log('========================================');
+    console.log('🔍 DEBUG retailResults count:', retailResults.length);
+    console.log('🔍 DEBUG retailResults:', JSON.stringify(retailResults, null, 2));
+
+    // Merge results
+    const allResults = [...debtResults, ...retailResults];
+
+    console.log('========================================');
+    console.log('🔍 ALL RESULTS (MERGED)');
+    console.log('========================================');
+    console.log('🔍 DEBUG allResults count:', allResults.length, '(debt:', debtResults.length, ', retail:', retailResults.length, ')');
+    console.log('🔍 DEBUG allResults:', JSON.stringify(allResults, null, 2));
 
     // Format kết quả theo khách hàng
     const customerMap = new Map<number, any>();
 
-    results.forEach((row) => {
+    allResults.forEach((row) => {
       const customerId = row.customerId;
       if (!customerMap.has(customerId)) {
         customerMap.set(customerId, {
@@ -802,16 +978,25 @@ export class ReportsService {
       }
 
       const customer = customerMap.get(customerId);
+      const quantity = parseFloat(row.totalQuantity) || 0;
+      const amount = parseFloat(row.totalAmount) || 0;
+
+      // Luôn thêm vào products, ngay cả khi quantity <= 0
+      // Điều này cho phép frontend filter và hiển thị chính xác
       customer.products.push({
         productId: row.productId,
-        productName: row.productName,
-        quantity: parseFloat(row.totalQuantity),
-        unitPrice: parseFloat(row.unitPrice),
-        amount: parseFloat(row.totalAmount),
+        productName: row.productName || 'Sản phẩm không xác định',
+        quantity: quantity,
+        unitPrice: parseFloat(row.unitPrice) || 0,
+        amount: amount,
         saleType: row.saleType,
       });
-      customer.totalQuantity += parseFloat(row.totalQuantity);
-      customer.totalAmount += parseFloat(row.totalAmount);
+
+      // Chỉ cộng vào tổng nếu quantity > 0
+      if (quantity > 0) {
+        customer.totalQuantity += quantity;
+        customer.totalAmount += amount;
+      }
     });
 
     return Array.from(customerMap.values());
