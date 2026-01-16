@@ -32,19 +32,27 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-4 py-12"
-      style={{ background: 'linear-gradient(135deg, #315eac 0%, #5a8ed1 50%, #f78f1e 100%)' }}
-    >
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-2xl shadow-2xl p-10">
-          {/* Logo và tiêu đề */}
-          <div className="text-center mb-10">
-            <div className="flex justify-center mb-4">
-              <img src="/logo.png" alt="QLXD System" className="h-24 w-auto" />
-            </div>
-
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
+      <div className="max-w-6xl w-full mx-4 my-8">
+        <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-2">
+            {/* Left Side - Login Form */}
+            <div className="p-8 lg:p-12 xl:p-16">
+              {/* Logo và tiêu đề */}
+              <div className="mb-10 text-center">
+                <div className="flex justify-center mb-6">
+                  <img src="/logo.png" alt="QLXD System" className="h-20 w-auto drop-shadow-lg" />
+                </div>
+                <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-500 to-cyan-600 mb-3">
+                  Đăng nhập
+                </h1>
+                <div className="flex items-center justify-center gap-2 text-gray-600 mb-6">
+                  <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1zm-5 8.274l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L5 10.274zm10 0l-.818 2.552c.25.112.526.174.818.174.292 0 .569-.062.818-.174L15 10.274z" clipRule="evenodd" />
+                  </svg>
+                  <p className="text-sm font-medium">Hệ thống quản lý cửa hàng xăng dầu</p>
+                </div>
+              </div>
 
           {error && (
             <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
@@ -73,7 +81,7 @@ const LoginPage: React.FC = () => {
                 autoComplete="username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300 transition-all"
                 placeholder="Nhập tên đăng nhập"
               />
             </div>
@@ -90,7 +98,7 @@ const LoginPage: React.FC = () => {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                  className="block w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-blue-300 transition-all"
                   placeholder="Nhập mật khẩu"
                 />
                 <button
@@ -112,19 +120,19 @@ const LoginPage: React.FC = () => {
               disabled={loading}
               className="w-full flex justify-center items-center py-3.5 px-4 border border-transparent rounded-lg shadow-md text-base font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed transition-all transform hover:scale-[1.02] active:scale-[0.98]"
               style={{
-                backgroundColor: loading ? '#9ca3af' : '#f78f1e',
-                boxShadow: loading ? 'none' : '0 4px 14px 0 rgba(247, 143, 30, 0.39)'
+                backgroundColor: loading ? '#9ca3af' : '#3b82f6',
+                boxShadow: loading ? 'none' : '0 4px 14px 0 rgba(59, 130, 246, 0.39)'
               }}
               onMouseEnter={(e) => {
                 if (!loading) {
-                  e.currentTarget.style.backgroundColor = '#e07c0f';
-                  e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(247, 143, 30, 0.5)';
+                  e.currentTarget.style.backgroundColor = '#2563eb';
+                  e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(59, 130, 246, 0.5)';
                 }
               }}
               onMouseLeave={(e) => {
                 if (!loading) {
-                  e.currentTarget.style.backgroundColor = '#f78f1e';
-                  e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(247, 143, 30, 0.39)';
+                  e.currentTarget.style.backgroundColor = '#3b82f6';
+                  e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(59, 130, 246, 0.39)';
                 }
               }}
             >
@@ -142,11 +150,46 @@ const LoginPage: React.FC = () => {
             </button>
           </form>
 
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-xs text-gray-500">
-              © 2026 QLXD. SWP.
-            </p>
+              {/* Footer */}
+              <div className="mt-8">
+                <p className="text-xs text-gray-500 text-center">
+                  © 2026 QLXD. SWP.
+                </p>
+              </div>
+            </div>
+
+            {/* Right Side - Welcome Panel */}
+            <div className="hidden lg:flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 p-12">
+              <div className="text-center max-w-xl w-full px-8">
+                <div className="mb-16">
+                  <h2 className="font-black tracking-wider leading-tight uppercase" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif", letterSpacing: '0.05em', fontSize: 'clamp(4rem, 12vw, 16rem)' }}>
+                    <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">S.W.P</span>
+                    <span className="text-gray-400 mx-2">-</span>
+                    <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent">CHI NHÁNH MIỀN BẮC</span>
+                  </h2>
+                  <div className="h-3 w-64 bg-gradient-to-r from-blue-600 to-orange-600 mx-auto mt-8 rounded-full shadow-lg"></div>
+                </div>
+                <div className="relative">
+                  <div className="absolute
+Chào mừng bạn đã đến-inset-2 bg-gradient-to-r from-orange-300 to-blue-400 rounded-3xl blur-xl opacity-30 animate-pulse"></div>
+                  <div className="relative bg-white rounded-3xl p-10 shadow-2xl border-2 border-gradient">
+                    <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-200/30 to-blue-200/30 opacity-50"></div>
+                    <div className="relative">
+                      <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#f26722] to-[#31b3e7] mb-4">
+                        Chào mừng bạn đã đến với S.W.P
+                      </h3>
+                      <div className="h-px w-24 bg-gradient-to-r from-[#f26722] to-[#31b3e7] mx-auto mb-6"></div>
+                      <p className="text-xl font-semibold text-gray-800 leading-relaxed mb-2">
+                        Chúc bạn một ngày tốt lành
+                      </p>
+                      <p className="text-lg text-gray-600 font-medium">
+                        và làm việc hiệu quả
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

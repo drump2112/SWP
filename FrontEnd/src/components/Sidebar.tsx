@@ -46,7 +46,6 @@ const navigation: NavItem[] = [
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Xuất hàng theo KH', href: '/reports/sales-by-customer', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
       { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
@@ -285,6 +284,11 @@ const Sidebar: React.FC = () => {
                         ml-4 mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out
                         ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
                       `}
+                      style={{
+                        background: isMenuOpen ? 'rgba(241, 245, 249, 0.5)' : 'transparent',
+                        borderRadius: '8px',
+                        padding: isMenuOpen ? '8px' : '0',
+                      }}
                     >
                       {item.children && item.children.map((child) => {
                         const childActive = isActive(child.href);
@@ -303,20 +307,20 @@ const Sidebar: React.FC = () => {
                             `}
                             style={{
                               background: childActive
-                                ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)'
-                                : 'transparent',
+                                ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(219, 234, 254, 0.8) 100%)'
+                                : 'rgba(255, 255, 255, 0.6)',
                               borderLeft: childActive ? '3px solid rgba(59, 130, 246, 0.9)' : '3px solid transparent',
                               backdropFilter: childActive ? 'blur(10px)' : 'none',
                             }}
                             onMouseEnter={(e) => {
                               if (!childActive) {
-                                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.06)';
+                                e.currentTarget.style.background = 'rgba(219, 234, 254, 0.7)';
                                 e.currentTarget.style.borderLeft = '3px solid rgba(59, 130, 246, 0.5)';
                               }
                             }}
                             onMouseLeave={(e) => {
                               if (!childActive) {
-                                e.currentTarget.style.background = 'transparent';
+                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
                                 e.currentTarget.style.borderLeft = '3px solid transparent';
                               }
                             }}
@@ -443,7 +447,8 @@ const Sidebar: React.FC = () => {
           transition: opacity 0.2s, visibility 0.2s;
         }
 
-        .menu-item-wrapper:hover .submenu-tooltip {
+        .menu-item-wrapper:hover .submenu-tooltip,
+        .submenu-tooltip:hover {
           opacity: 1 !important;
           visibility: visible !important;
           pointer-events: auto !important;

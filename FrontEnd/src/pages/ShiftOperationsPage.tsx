@@ -32,6 +32,7 @@ import {
   CreditCardIcon,
   BuildingLibraryIcon,
   ArrowLeftIcon,
+  ArrowRightIcon,
   CheckIcon,
   DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
@@ -60,7 +61,6 @@ const ShiftOperationsPage: React.FC = () => {
   const [productPrices, setProductPrices] = useState<Record<number, number>>({});
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
   const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
-  const [retailCustomerId, setRetailCustomerId] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPreviousShift, setHasPreviousShift] = useState(false);
 
@@ -149,9 +149,13 @@ const ShiftOperationsPage: React.FC = () => {
   });
 
   // Fetch users cho select Người Giao/Nhận
-  const { data: users, isLoading: isLoadingUsers, error: usersError } = useQuery({
-    queryKey: ["users"],
-    queryFn: usersApi.getAll,
+  const { data: storeUsers, isLoading: isLoadingUsers, error: usersError } = useQuery({
+    queryKey: ["users", report?.shift.storeId],
+    queryFn: async () => {
+      if (!report?.shift.storeId) return [];
+      return usersApi.getByStore(report.shift.storeId);
+    },
+    enabled: !!report?.shift.storeId,
   });
 
   // Debug users loading
@@ -159,18 +163,10 @@ const ShiftOperationsPage: React.FC = () => {
     if (usersError) {
       console.error("❌ Error loading users:", usersError);
     }
-    if (users) {
-      console.log("✅ Loaded users:", users.length, users);
+    if (storeUsers) {
+      console.log("✅ Loaded store users:", storeUsers.length, storeUsers);
     }
-  }, [users, usersError]);
-
-  // Filter users theo cửa hàng của ca làm việc
-  const storeUsers = React.useMemo(() => {
-    if (!users || !report?.shift.storeId) return [];
-    const filtered = users.filter((u: any) => u.storeId === report.shift.storeId);
-    console.log(`🔍 Filtered users for store ${report.shift.storeId}:`, filtered.length, filtered);
-    return filtered;
-  }, [users, report?.shift.storeId]);
+  }, [storeUsers, usersError]);
 
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
   useEffect(() => {
@@ -212,7 +208,6 @@ const ShiftOperationsPage: React.FC = () => {
         exports: draftExports,
         inventoryChecks: draftInventoryChecks,
         declaredRetailQuantities,
-        retailCustomerId,
       };
       localStorage.setItem(draftKey, JSON.stringify(draftData));
     }
@@ -225,7 +220,6 @@ const ShiftOperationsPage: React.FC = () => {
     draftExports,
     draftInventoryChecks,
     declaredRetailQuantities,
-    retailCustomerId,
     shiftId,
   ]);
 
@@ -340,9 +334,6 @@ const ShiftOperationsPage: React.FC = () => {
           }
           if (parsed.declaredRetailQuantities) {
             setDeclaredRetailQuantities(parsed.declaredRetailQuantities);
-          }
-          if (parsed.retailCustomerId) {
-            setRetailCustomerId(parsed.retailCustomerId);
           }
           toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", { position: "top-right", autoClose: 3000 });
           return;
@@ -496,7 +487,6 @@ const ShiftOperationsPage: React.FC = () => {
 
     // 5. Initialize Declared Retail Quantities (Step 2 - Auto Calculate)
     // In edit mode, we assume the previous "Declared" was exactly "Pump - Debt"
-    const initialDeclared: Record<number, number> = {};
     const productIds = new Set<number>();
 
     // Sum pump readings by product
@@ -516,6 +506,8 @@ const ShiftOperationsPage: React.FC = () => {
       });
     }
 
+    // Initialize declaredRetailQuantities from calculation
+    const initialDeclared: Record<number, number> = {};
     productIds.forEach((pid) => {
       const pQty = pumpSums[pid] || 0;
       const dQty = debtSums[pid] || 0;
@@ -523,18 +515,6 @@ const ShiftOperationsPage: React.FC = () => {
       initialDeclared[pid] = Math.round(retail * 1000) / 1000;
     });
     setDeclaredRetailQuantities(initialDeclared);
-
-    // 6. Person In Charge (Step 2)
-    // Since we don't save this field specially, we try to match the shift user with internal customers
-    // if (storeCustomers && report.shift?.userId) {
-    //   // Assuming there is a link between user and customer for "Person in Charge"
-    //   // Or usually the one running the shift is the User.
-    //   // If the field "retailCustomerId" is strictly for the internal employee customer record:
-    //   const employee = storeCustomers.find((c: any) => c.email === user?.email || c.name === user?.fullName);
-    //   if (employee) {
-    //     setRetailCustomerId(employee.id);
-    //   }
-    // }
 
     toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
   }, [isEditMode, report, pumps, shiftId, storeCustomers, user]);
@@ -740,6 +720,23 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
+    // Validation 1.6: Kiểm tra bắt buộc chọn Người Giao và Người Nhận
+    if (!handoverUserId) {
+      toast.error("Vui lòng chọn Người Giao trước khi chốt ca!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    if (!receiverUserId) {
+      toast.error("Vui lòng chọn Người Nhận trước khi chốt ca!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
+
     // Validation 2: Kiểm tra có vòi nào chưa nhập
     const hasEmptyReadings = readingsArray.some((r) => r.startValue === 0 && r.endValue === 0);
     if (hasEmptyReadings) {
@@ -851,8 +848,8 @@ const ShiftOperationsPage: React.FC = () => {
         <div class="mt-4 text-left">
           <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian chốt ca</label>
           <input type="datetime-local" id="closedAt" class="swal2-input" style="margin: 0; width: 100%;" value="${dayjs().format(
-            "YYYY-MM-DDTHH:mm"
-          )}">
+        "YYYY-MM-DDTHH:mm"
+      )}">
         </div>
       `,
       icon: "question",
@@ -873,19 +870,6 @@ const ShiftOperationsPage: React.FC = () => {
     if (!result.isConfirmed) return;
 
     const closedAt = result.value;
-
-    // ✅ Tạo retailSales từ declaredRetailQuantities + retailCustomerId
-    // Để gán lượng bán lẻ cho người phụ trách ca (customer type INTERNAL)
-    const retailSales = Object.entries(declaredRetailQuantities)
-      .filter(([_, quantity]) => quantity > 0)
-      .map(([productId, quantity]) => {
-        const price = productPrices[Number(productId)] || 0;
-        return {
-          productId: Number(productId),
-          quantity: quantity,
-          unitPrice: price,
-        };
-      });
 
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
@@ -921,8 +905,6 @@ const ShiftOperationsPage: React.FC = () => {
       })),
       handoverName: handoverUserId ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName : undefined,
       receiverName: receiverUserId ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName : undefined,
-      retailCustomerId: retailCustomerId || undefined, // Người phụ trách ca
-      retailSales: retailSales.length > 0 ? retailSales : undefined, // Bán lẻ thực tế
     };
 
     if (isEditMode) {
@@ -1455,6 +1437,121 @@ const ShiftOperationsPage: React.FC = () => {
     depositsCount: isShiftOpen ? draftDeposits.length : report?.cashDeposits?.length || 0,
   });
 
+  // Tab navigation helpers
+  const tabs = ["pump", "debt", "receipt", "deposit", "import", "export", "inventory"] as const;
+  const currentTabIndex = tabs.indexOf(activeTab);
+  const hasPreviousTab = currentTabIndex > 0;
+  const hasNextTab = currentTabIndex < tabs.length - 1;
+
+  const goToPreviousTab = async () => {
+    if (!hasPreviousTab) return;
+    const previousTab = tabs[currentTabIndex - 1];
+
+    if (hasUnsavedChanges) {
+      const confirmed = await showConfirm(
+        "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
+        "Xác nhận chuyển tab",
+        "warning"
+      );
+      if (confirmed) setActiveTab(previousTab);
+    } else {
+      setActiveTab(previousTab);
+    }
+  };
+
+  const goToNextTab = async () => {
+    if (!hasNextTab) return;
+    const nextTab = tabs[currentTabIndex + 1];
+
+    // Validation: Nếu đang ở tab "pump", kiểm tra số lít tính toán không được âm
+    if (activeTab === "pump") {
+      const readingsArray = Object.values(pumpReadings);
+      const invalidReadings = readingsArray.filter((reading) => {
+        const quantity = calculateQuantity(reading);
+        return quantity < 0;
+      });
+
+      if (invalidReadings.length > 0) {
+        const errorMessages = invalidReadings.map((r) => {
+          const pump = pumps?.find((p: any) => p.code === r.pumpCode);
+          const product = products?.find((p) => p.id === r.productId);
+          const quantity = calculateQuantity(r);
+          return `- Vòi ${r.pumpCode} (${product?.name || "N/A"}): ${quantity.toFixed(3)} lít`;
+        });
+
+        toast.error(
+          <div>
+            <div className="font-bold mb-2">⚠️ Số lít tính toán không hợp lệ!</div>
+            <div className="text-sm">Các vòi bơm sau có số lít âm:</div>
+            <div className="text-sm mt-1 space-y-1">
+              {errorMessages.map((msg, idx) => (
+                <div key={idx}>{msg}</div>
+              ))}
+            </div>
+            <div className="text-sm mt-2 font-medium">
+              Vui lòng kiểm tra lại: Số cuối, Số đầu, và Xuất kiểm thử/Quay kho
+            </div>
+          </div>,
+          {
+            position: "top-center",
+            autoClose: 8000,
+          }
+        );
+        return;
+      }
+    }
+
+    // Validation pass → chuyển tab trực tiếp
+    setActiveTab(nextTab);
+  };
+
+  const tabLabels: Record<typeof tabs[number], string> = {
+    pump: "B1 - Số máy cột bơm",
+    debt: "B2 - Bán hàng",
+    receipt: "B3 - Thu tiền",
+    deposit: "B4 - Nộp tiền",
+    import: "B5 - Nhập hàng",
+    export: "B6 - Xuất hàng",
+    inventory: "B7 - Kiểm kê",
+  };
+
+  // Tab Navigation Component
+  const TabNavigation = () => (
+    <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
+      <button
+        onClick={goToPreviousTab}
+        disabled={!hasPreviousTab}
+        className={`inline-flex items-center px-4 py-2.5 rounded-lg font-medium transition-all ${
+          hasPreviousTab
+            ? "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
+            : "bg-gray-50 text-gray-400 cursor-not-allowed"
+        }`}
+      >
+        <ArrowLeftIcon className="h-5 w-5 mr-2" />
+        {hasPreviousTab && <span className="text-sm">{tabLabels[tabs[currentTabIndex - 1]]}</span>}
+        {!hasPreviousTab && <span className="text-sm">Quay lại</span>}
+      </button>
+
+      <div className="text-sm text-gray-500 font-medium">
+        Bước {currentTabIndex + 1} / {tabs.length}
+      </div>
+
+      <button
+        onClick={goToNextTab}
+        disabled={!hasNextTab}
+        className={`inline-flex items-center px-4 py-2.5 rounded-lg font-medium transition-all ${
+          hasNextTab
+            ? "bg-blue-100 text-blue-700 hover:bg-blue-200 hover:shadow-md"
+            : "bg-gray-50 text-gray-400 cursor-not-allowed"
+        }`}
+      >
+        {hasNextTab && <span className="text-sm">{tabLabels[tabs[currentTabIndex + 1]]}</span>}
+        {!hasNextTab && <span className="text-sm">Tiếp theo</span>}
+        <ArrowRightIcon className="h-5 w-5 ml-2" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -1613,32 +1710,60 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("pump");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "pump"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "pump"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B1 - Số máy cột bơm
             </button>
             <button
               onClick={async () => {
-                if (activeTab !== "debt" || !hasUnsavedChanges) {
-                  setActiveTab("debt");
-                  return;
+                // Validation: Kiểm tra số lít tính toán không được âm trước khi chuyển sang B2
+                if (activeTab !== "debt") {
+                  const readingsArray = Object.values(pumpReadings);
+                  const invalidReadings = readingsArray.filter((reading) => {
+                    const quantity = calculateQuantity(reading);
+                    return quantity < 0;
+                  });
+
+                  if (invalidReadings.length > 0) {
+                    const errorMessages = invalidReadings.map((r) => {
+                      const pump = pumps?.find((p: any) => p.code === r.pumpCode);
+                      const product = products?.find((p) => p.id === r.productId);
+                      const quantity = calculateQuantity(r);
+                      return `- Vòi ${r.pumpCode} (${product?.name || "N/A"}): ${quantity.toFixed(3)} lít`;
+                    });
+
+                    toast.error(
+                      <div>
+                        <div className="font-bold mb-2">⚠️ Số lít tính toán không hợp lệ!</div>
+                        <div className="text-sm">Các vòi bơm sau có số lít âm:</div>
+                        <div className="text-sm mt-1 space-y-1">
+                          {errorMessages.map((msg, idx) => (
+                            <div key={idx}>{msg}</div>
+                          ))}
+                        </div>
+                        <div className="text-sm mt-2 font-medium">
+                          Vui lòng quay lại B1 để kiểm tra: Số cuối, Số đầu, và Xuất kiểm thử/Quay kho
+                        </div>
+                      </div>,
+                      {
+                        position: "top-center",
+                        autoClose: 8000,
+                      }
+                    );
+                    return;
+                  }
                 }
-                const confirmed = await showConfirm(
-                  "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
-                  "Xác nhận chuyển tab",
-                  "warning"
-                );
-                if (confirmed) setActiveTab("debt");
+
+                // Validation pass → chuyển tab trực tiếp
+                setActiveTab("debt");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "debt"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "debt"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B2 - Bán hàng
             </button>
@@ -1655,11 +1780,10 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("receipt");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "receipt"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "receipt"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B3 - Thu tiền
             </button>
@@ -1676,11 +1800,10 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("deposit");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "deposit"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "deposit"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B4 - Nộp tiền
             </button>
@@ -1697,11 +1820,10 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("import");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "import"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "import"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B5 - Nhập hàng
             </button>
@@ -1718,11 +1840,10 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("export");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "export"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "export"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B6 - Xuất hàng
             </button>
@@ -1739,11 +1860,10 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("inventory");
               }}
-              className={`py-4 px-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === "inventory"
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "inventory"
+                  ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                }`}
             >
               B7 - Kiểm kê
             </button>
@@ -1837,16 +1957,33 @@ const ShiftOperationsPage: React.FC = () => {
                                     if (e.key === "-" || e.key === "e" || e.key === "E") {
                                       e.preventDefault();
                                     }
+                                    // Nhấn Enter để chuyển sang ô tiếp theo
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      const currentInput = e.currentTarget;
+                                      const currentRow = currentInput.closest("tr");
+                                      const nextInput = currentRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                      if (nextInput && nextInput !== currentInput) {
+                                        nextInput.focus();
+                                      } else {
+                                        // Nếu không tìm thấy input tiếp theo trong hàng, chuyển sang hàng tiếp theo
+                                        const nextRow = currentRow?.nextElementSibling;
+                                        const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                        if (firstInput) {
+                                          firstInput.focus();
+                                        }
+                                      }
+                                    }
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   disabled={hasPreviousShift}
-                                  className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${
-                                    hasPreviousShift ? "bg-gray-100 cursor-not-allowed text-gray-600" : ""
-                                  }`}
+                                  className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${hasPreviousShift ? "bg-gray-100 cursor-not-allowed text-gray-600" : ""
+                                    }`}
                                   placeholder="0.000"
                                   title={
                                     hasPreviousShift ? "Số đầu được tự động lấy từ ca trước và không thể thay đổi" : ""
                                   }
+                                  data-field="startValue"
                                 />
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -1872,10 +2009,30 @@ const ShiftOperationsPage: React.FC = () => {
                                     if (e.key === "-" || e.key === "e" || e.key === "E") {
                                       e.preventDefault();
                                     }
+                                    // Nhấn Enter để chuyển sang ô tiếp theo
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      const currentInput = e.currentTarget;
+                                      const currentRow = currentInput.closest("tr");
+                                      const allInputs = Array.from(currentRow?.querySelectorAll('input[type="number"]:not([disabled])') || []) as HTMLInputElement[];
+                                      const currentIndex = allInputs.indexOf(currentInput);
+                                      const nextInput = allInputs[currentIndex + 1];
+                                      if (nextInput) {
+                                        nextInput.focus();
+                                      } else {
+                                        // Nếu hết input trong hàng, chuyển sang hàng tiếp theo
+                                        const nextRow = currentRow?.nextElementSibling;
+                                        const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                        if (firstInput) {
+                                          firstInput.focus();
+                                        }
+                                      }
+                                    }
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-blue-500 transition-colors"
                                   placeholder="0"
+                                  data-field="endValue"
                                 />
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -1907,17 +2064,28 @@ const ShiftOperationsPage: React.FC = () => {
                                     if (e.key === "-" || e.key === "e" || e.key === "E") {
                                       e.preventDefault();
                                     }
+                                    // Nhấn Enter để chuyển sang hàng tiếp theo
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      const currentInput = e.currentTarget;
+                                      const currentRow = currentInput.closest("tr");
+                                      const nextRow = currentRow?.nextElementSibling;
+                                      const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                      if (firstInput) {
+                                        firstInput.focus();
+                                      }
+                                    }
                                   }}
                                   className="w-28 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-purple-500 transition-colors bg-purple-50"
                                   placeholder="0.000"
                                   title="Lượng xuất kiểm thử hoặc quay kho (lít)"
+                                  data-field="testExport"
                                 />
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <span
-                                  className={`text-sm font-bold px-3 py-1 rounded-full ${
-                                    quantity < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                                  }`}
+                                  className={`text-sm font-bold px-3 py-1 rounded-full ${quantity < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                                    }`}
                                 >
                                   {quantity.toFixed(3)}
                                 </span>
@@ -2099,44 +2267,14 @@ const ShiftOperationsPage: React.FC = () => {
                   </table>
                 </div>
               )}
+
+              <TabNavigation />
             </div>
           )}
 
           {/* Tab 2: Debt Sales */}
           {activeTab === "debt" && (
             <div className="space-y-6">
-              {/* Retail Responsibility Section */}
-              {canEdit ? (
-                <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-sm mb-4">
-                  <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người phụ trách ca</h3>
-                  <div className="max-w-md">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">CTH/PT Cửa Hàng</label>
-                    <SearchableSelect
-                      options={
-                        storeCustomers
-                          ?.filter((c: any) => c.type === "INTERNAL")
-                          .map((customer: any) => ({
-                            value: customer.id,
-                            label: `${customer.code} - ${customer.name}`,
-                          })) || []
-                      }
-                      value={retailCustomerId}
-                      onChange={(value) => setRetailCustomerId(value as number)}
-                      placeholder="-- Chọn nhân viên (chỉ để theo dõi) --"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white border border-indigo-200 rounded-lg p-4 shadow-sm mb-4">
-                  <h3 className="text-lg font-semibold text-indigo-900 mb-2">👤 Người phụ trách ca</h3>
-                  <div className="flex items-center text-gray-700">
-                    <span className="font-medium mr-2">Người chốt ca:</span>
-                    <span>{user?.fullName || "Chi tiết trong lịch sử"}</span>
-                  </div>
-                </div>
-              )}
-
               {/* Retail Quantity Verification Section */}
               {canEdit ? (
                 <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
@@ -2196,24 +2334,21 @@ const ShiftOperationsPage: React.FC = () => {
                                     value={declaredRetailQuantities[productId] ?? ""}
                                     onChange={(e) => {
                                       const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
-                                      // Validate không cho số âm
                                       if (val < 0) return;
                                       setDeclaredRetailQuantities((prev) => ({
                                         ...prev,
                                         [productId]: val,
                                       }));
                                     }}
-                                    className={`w-full px-2 py-1 text-right border rounded focus:ring-2 focus:ring-blue-500 ${
-                                      !isMatch ? "border-red-300 bg-white" : "border-gray-300"
-                                    }`}
+                                    className={`w-full px-2 py-1 text-right border rounded focus:ring-2 focus:ring-blue-500 ${!isMatch ? "border-red-300 bg-white" : "border-gray-300"
+                                      }`}
                                     placeholder="0.000"
                                   />
                                 </td>
                                 <td className="px-4 py-3 text-right font-medium">{totalDeclared.toFixed(3)}</td>
                                 <td
-                                  className={`px-4 py-3 text-right font-bold ${
-                                    isMatch ? "text-green-600" : "text-red-600"
-                                  }`}
+                                  className={`px-4 py-3 text-right font-bold ${isMatch ? "text-green-600" : "text-red-600"
+                                    }`}
                                 >
                                   {diff.toFixed(3)}
                                 </td>
@@ -2225,83 +2360,13 @@ const ShiftOperationsPage: React.FC = () => {
                     </table>
                   </div>
                   <p className="text-xs text-gray-500 mt-2 italic">
-                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu với tổng lượng bơm.
+                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu với tổng lượng bơm. <strong>Chỉ để kiểm tra số liệu, KHÔNG tạo công nợ.</strong>
                   </p>
                 </div>
-              ) : (
-                <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
-                  <div className="bg-blue-50 border-b border-blue-200 px-4 py-3 mb-4 rounded-t-lg">
-                    <p className="text-sm text-blue-800 font-medium">ℹ️ Ca đã chốt - Dữ liệu đối chiếu (Read-only)</p>
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 px-2">⛽ Đối chiếu lượng hàng bán</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 text-xs uppercase text-gray-500">
-                          <th className="px-4 py-2 text-left">mặt hàng</th>
-                          <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
-                          <th className="px-4 py-2 text-right">Bán nợ (2)</th>
-                          <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (Tính toán) (3)</th>
-                          <th className="px-4 py-2 text-right">Tổng bán (2+3)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {(() => {
-                          const productIds = Array.from(
-                            new Set(report?.pumpReadings?.map((r: any) => r.productId) || [])
-                          );
-
-                          if (productIds.length === 0) {
-                            return (
-                              <tr>
-                                <td colSpan={5} className="text-center py-4 text-gray-500">
-                                  Không có dữ liệu
-                                </td>
-                              </tr>
-                            );
-                          }
-
-                          return productIds.map((productId) => {
-                            const product = products?.find((p) => p.id === productId);
-
-                            // 1. Pump Qty from report
-                            const pumpQty =
-                              report?.pumpReadings
-                                ?.filter((r: any) => r.productId === productId)
-                                .reduce((sum: number, r: any) => sum + (Number(r.quantity) || 0), 0) || 0;
-
-                            // 2. Debt Qty from report
-                            const debtQty =
-                              report?.debtSales
-                                ?.filter((s: any) => s.productId === productId)
-                                .reduce((sum: number, s: any) => sum + (Number(s.quantity) || 0), 0) || 0;
-
-                            // 3. Retail Qty (Calculated)
-                            const retailQty = pumpQty - debtQty;
-
-                            return (
-                              <tr key={productId as number}>
-                                <td className="px-4 py-3 font-medium text-gray-900">
-                                  {product?.name || `ID: ${productId}`}
-                                </td>
-                                <td className="px-4 py-3 text-right font-bold text-blue-600">{pumpQty.toFixed(3)}</td>
-                                <td className="px-4 py-3 text-right text-gray-600">{debtQty.toFixed(3)}</td>
-                                <td className="px-4 py-3 text-right text-gray-800 font-medium">
-                                  {retailQty.toFixed(3)}
-                                </td>
-                                <td className="px-4 py-3 text-right font-medium">{(debtQty + retailQty).toFixed(3)}</td>
-                              </tr>
-                            );
-                          });
-                        })()}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Danh sách bán nợ</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Danh sách bán nợ  </h3>
                 {canEdit && (
                   <div className="mb-4">
                     <button
@@ -2342,7 +2407,7 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">mặt hàng *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Mặt hàng *</label>
                       <SearchableSelect
                         options={products?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
                         value={selectedDebtProduct}
@@ -2478,7 +2543,6 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
                   </form>
                 )}
-
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
@@ -2534,38 +2598,40 @@ const ShiftOperationsPage: React.FC = () => {
                         </tr>
                       )
                     ) : // Hiển thị data từ report khi ca đã chốt
-                    report?.debtSales && report.debtSales.length > 0 ? (
-                      report.debtSales.map((sale: any) => {
-                        const customer = customers?.find((c) => c.id === sale.customerId);
-                        const product = products?.find((p) => p.id === sale.productId);
-                        return (
-                          <tr key={sale.id}>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {customer?.code || sale.customer?.code} - {customer?.name || sale.customer?.name}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{product?.name || sale.product?.name}</td>
-                            <td className="px-6 py-4 text-sm text-right">
-                              {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
-                            </td>
-                            <td className="px-6 py-4 text-sm text-right">
-                              {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
-                            </td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
-                              {Number(sale.amount).toLocaleString("vi-VN")} ₫
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                          Không có doanh số bán công nợ
-                        </td>
-                      </tr>
-                    )}
+                      report?.debtSales && report.debtSales.length > 0 ? (
+                        report.debtSales.map((sale: any) => {
+                          const customer = customers?.find((c) => c.id === sale.customerId);
+                          const product = products?.find((p) => p.id === sale.productId);
+                          return (
+                            <tr key={sale.id}>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {customer?.code || sale.customer?.code} - {customer?.name || sale.customer?.name}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name || sale.product?.name}</td>
+                              <td className="px-6 py-4 text-sm text-right">
+                                {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
+                              </td>
+                              <td className="px-6 py-4 text-sm text-right">
+                                {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
+                              </td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
+                                {Number(sale.amount).toLocaleString("vi-VN")} ₫
+                              </td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                            Không có doanh số bán công nợ
+                          </td>
+                        </tr>
+                      )}
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
 
@@ -2730,46 +2796,48 @@ const ShiftOperationsPage: React.FC = () => {
                         </tr>
                       )
                     ) : // Data từ report khi ca đã chốt
-                    report?.receipts && report.receipts.length > 0 ? (
-                      report.receipts.map((receipt: any) => {
-                        const customerNames =
-                          receipt.receiptDetails
-                            ?.map((d: any) => {
-                              const cust = customers?.find((c) => c.id === d.customerId);
-                              return cust?.name || d.customer?.name || "N/A";
-                            })
-                            .join(", ") ||
-                          receipt.details
-                            ?.map((d: any) => {
-                              const cust = customers?.find((c) => c.id === d.customerId);
-                              return cust?.name || d.customer?.name || "N/A";
-                            })
-                            .join(", ") ||
-                          "-";
-                        return (
-                          <tr key={receipt.id}>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {dayjs(receipt.createdAt).format("DD/MM/YYYY HH:mm")}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
-                              {Number(receipt.amount).toLocaleString("vi-VN")} ₫
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500"></td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                          Không có phiếu thu tiền
-                        </td>
-                      </tr>
-                    )}
+                      report?.receipts && report.receipts.length > 0 ? (
+                        report.receipts.map((receipt: any) => {
+                          const customerNames =
+                            receipt.receiptDetails
+                              ?.map((d: any) => {
+                                const cust = customers?.find((c) => c.id === d.customerId);
+                                return cust?.name || d.customer?.name || "N/A";
+                              })
+                              .join(", ") ||
+                            receipt.details
+                              ?.map((d: any) => {
+                                const cust = customers?.find((c) => c.id === d.customerId);
+                                return cust?.name || d.customer?.name || "N/A";
+                              })
+                              .join(", ") ||
+                            "-";
+                          return (
+                            <tr key={receipt.id}>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {dayjs(receipt.createdAt).format("DD/MM/YYYY HH:mm")}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
+                              <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
+                              <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
+                                {Number(receipt.amount).toLocaleString("vi-VN")} ₫
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500"></td>
+                            </tr>
+                          );
+                        })
+                      ) : (
+                        <tr>
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                            Không có phiếu thu tiền
+                          </td>
+                        </tr>
+                      )}
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
 
@@ -2811,8 +2879,8 @@ const ShiftOperationsPage: React.FC = () => {
                           editingDepositId
                             ? draftDeposits.find((d) => d.id === editingDepositId)?.amount
                             : suggestedDepositAmount > 0
-                            ? suggestedDepositAmount
-                            : ""
+                              ? suggestedDepositAmount
+                              : ""
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                         placeholder="VD: 50000000"
@@ -2962,31 +3030,33 @@ const ShiftOperationsPage: React.FC = () => {
                         </tr>
                       )
                     ) : // Data từ report khi ca đã chốt
-                    report?.cashDeposits && report.cashDeposits.length > 0 ? (
-                      report.cashDeposits.map((deposit: any) => (
-                        <tr key={deposit.id}>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {dayjs(deposit.depositDate).format("DD/MM/YYYY")}
+                      report?.cashDeposits && report.cashDeposits.length > 0 ? (
+                        report.cashDeposits.map((deposit: any) => (
+                          <tr key={deposit.id}>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {dayjs(deposit.depositDate).format("DD/MM/YYYY")}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
+                              {Number(deposit.amount).toLocaleString("vi-VN")} ₫
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500"></td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                            Không có phiếu nộp tiền
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || "-"}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
-                          <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
-                            {Number(deposit.amount).toLocaleString("vi-VN")} ₫
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-500"></td>
                         </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
-                          Không có phiếu nộp tiền
-                        </td>
-                      </tr>
-                    )}
+                      )}
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
 
@@ -3095,6 +3165,8 @@ const ShiftOperationsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
 
@@ -3253,6 +3325,8 @@ const ShiftOperationsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
 
@@ -3369,9 +3443,8 @@ const ShiftOperationsPage: React.FC = () => {
                               {Number(item.actualQuantity || 0).toLocaleString("vi-VN")}
                             </td>
                             <td
-                              className={`px-6 py-4 text-sm text-right font-semibold ${
-                                item.difference < 0 ? "text-red-600" : "text-green-600"
-                              }`}
+                              className={`px-6 py-4 text-sm text-right font-semibold ${item.difference < 0 ? "text-red-600" : "text-green-600"
+                                }`}
                             >
                               {Number(item.difference || 0).toLocaleString("vi-VN")}
                             </td>
@@ -3398,6 +3471,8 @@ const ShiftOperationsPage: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              <TabNavigation />
             </div>
           )}
         </div>

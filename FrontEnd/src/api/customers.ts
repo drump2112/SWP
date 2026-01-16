@@ -202,6 +202,22 @@ export const customersApi = {
 
   // ============ OPENING BALANCE APIs ============
 
+  getOpeningBalanceRecords: async (storeId?: number): Promise<{
+    id: number;
+    customerId: number;
+    customerCode: string;
+    customerName: string;
+    storeId: number;
+    storeName: string;
+    balance: number;
+    notes: string;
+    createdAt: string;
+  }[]> => {
+    const params = storeId ? { storeId } : {};
+    const response = await api.get('/customers/opening-balance', { params });
+    return response.data;
+  },
+
   importOpeningBalance: async (data: {
     storeId: number;
     transactionDate: string;
@@ -213,6 +229,20 @@ export const customersApi = {
     debtLedgerIds: number[];
   }> => {
     const response = await api.post('/customers/opening-balance/import', data);
+    return response.data;
+  },
+
+  updateOpeningBalance: async (
+    id: number,
+    balance: number,
+    notes?: string,
+    createdAt?: string
+  ): Promise<{
+    message: string;
+    id: number;
+    newBalance: number;
+  }> => {
+    const response = await api.put(`/customers/opening-balance/${id}`, { balance, notes, createdAt });
     return response.data;
   },
 };

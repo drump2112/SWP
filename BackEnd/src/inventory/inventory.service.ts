@@ -1013,7 +1013,7 @@ export class InventoryService {
           document.supplierName = notes;
         }
         if (effectiveDate) {
-          document.effectiveDate = new Date(effectiveDate);
+          document.docDate = new Date(effectiveDate);
         }
         await manager.save(InventoryDocument, document);
       }

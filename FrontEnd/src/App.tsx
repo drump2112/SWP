@@ -24,8 +24,10 @@ import CashReportPage from './pages/CashReportPage';
 import InventoryImportPage from './pages/InventoryImportPage';
 import InventoryReportPage from './pages/InventoryReportPage';
 import InitialStock from './pages/InitialStock';
+import ManageInitialStock from './pages/ManageInitialStock';
 import StockReport from './pages/StockReport';
 import CashOpeningBalance from './pages/CashOpeningBalance';
+import ManageCashOpeningBalance from './pages/ManageCashOpeningBalance';
 import { OpeningBalancePage } from './pages/OpeningBalancePage';
 
 const queryClient = new QueryClient({
@@ -75,11 +77,31 @@ function App() {
               }
             />
             <Route
+              path="/inventory/manage-initial-stock"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ManageInitialStock />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/cash/opening-balance"
               element={
                 <ProtectedRoute>
                   <DashboardLayout>
                     <CashOpeningBalance />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/cash/manage-opening-balance"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ManageCashOpeningBalance />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

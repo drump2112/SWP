@@ -37,6 +37,11 @@ export const usersApi = {
     return response.data;
   },
 
+  getByStore: async (storeId: number): Promise<User[]> => {
+    const response = await api.get(`/users/by-store/${storeId}`);
+    return response.data;
+  },
+
   getById: async (id: number): Promise<User> => {
     const response = await api.get(`/users/${id}`);
     return response.data;

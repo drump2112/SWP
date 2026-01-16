@@ -1,5 +1,5 @@
 import React from 'react';
-import Select, { type MultiValue, type SingleValue } from 'react-select';
+import Select, { type MultiValue, type SingleValue, components, type ValueContainerProps } from 'react-select';
 import type { StylesConfig, GroupBase } from 'react-select';
 
 interface Option {
@@ -18,6 +18,7 @@ interface SearchableSelectProps {
   isMulti?: boolean;
   name?: string;
   required?: boolean;
+  hideSelectedValues?: boolean; // New prop to hide selected values in multi-select
 }
 
 const SearchableSelect: React.FC<SearchableSelectProps> = ({
@@ -31,7 +32,31 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   isMulti = false,
   name,
   required = false,
+  hideSelectedValues = false,
 }) => {
+  // Custom ValueContainer to show count instead of all selected values
+  const ValueContainer = ({ children, ...props }: ValueContainerProps<Option, boolean>) => {
+    const { getValue, hasValue } = props;
+    const selectedCount = getValue().length;
+
+    if (isMulti && hideSelectedValues && hasValue && selectedCount > 0) {
+      return (
+        <components.ValueContainer {...props}>
+          <div className="text-sm text-gray-700">
+            Đã chọn {selectedCount} mục
+          </div>
+          {React.Children.map(children, (child) =>
+            child && typeof child === 'object' && 'type' in child && child.type !== components.MultiValue
+              ? child
+              : null
+          )}
+        </components.ValueContainer>
+      );
+    }
+
+    return <components.ValueContainer {...props}>{children}</components.ValueContainer>;
+  };
+
   // Handle value for both single and multi select
   const getValue = () => {
     if (isMulti) {
@@ -164,6 +189,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
           ...customStyles,
           menuPortal: (base) => ({ ...base, zIndex: 9999 }),
         }}
+        components={hideSelectedValues ? { ValueContainer } : undefined}
       />
       {required && (
         <input
