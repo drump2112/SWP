@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import * as XLSX from 'xlsx';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
@@ -129,7 +128,7 @@ const InitialStock: React.FC = () => {
       const response = await api.put('/inventory/initial-stock', payload);
       return response.data;
     },
-    onSuccess: () => {
+    onSuccess: () =>  {
       toast.success('Cập nhật tồn đầu thành công!');
       setEditingRecord(null);
       setEditedItems([]);
@@ -227,56 +226,6 @@ const InitialStock: React.FC = () => {
     setEditedEffectiveDate('');
   };
 
-  // Export to Excel
-  const downloadTemplate = () => {
-    const templateData = [
-      {
-        'Mã SP': 'SP001',
-        'Tên SP': 'Xăng RON 95',
-        'Số lượng': 1000,
-        'Ghi chú': 'Tồn đầu kỳ',
-      },
-      {
-        'Mã SP': 'SP002',
-        'Tên SP': 'Dầu DO',
-        'Số lượng': 2000,
-        'Ghi chú': 'Tồn kho khởi đầu',
-      },
-    ];
-
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
-    XLSX.writeFile(workbook, 'Template_Nhap_Ton_Dau_Ky.xlsx');
-  };
-
-  const exportToExcel = () => {
-    if (!records || records.length === 0) {
-      toast.warning('Không có dữ liệu để xuất');
-      return;
-    }
-
-    const exportData = records.flatMap(record => 
-      record.items.map(item => ({
-        'Cửa hàng': record.storeName,
-        'Mã SP': item.productCode,
-        'Tên SP': item.productName,
-        'Số lượng': item.quantity,
-        'Ghi chú': item.notes || '',
-        'Ngày hiệu lực': new Date(record.effectiveDate).toLocaleDateString('vi-VN'),
-        'Ngày tạo': new Date(record.createdAt).toLocaleDateString('vi-VN'),
-      }))
-    );
-
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Tồn đầu kỳ');
-    
-    const fileName = `Ton_Dau_Ky_${new Date().toISOString().split('T')[0]}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
-    toast.success('Xuất Excel thành công!');
-  };
-
   const updateEditedItem = (index: number, field: keyof StockItem, value: any) => {
     const updated = [...editedItems];
     let processedValue = value;
@@ -368,27 +317,6 @@ const InitialStock: React.FC = () => {
               )}
             </svg>
             {showAddForm ? 'Đóng form' : 'Thêm tồn đầu mới'}
-          </button>
-
-          <button
-            onClick={downloadTemplate}
-            className="px-3 py-1.5 text-sm bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-md shadow hover:shadow-lg hover:from-blue-700 hover:to-blue-800 transition-all duration-300 flex items-center gap-2 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Tải template
-          </button>
-
-          <button
-            onClick={exportToExcel}
-            disabled={!records || records.length === 0}
-            className="px-3 py-1.5 text-sm bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-md shadow hover:shadow-lg hover:from-emerald-700 hover:to-teal-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 flex items-center gap-2 font-medium"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Xuất Excel
           </button>
         </div>
 

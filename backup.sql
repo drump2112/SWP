@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 4qrKdv5eoL9xhsY1OxKsUDnGWYEX6ssSiWGQAF579N11L0D69WsGfvLQl3u5tHh
+\restrict 0AYd8dP4dKBT7K3dvofeA1Abi41Iyy1U8iDlJkIINrpy708upRJwbayZqIIqrGi
 
 -- Dumped from database version 15.15 (Debian 15.15-1.pgdg13+1)
 -- Dumped by pg_dump version 15.15 (Debian 15.15-1.pgdg13+1)
@@ -1287,7 +1287,9 @@ CREATE TABLE public.shifts (
     status character varying(20) DEFAULT 'OPEN'::character varying NOT NULL,
     version integer DEFAULT 1 NOT NULL,
     adjusted_from_shift_id integer,
-    is_active boolean DEFAULT true NOT NULL
+    is_active boolean DEFAULT true NOT NULL,
+    receiver_name character varying(255),
+    handover_name character varying(255)
 );
 
 
@@ -1770,6 +1772,22 @@ COPY public.audit_logs (id, table_name, record_id, action, old_data, new_data, c
 63	shifts	57	CLOSE	{"status": "OPEN", "closedAt": "2026-01-14T02:59:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-14T15:03:00.000Z"}	\N	2026-01-13 03:03:30.051702
 64	shifts	58	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-13T07:06:00.000Z"}	\N	2026-01-13 07:06:35.060709
 65	shifts	58	CLOSE	{"status": "OPEN", "closedAt": "2026-01-13T07:06:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-13T07:26:00.000Z"}	\N	2026-01-13 07:26:10.814685
+66	shifts	58	CLOSE	{"status": "OPEN", "closedAt": "2026-01-13T07:26:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-13T02:09:00.000Z"}	\N	2026-01-15 02:09:37.005603
+67	shifts	59	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-15T07:13:00.000Z"}	\N	2026-01-15 07:13:57.049548
+68	shifts	59	CLOSE	{"status": "OPEN", "closedAt": "2026-01-15T07:13:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-14T07:24:00.000Z"}	\N	2026-01-15 07:24:42.188839
+69	shifts	60	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-15T08:40:00.000Z"}	\N	2026-01-15 08:40:32.796745
+70	shifts	60	CLOSE	{"status": "OPEN", "closedAt": "2026-01-15T08:40:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-15T08:41:00.000Z"}	\N	2026-01-15 08:41:05.219477
+71	shifts	61	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-16T09:29:00.000Z"}	\N	2026-01-15 09:29:15.461336
+72	shifts	61	CLOSE	{"status": "OPEN", "closedAt": "2026-01-16T09:29:00.000Z"}	{"status": "CLOSED", "closedAt": "2026-01-16T09:30:00.000Z"}	\N	2026-01-15 09:30:14.145975
+73	shifts	62	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-15T09:47:00.000Z"}	\N	2026-01-15 09:47:48.772652
+74	shifts	64	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-15T13:55:00.000Z"}	\N	2026-01-15 13:55:45.441186
+75	shifts	66	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-15T16:51:00.000Z"}	\N	2026-01-15 16:51:59.739953
+76	users	1	LOGIN_FAILED	\N	{"reason": "Sai mật khẩu", "userId": 1, "username": "admin", "timestamp": "2026-01-15T18:22:59.445Z"}	1	2026-01-15 18:22:59.449663
+77	shifts	65	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-16T07:10:00.000Z"}	\N	2026-01-16 07:10:10.335568
+78	shifts	68	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-02T13:45:00.000Z"}	\N	2026-01-18 13:46:03.143319
+79	shifts	69	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-02T13:51:00.000Z"}	\N	2026-01-18 13:51:12.357849
+80	shifts	70	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-08T13:52:00.000Z"}	\N	2026-01-18 13:52:57.155383
+81	shifts	71	CLOSE	{"status": "OPEN", "closedAt": null}	{"status": "CLOSED", "closedAt": "2026-01-08T13:57:00.000Z"}	\N	2026-01-18 13:57:10.270333
 \.
 
 
@@ -1794,7 +1812,10 @@ COPY public.bank_ledger (id, bank_account_id, store_id, ref_type, ref_id, bank_i
 --
 
 COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit_time, receiver_name, notes, created_by, created_at, payment_method) FROM stdin;
-85	1	58	10574400.00	2026-01-13	\N	Công ty SWP	Nộp tiền Ca #1	\N	2026-01-13 07:26:10.814685	CASH
+98	1	68	5140000.00	2026-01-18	\N	Công ty SWP	Nộp tiền Ca #1	\N	2026-01-18 13:46:03.143319	CASH
+99	3	69	2100000.00	2026-01-18	\N	Công ty SWP	Nộp tiền Ca #1	\N	2026-01-18 13:51:12.357849	CASH
+100	3	70	2820000.00	2026-01-18	\N	Công ty SWP	Nộp tiền Ca #1	\N	2026-01-18 13:52:57.155383	CASH
+101	1	71	4738000.00	2026-01-18	\N	Công ty SWP	Nộp tiền Ca #1	\N	2026-01-18 13:57:10.270333	CASH
 \.
 
 
@@ -1803,8 +1824,14 @@ COPY public.cash_deposits (id, store_id, shift_id, amount, deposit_date, deposit
 --
 
 COPY public.cash_ledger (id, store_id, ref_type, ref_id, cash_in, cash_out, created_at, superseded_by_shift_id, shift_id) FROM stdin;
-172	1	SHIFT_CLOSE	58	10574400.00	0.00	2026-01-13 07:26:10.814685	\N	58
-173	1	DEPOSIT	85	0.00	10574400.00	2026-01-13 07:26:10.814685	\N	58
+200	1	SHIFT_CLOSE	68	5140000.00	0.00	2026-01-18 13:46:03.143319	\N	68
+201	1	DEPOSIT	98	0.00	5140000.00	2026-01-18 13:46:03.143319	\N	68
+202	3	SHIFT_CLOSE	69	2100000.00	0.00	2026-01-18 13:51:12.357849	\N	69
+203	3	DEPOSIT	99	0.00	2100000.00	2026-01-18 13:51:12.357849	\N	69
+204	3	SHIFT_CLOSE	70	2820000.00	0.00	2026-01-18 13:52:57.155383	\N	70
+205	3	DEPOSIT	100	0.00	2820000.00	2026-01-18 13:52:57.155383	\N	70
+206	1	SHIFT_CLOSE	71	4738000.00	0.00	2026-01-18 13:57:10.270333	\N	71
+207	1	DEPOSIT	101	0.00	4738000.00	2026-01-18 13:57:10.270333	\N	71
 \.
 
 
@@ -1816,7 +1843,7 @@ COPY public.customer_stores (customer_id, store_id, credit_limit) FROM stdin;
 24	1	\N
 25	16	\N
 1	1	10000000.00
-2	1	\N
+2	1	100000000.00
 \.
 
 
@@ -1837,8 +1864,8 @@ COPY public.customers (id, code, name, tax_code, address, phone, credit_limit, n
 --
 
 COPY public.debt_ledger (id, customer_id, store_id, ref_type, ref_id, debit, credit, created_at, notes, superseded_by_shift_id, shift_id) FROM stdin;
-66	2	1	OPENING_BALANCE	\N	5000000.00	0.00	2025-12-31 07:00:00	Số dư đầu kỳ công nợ	\N	\N
-64	1	1	OPENING_BALANCE	\N	10000000.00	0.00	2025-12-31 07:00:00	Số dư đầu kỳ công nợ	\N	\N
+79	2	1	DEBT_SALE	56	1100000.00	0.00	2026-01-18 13:46:03.143319	Bán công nợ	\N	68
+80	2	1	DEBT_SALE	57	1150000.00	0.00	2026-01-18 13:57:10.270333	Bán công nợ	\N	71
 \.
 
 
@@ -1867,8 +1894,14 @@ COPY public.expenses (id, store_id, shift_id, expense_category_id, amount, descr
 --
 
 COPY public.inventory_document_items (id, document_id, product_id, quantity, unit_price, tank_id) FROM stdin;
-100	55	3	240.000	17060.00	\N
-101	55	2	360.000	18000.00	\N
+126	68	3	240.000	11000.00	\N
+127	68	2	360.000	10000.00	\N
+128	69	2	100.000	10000.00	\N
+129	69	3	100.000	11000.00	\N
+130	70	2	120.000	12000.00	\N
+131	70	3	120.000	11500.00	\N
+132	71	3	200.000	11500.00	\N
+133	71	2	299.000	12000.00	\N
 \.
 
 
@@ -1877,7 +1910,10 @@ COPY public.inventory_document_items (id, document_id, product_id, quantity, uni
 --
 
 COPY public.inventory_documents (id, warehouse_id, doc_type, doc_date, ref_shift_id, status, supplier_name, invoice_number, license_plate) FROM stdin;
-55	1	EXPORT	2026-01-13	58	\N	Xuất bán ca #1	\N	\N
+68	1	EXPORT	2026-01-18	68	\N	Xuất bán ca #1	\N	\N
+69	3	EXPORT	2026-01-18	69	\N	Xuất bán ca #1	\N	\N
+70	3	EXPORT	2026-01-18	70	\N	Xuất bán ca #1	\N	\N
+71	1	EXPORT	2026-01-18	71	\N	Xuất bán ca #1	\N	\N
 \.
 
 
@@ -1886,10 +1922,18 @@ COPY public.inventory_documents (id, warehouse_id, doc_type, doc_date, ref_shift
 --
 
 COPY public.inventory_ledger (id, warehouse_id, product_id, ref_type, ref_id, quantity_in, quantity_out, created_at, tank_id, superseded_by_shift_id, shift_id) FROM stdin;
-101	1	3	ADJUSTMENT	\N	10400.000	0.000	2026-01-01 00:00:00.410999	\N	\N	\N
-102	1	2	ADJUSTMENT	\N	11000.000	0.000	2026-01-01 00:00:00.410999	\N	\N	\N
-169	1	3	EXPORT	55	0.000	240.000	2026-01-13 07:26:10.814685	\N	\N	58
-170	1	2	EXPORT	55	0.000	360.000	2026-01-13 07:26:10.814685	\N	\N	58
+201	1	3	EXPORT	68	0.000	240.000	2026-01-18 13:46:03.143319	\N	\N	68
+202	1	2	EXPORT	68	0.000	360.000	2026-01-18 13:46:03.143319	\N	\N	68
+203	3	2	EXPORT	69	0.000	100.000	2026-01-18 13:51:12.357849	\N	\N	69
+204	3	3	EXPORT	69	0.000	100.000	2026-01-18 13:51:12.357849	\N	\N	69
+205	3	2	EXPORT	70	0.000	120.000	2026-01-18 13:52:57.155383	\N	\N	70
+206	3	3	EXPORT	70	0.000	120.000	2026-01-18 13:52:57.155383	\N	\N	70
+207	1	3	EXPORT	71	0.000	200.000	2026-01-18 13:57:10.270333	\N	\N	71
+208	1	2	EXPORT	71	0.000	299.000	2026-01-18 13:57:10.270333	\N	\N	71
+196	1	2	ADJUSTMENT	\N	11000.000	0.000	2025-12-31 00:00:00.504	\N	\N	\N
+194	3	3	ADJUSTMENT	\N	10000.000	0.000	2025-12-31 00:00:00.504	\N	\N	\N
+195	1	3	ADJUSTMENT	\N	11000.000	0.000	2025-12-31 00:00:00.504	\N	\N	\N
+193	3	2	ADJUSTMENT	\N	10000.000	0.000	2025-12-31 00:00:00.504	\N	\N	\N
 \.
 
 
@@ -1930,10 +1974,12 @@ COPY public.permissions (id, code, description) FROM stdin;
 --
 
 COPY public.product_prices (id, product_id, region_id, price, valid_from, valid_to, created_at) FROM stdin;
-9	2	1	18000.00	2025-12-31 07:00:00	\N	2026-01-13 06:45:36.922334
-10	3	1	17060.00	2025-12-31 07:00:00	\N	2026-01-13 06:45:36.932985
-11	2	2	17250.00	2025-12-31 07:00:00	\N	2026-01-13 06:46:02.822235
-12	3	2	17150.00	2025-12-31 07:00:00	\N	2026-01-13 06:46:02.831641
+15	2	1	10000.00	2026-01-02 07:00:00	2026-01-08 07:00:00	2026-01-18 13:44:41.196876
+16	3	1	11000.00	2026-01-02 07:00:00	2026-01-08 07:00:00	2026-01-18 13:44:41.206387
+18	3	1	11500.00	2026-01-08 07:00:00	2026-01-15 15:00:00	2026-01-18 13:51:53.584751
+19	3	1	17000.00	2026-01-15 15:00:00	\N	2026-01-18 16:15:30.645596
+17	2	1	12000.00	2026-01-08 07:00:00	2026-01-15 15:00:00	2026-01-18 13:51:53.580533
+20	2	1	18000.00	2026-01-15 15:00:00	\N	2026-01-18 16:15:30.650639
 \.
 
 
@@ -1953,11 +1999,20 @@ COPY public.products (id, code, name, unit, is_fuel) FROM stdin;
 --
 
 COPY public.pump_readings (id, shift_id, pump_code, product_id, start_value, end_value, quantity, pump_id, unit_price, test_export) FROM stdin;
-336	58	V1	3	0.000	120.000	120.000	\N	17060.00	0.000
-337	58	V2	3	0.000	120.000	120.000	\N	17060.00	0.000
-338	58	V3	2	0.000	120.000	120.000	\N	18000.00	0.000
-339	58	V4	2	0.000	120.000	120.000	\N	18000.00	0.000
-340	58	V5	2	0.000	120.000	120.000	\N	18000.00	0.000
+422	68	V1	3	0.000	120.000	120.000	\N	11000.00	0.000
+423	68	V2	3	0.000	120.000	120.000	\N	11000.00	0.000
+424	68	V3	2	0.000	120.000	120.000	\N	10000.00	0.000
+425	68	V4	2	0.000	120.000	120.000	\N	10000.00	0.000
+426	68	V5	2	0.000	120.000	120.000	\N	10000.00	0.000
+427	69	V01	2	0.000	100.000	100.000	\N	10000.00	0.000
+428	69	V02	3	0.000	100.000	100.000	\N	11000.00	0.000
+429	70	V01	2	100.000	220.000	120.000	\N	12000.00	0.000
+430	70	V02	3	100.000	220.000	120.000	\N	11500.00	0.000
+431	71	V1	3	120.000	220.000	100.000	\N	11500.00	0.000
+432	71	V2	3	120.000	220.000	100.000	\N	11500.00	0.000
+433	71	V3	2	120.000	220.000	100.000	\N	12000.00	0.000
+434	71	V4	2	120.000	219.000	99.000	\N	12000.00	0.000
+435	71	V5	2	120.000	220.000	100.000	\N	12000.00	0.000
 \.
 
 
@@ -2030,11 +2085,22 @@ COPY public.roles (id, code, name) FROM stdin;
 --
 
 COPY public.sales (id, shift_id, store_id, product_id, quantity, unit_price, amount, customer_id, payment_method) FROM stdin;
-364	58	1	3	120.000	17060.00	2047200.00	\N	CASH
-365	58	1	3	120.000	17060.00	2047200.00	\N	CASH
-366	58	1	2	120.000	18000.00	2160000.00	\N	CASH
-367	58	1	2	120.000	18000.00	2160000.00	\N	CASH
-368	58	1	2	120.000	18000.00	2160000.00	\N	CASH
+465	68	1	3	120.000	11000.00	1320000.00	\N	CASH
+466	68	1	3	120.000	11000.00	1320000.00	\N	CASH
+467	68	1	2	120.000	10000.00	1200000.00	\N	CASH
+468	68	1	2	120.000	10000.00	1200000.00	\N	CASH
+469	68	1	2	120.000	10000.00	1200000.00	\N	CASH
+470	68	1	3	100.000	11000.00	1100000.00	2	CASH
+471	69	3	2	100.000	10000.00	1000000.00	\N	CASH
+472	69	3	3	100.000	11000.00	1100000.00	\N	CASH
+473	70	3	2	120.000	12000.00	1440000.00	\N	CASH
+474	70	3	3	120.000	11500.00	1380000.00	\N	CASH
+475	71	1	3	100.000	11500.00	1150000.00	\N	CASH
+476	71	1	3	100.000	11500.00	1150000.00	\N	CASH
+477	71	1	2	100.000	12000.00	1200000.00	\N	CASH
+478	71	1	2	99.000	12000.00	1188000.00	\N	CASH
+479	71	1	2	100.000	12000.00	1200000.00	\N	CASH
+480	71	1	3	100.000	11500.00	1150000.00	2	CASH
 \.
 
 
@@ -2051,6 +2117,8 @@ COPY public.shift_adjustments (id, shift_id, adjustment_type, reason, created_by
 --
 
 COPY public.shift_debt_sales (id, shift_id, customer_id, product_id, quantity, unit_price, amount, notes, created_at) FROM stdin;
+56	68	2	3	100.000	11000.00	1100000.00	\N	2026-01-18 13:46:03.143319
+57	71	2	3	100.000	11500.00	1150000.00	\N	2026-01-18 13:57:10.270333
 \.
 
 
@@ -2058,9 +2126,11 @@ COPY public.shift_debt_sales (id, shift_id, customer_id, product_id, quantity, u
 -- Data for Name: shifts; Type: TABLE DATA; Schema: public; Owner: postgres
 --
 
-COPY public.shifts (id, store_id, shift_date, shift_no, opened_at, closed_at, status, version, adjusted_from_shift_id, is_active) FROM stdin;
-58	1	2026-01-13	1	2026-01-13 01:44:00	2026-01-13 14:26:00	CLOSED	1	\N	t
-59	1	2026-01-14	1	2026-01-14 02:36:00	\N	OPEN	1	\N	t
+COPY public.shifts (id, store_id, shift_date, shift_no, opened_at, closed_at, status, version, adjusted_from_shift_id, is_active, receiver_name, handover_name) FROM stdin;
+68	1	2026-01-02	1	2026-01-02 08:45:00	2026-01-02 20:45:00	CLOSED	1	\N	t	Nguyễn Văn Thắng	Tây Nam 81
+69	3	2026-01-02	1	2026-01-02 08:50:00	2026-01-02 20:51:00	CLOSED	1	\N	t	Nguyễn văn a	ch11
+70	3	2026-01-08	1	2026-01-08 08:52:00	2026-01-08 20:52:00	CLOSED	1	\N	t	ch11	Nguyễn văn a
+71	1	2026-01-08	1	2026-01-08 08:56:00	2026-01-08 20:57:00	CLOSED	1	\N	t	Nguyễn Văn Thắng	Tây Nam 81
 \.
 
 
@@ -2121,6 +2191,7 @@ b86b2308-cc88-4577-bbed-27799a0dbdcc	1	2026-01-12 12:44:29.103	2026-01-05 05:44:
 1dabf13c-3717-49d7-925e-e647060abd75	1	2026-01-14 23:05:04.061	2026-01-07 16:05:04.064055	f
 24beeaf0-bf57-46c7-8f1c-682492da58f6	4	2026-01-13 18:03:36.161	2026-01-06 11:03:36.162607	f
 0659535c-67ef-4da7-855d-3e92da27ec61	4	2026-01-15 13:11:39.338	2026-01-08 06:11:39.34657	f
+b25dae08-4713-4098-a6c0-540921d24830	1	2026-01-21 22:42:37.77	2026-01-14 15:42:37.789811	f
 8f12c1a8-5a29-4b99-a8dc-fb7457d28235	1	2026-01-15 14:20:09.02	2026-01-08 07:20:09.025903	f
 20f859dc-0658-475e-b54a-033977cff316	1	2026-01-15 14:57:27.364	2026-01-08 07:57:27.368596	f
 2e47c1c9-597f-40bf-bdf1-ebea2e2f4a1a	4	2026-01-12 15:30:09.156	2026-01-05 08:30:09.158119	f
@@ -2193,10 +2264,90 @@ cd33b947-fb6e-498a-a1b6-b9377fec58c7	4	2026-01-20 14:16:36.762	2026-01-13 07:16:
 cb96dcfb-23c1-42be-8803-4ce4fc2eeeee	4	2026-01-20 14:16:36.764	2026-01-13 07:16:36.76774	f
 fa7b30ea-0dd6-4b68-b9f3-2667a730109c	4	2026-01-20 14:16:36.765	2026-01-13 07:16:36.767883	f
 fdc027b0-2043-447d-a276-0a38634f0a66	4	2026-01-20 14:16:36.759	2026-01-13 07:16:36.768043	f
+af8b6a2d-d19b-48e7-8398-ed08c95fbf2b	1	2026-01-21 22:42:37.773	2026-01-14 15:42:37.790044	f
+0c74c723-67bf-4c81-8b74-c1834dd1d01c	1	2026-01-21 22:42:37.776	2026-01-14 15:42:37.790312	f
+887b572d-9c73-4b43-b89b-86da540984df	1	2026-01-21 22:42:37.778	2026-01-14 15:42:37.790454	f
 13b8d46e-ccb9-4ce3-9bcb-4a994405971b	1	2026-01-20 15:18:46.354	2026-01-13 08:18:46.356379	f
-12dff1ef-2e22-42d5-89de-39d67039381b	1	2026-01-20 15:18:46.355	2026-01-13 08:18:46.35664	f
+f0e6e1b3-4d2a-4869-b568-bcf7e327965a	1	2026-01-21 22:42:37.767	2026-01-14 15:42:37.790597	f
 49b2709b-3fd3-4d10-832d-4a36b92f0d78	4	2026-01-20 16:39:45.147	2026-01-13 09:39:45.148629	f
-d729cede-fa5e-4063-a6fd-c003ca45ac01	4	2026-01-20 17:21:09.669	2026-01-13 10:21:09.67171	f
+05adfb0e-c165-4ab5-b9f9-4bd3c67c0976	4	2026-01-25 19:51:34.736	2026-01-18 12:51:34.738097	f
+d6512f72-913e-4888-8c6d-d5551e1c3718	1	2026-01-22 09:08:56.358	2026-01-15 02:08:56.363377	f
+e1aed7f5-9395-49b0-8b82-0c6be8cb5315	1	2026-01-22 09:08:56.361	2026-01-15 02:08:56.363547	f
+7b5c1c21-704a-49eb-8c34-4fb960382572	1	2026-01-21 17:50:08.121	2026-01-14 10:50:08.12665	f
+bc2c3739-4c31-40d7-9321-a8c53945b9ff	1	2026-01-21 17:50:08.124	2026-01-14 10:50:08.126787	f
+203b9ca9-77ba-4c12-b715-5778ea43aa11	1	2026-01-21 17:50:08.127	2026-01-14 10:50:08.131969	f
+a13acadf-895b-4d91-a870-0dd261e94253	1	2026-01-21 17:50:08.132	2026-01-14 10:50:08.136709	f
+73afb21c-9532-44d7-ab9d-9ea95cece5fe	1	2026-01-21 17:50:08.134	2026-01-14 10:50:08.140093	f
+36838a91-ea6b-4f44-b401-5284963e5d3a	1	2026-01-22 09:08:56.364	2026-01-15 02:08:56.369257	f
+336bc18b-07a2-45cc-8684-86e625cc5a1c	1	2026-01-22 09:08:56.37	2026-01-15 02:08:56.373721	f
+731522a4-971a-4898-ba3d-b371f1b1f9e6	1	2026-01-22 09:08:56.365	2026-01-15 02:08:56.373866	f
+72938a7a-9536-43e9-b3fa-96c148a771b9	1	2026-01-25 20:41:02.067	2026-01-18 13:41:02.072369	f
+e4bfae1a-fc2c-49bc-8f63-cd1440c3b408	1	2026-01-25 20:41:02.061	2026-01-18 13:41:02.072623	f
+48da911e-f951-4428-a432-b9a6e1302393	1	2026-01-22 13:55:02.616	2026-01-15 06:55:02.620885	f
+9f5339df-6d4d-4c74-a1ea-a1ecaf98eb65	1	2026-01-22 13:55:02.619	2026-01-15 06:55:02.622092	f
+4c474d57-4bf0-4b91-80c8-c3cabe6db750	1	2026-01-22 13:55:02.621	2026-01-15 06:55:02.626528	f
+64855369-c8da-4143-bb74-8e4eadc5145c	1	2026-01-22 13:55:02.622	2026-01-15 06:55:02.626975	f
+f0741d54-5b88-4733-b0f8-c5fcaf90a3f3	1	2026-01-22 13:55:02.623	2026-01-15 06:55:02.630426	f
+d5c854ff-a220-4fbf-82b1-579d841ef78f	1	2026-01-25 20:52:10.89	2026-01-18 13:52:10.893489	f
+828875fa-810c-4bf2-b24d-1d31fbc7280a	4	2026-01-22 14:51:32.474	2026-01-15 07:51:32.476944	f
+ea32b74a-d47d-4496-9af8-010907db34fd	1	2026-01-25 21:35:25.317	2026-01-18 14:35:25.320929	f
+c3fff033-d444-4462-b45b-6165514e75c9	1	2026-01-25 21:35:25.318	2026-01-18 14:35:25.321066	f
+812a3515-750d-4418-8c67-e0035f710fdc	1	2026-01-25 21:35:25.314	2026-01-18 14:35:25.321208	f
+e6b4ae08-bcb2-48da-8675-56580ec17c87	1	2026-01-25 22:05:25.208	2026-01-18 15:05:25.212419	f
+4241f29d-7703-409a-8534-c74bf9ff273f	1	2026-01-22 16:46:21.642	2026-01-15 09:46:21.644453	f
+558dfdd3-524d-47f7-b40c-36ebfea39b91	1	2026-01-25 22:05:25.209	2026-01-18 15:05:25.212544	f
+b8563481-74d7-41ac-9f0a-41e57c77ac23	1	2026-01-25 22:05:25.205	2026-01-18 15:05:25.212669	f
+252f07cb-5e81-4ece-af3e-ecb0cfd2a345	4	2026-01-22 17:15:50.193	2026-01-15 10:15:50.194977	f
+8560f776-6ec2-4f21-b682-ae02c4b559a1	1	2026-01-25 23:07:03.164	2026-01-18 16:07:03.1697	f
+656493b3-a7c8-43cc-9f78-a667b12e3c45	1	2026-01-25 23:07:03.165	2026-01-18 16:07:03.169827	f
+160b8ca1-2212-47f0-84d5-4f61057e9a66	4	2026-01-22 18:06:50.548	2026-01-15 11:06:50.553249	f
+9351c791-dc46-4474-b9c4-ed7422aca2b9	1	2026-01-25 23:07:03.166	2026-01-18 16:07:03.169997	f
+016d8fd8-79ba-45ba-a3a6-6eea4754649d	1	2026-01-25 23:07:03.167	2026-01-18 16:07:03.170104	f
+447244a7-1ee6-414e-8ecd-d0559577baeb	1	2026-01-25 23:07:03.161	2026-01-18 16:07:03.170209	f
+962d5344-408c-4602-a6de-54e9df3b735f	1	2026-01-22 19:28:20.73	2026-01-15 12:28:20.734276	f
+79f0e94a-de82-494f-ad4f-71c246e96c01	1	2026-01-22 19:28:20.732	2026-01-15 12:28:20.7344	f
+54b41277-91df-44f6-8da4-256871da2ac7	1	2026-01-22 19:28:20.735	2026-01-15 12:28:20.738826	f
+fd10a15f-6c9f-4057-9028-38d51bdb8fc6	1	2026-01-22 19:28:20.739	2026-01-15 12:28:20.743276	f
+c5a576d9-cc3c-4bc0-9eab-b4edb0ff6979	1	2026-01-22 19:28:20.74	2026-01-15 12:28:20.746857	f
+300abc55-b38e-4699-862b-b08cc807e7b2	1	2026-01-26 00:23:38.293	2026-01-18 17:23:38.302041	f
+5205e73d-f188-4c0b-93cd-a1e0254f71dd	1	2026-01-26 00:23:38.297	2026-01-18 17:23:38.302592	f
+6d10a8c7-42fb-43b2-b6d5-3a9642a4a65b	1	2026-01-26 00:23:38.322	2026-01-18 17:23:38.329076	f
+3b4feb4e-1856-4b80-917b-d2034b1809a3	7	2026-01-22 20:36:02.321	2026-01-15 13:36:02.322792	f
+647f41a1-81e3-4207-983d-b09bf8e8b841	7	2026-01-22 20:36:02.317	2026-01-15 13:36:02.322658	f
+b034404b-97bd-43f5-925d-49259dac677b	1	2026-01-26 00:58:33.837	2026-01-18 17:58:33.845365	f
+fdb3d542-35a0-4424-9b13-ccfde975329c	1	2026-01-26 00:58:33.848	2026-01-18 17:58:33.864634	f
+e3729c48-f7f1-4f31-bbd6-5538225163d2	1	2026-01-26 00:58:33.852	2026-01-18 17:58:33.865014	f
+a9f25ca5-b345-4b01-9606-ebf41ef2c524	1	2026-01-26 00:58:33.842	2026-01-18 17:58:33.865279	f
+df0293fb-389e-4bb3-a9f7-6eb7dc0f997b	1	2026-01-26 09:31:20.665	2026-01-19 02:31:20.6702	f
+8e6d0602-c7fb-4c8f-af29-6d23c3cd9804	1	2026-01-22 22:20:49.581	2026-01-15 15:20:49.585009	f
+650ce86f-173c-491a-93b5-8551bcd3222d	1	2026-01-22 22:20:49.578	2026-01-15 15:20:49.585196	f
+4e96eade-a122-482c-84fa-0686b782b321	1	2026-01-26 09:31:20.667	2026-01-19 02:31:20.670334	f
+08e3576a-7b5f-4dbc-a666-c69048ba0bb0	1	2026-01-22 23:21:36.678	2026-01-15 16:21:36.681128	f
+924acc96-c7d5-4946-a6f5-779276307803	1	2026-01-22 23:43:27.935	2026-01-15 16:43:27.936804	f
+5023b033-01e5-45fe-b96c-d95248c6d721	1	2026-01-23 12:02:31.819	2026-01-16 05:02:31.821247	f
+8df8e8ec-a307-4e02-84cd-76834ef5a317	1	2026-01-23 12:02:31.817	2026-01-16 05:02:31.821359	f
+df94a7f6-dfb9-4185-ae45-03b60e005487	1	2026-01-23 12:51:30.858	2026-01-16 05:51:30.864012	f
+13aa0406-5e0a-4ee9-bd0b-842d3af9c8bb	1	2026-01-23 12:51:30.859	2026-01-16 05:51:30.864135	f
+e7f558fe-bff7-4027-aab5-cd7b5acc436f	1	2026-01-23 12:51:30.86	2026-01-16 05:51:30.864262	f
+2e26ee21-6765-41b5-bece-738c6d0bf096	1	2026-01-23 12:51:30.861	2026-01-16 05:51:30.864364	f
+782511a3-b549-465f-88e9-65b6d14ff8b0	1	2026-01-23 12:51:30.855	2026-01-16 05:51:30.864545	f
+903ffc86-0a80-42ed-87c8-f544f0c36515	1	2026-01-23 21:29:12.461	2026-01-16 14:29:12.466011	f
+d85b1312-aca3-4403-8f8e-617702e88277	1	2026-01-23 21:29:12.463	2026-01-16 14:29:12.466177	f
+29f393b0-0f57-4237-82f7-9e8a8b66e43a	1	2026-01-23 21:29:12.467	2026-01-16 14:29:12.471553	f
+02f6b702-3d43-4101-a16f-7e575b6496a8	1	2026-01-23 21:29:12.472	2026-01-16 14:29:12.476026	f
+56a046d2-aff7-438b-a348-c0d3ad8fdfb3	1	2026-01-23 21:29:12.473	2026-01-16 14:29:12.479197	f
+6a1e98eb-f9ea-4870-9782-25d0081557d3	1	2026-01-26 09:31:20.671	2026-01-19 02:31:20.676921	f
+21182bd6-7435-4221-8765-8ca4c0191872	1	2026-01-26 09:31:20.672	2026-01-19 02:31:20.677056	f
+a595c92b-c3a9-4251-b522-58f8275e2876	1	2026-01-26 09:31:20.677	2026-01-19 02:31:20.680397	f
+51176310-3295-4d0e-8d30-07a600585121	1	2026-01-26 10:06:20.457	2026-01-19 03:06:20.460929	f
+28188708-fbe4-4be8-b5b0-ba3b13162670	1	2026-01-26 10:06:20.458	2026-01-19 03:06:20.461045	f
+2e406dbd-f2d0-4dc9-8861-803951ac207d	1	2026-01-26 10:06:20.459	2026-01-19 03:06:20.461158	f
+7b81ff46-9838-47ab-952a-9f5ab7c207ff	1	2026-01-26 10:06:20.456	2026-01-19 03:06:20.46125	f
+5e2cf6b8-0b61-4d2f-b242-1bef95b88b6c	1	2026-01-26 12:53:17.805	2026-01-19 05:53:17.815451	f
+a3fc9bb1-23fd-4258-a717-e67f228ad695	1	2026-01-26 12:53:17.807	2026-01-19 05:53:17.815558	f
+a1e969c9-bf70-407f-a263-2080fcf920c2	1	2026-01-26 12:53:17.808	2026-01-19 05:53:17.815682	f
+334f718e-c8bd-42ef-aae5-21c971c5d2b8	1	2026-01-26 12:53:17.81	2026-01-19 05:53:17.818355	f
+4d06a16a-9de6-4ab3-ba07-ab2104b6a302	1	2026-01-26 15:07:56.772	2026-01-19 08:07:56.772997	f
 \.
 
 
@@ -2209,6 +2360,8 @@ COPY public.users (id, username, password_hash, full_name, role_id, store_id, is
 5	ch10	$2b$10$UaKaGNx8MH57lpudce9M5e0O0wgkbjnUN1oApvIYXhd.No1FDDawe	HTT	5	2	t	2026-01-02 15:42:27.402355
 6	ch11	$2b$10$xev.vAwfgzcTu57K2q1OXOPgPfQYqyFmpsdKHM5p.xWM7ulWFVKhm	ch11	5	3	t	2026-01-03 07:36:38.844602
 4	ch81	$2b$10$86ZgJkgc3Izm63iLC6FpxeJXuSk3mUySDXJPQsnmY0bmHbAaQber.	Tây Nam 81	5	1	t	2026-01-01 18:01:34.674572
+7	thang81	$2b$10$OIxI.u1CLB.gTVg3vWvDeujMNWOcf0pWs00HAlTOkwZ9VrsYf3DKC	Nguyễn Văn Thắng	5	1	t	2026-01-14 14:15:59.667362
+8	ch112	$2b$10$nxBJ4Tf0Is6xWdUcSKTsE.03OIa7DGmyCQSJDBuzIXwH3u46jvfPy	Nguyễn văn a	5	3	t	2026-01-15 16:38:40.438978
 \.
 
 
@@ -2219,6 +2372,7 @@ COPY public.users (id, username, password_hash, full_name, role_id, store_id, is
 COPY public.warehouses (id, type, store_id) FROM stdin;
 1	STORE	1
 2	STORE	15
+3	STORE	3
 \.
 
 
@@ -2226,7 +2380,7 @@ COPY public.warehouses (id, type, store_id) FROM stdin;
 -- Name: audit_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.audit_logs_id_seq', 65, true);
+SELECT pg_catalog.setval('public.audit_logs_id_seq', 81, true);
 
 
 --
@@ -2247,14 +2401,14 @@ SELECT pg_catalog.setval('public.bank_ledger_id_seq', 1, false);
 -- Name: cash_deposits_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cash_deposits_id_seq', 85, true);
+SELECT pg_catalog.setval('public.cash_deposits_id_seq', 101, true);
 
 
 --
 -- Name: cash_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.cash_ledger_id_seq', 175, true);
+SELECT pg_catalog.setval('public.cash_ledger_id_seq', 207, true);
 
 
 --
@@ -2268,7 +2422,7 @@ SELECT pg_catalog.setval('public.customers_id_seq', 25, true);
 -- Name: debt_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.debt_ledger_id_seq', 66, true);
+SELECT pg_catalog.setval('public.debt_ledger_id_seq', 80, true);
 
 
 --
@@ -2289,21 +2443,21 @@ SELECT pg_catalog.setval('public.expenses_id_seq', 1, false);
 -- Name: inventory_document_items_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.inventory_document_items_id_seq', 101, true);
+SELECT pg_catalog.setval('public.inventory_document_items_id_seq', 133, true);
 
 
 --
 -- Name: inventory_documents_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.inventory_documents_id_seq', 55, true);
+SELECT pg_catalog.setval('public.inventory_documents_id_seq', 71, true);
 
 
 --
 -- Name: inventory_ledger_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.inventory_ledger_id_seq', 170, true);
+SELECT pg_catalog.setval('public.inventory_ledger_id_seq', 208, true);
 
 
 --
@@ -2338,7 +2492,7 @@ SELECT pg_catalog.setval('public.permissions_id_seq', 1, false);
 -- Name: product_prices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.product_prices_id_seq', 12, true);
+SELECT pg_catalog.setval('public.product_prices_id_seq', 20, true);
 
 
 --
@@ -2352,7 +2506,7 @@ SELECT pg_catalog.setval('public.products_id_seq', 6, true);
 -- Name: pump_readings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.pump_readings_id_seq', 350, true);
+SELECT pg_catalog.setval('public.pump_readings_id_seq', 435, true);
 
 
 --
@@ -2394,7 +2548,7 @@ SELECT pg_catalog.setval('public.roles_id_seq', 6, true);
 -- Name: sales_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.sales_id_seq', 378, true);
+SELECT pg_catalog.setval('public.sales_id_seq', 480, true);
 
 
 --
@@ -2408,14 +2562,14 @@ SELECT pg_catalog.setval('public.shift_adjustments_id_seq', 1, false);
 -- Name: shift_debt_sales_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.shift_debt_sales_id_seq', 40, true);
+SELECT pg_catalog.setval('public.shift_debt_sales_id_seq', 57, true);
 
 
 --
 -- Name: shifts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.shifts_id_seq', 59, true);
+SELECT pg_catalog.setval('public.shifts_id_seq', 71, true);
 
 
 --
@@ -2436,14 +2590,14 @@ SELECT pg_catalog.setval('public.tanks_id_seq', 7, true);
 -- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.users_id_seq', 6, true);
+SELECT pg_catalog.setval('public.users_id_seq', 8, true);
 
 
 --
 -- Name: warehouses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
 
-SELECT pg_catalog.setval('public.warehouses_id_seq', 2, true);
+SELECT pg_catalog.setval('public.warehouses_id_seq', 3, true);
 
 
 --
@@ -3380,5 +3534,5 @@ ALTER TABLE ONLY public.inventory_ledger
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 4qrKdv5eoL9xhsY1OxKsUDnGWYEX6ssSiWGQAF579N11L0D69WsGfvLQl3u5tHh
+\unrestrict 0AYd8dP4dKBT7K3dvofeA1Abi41Iyy1U8iDlJkIINrpy708upRJwbayZqIIqrGi
 
