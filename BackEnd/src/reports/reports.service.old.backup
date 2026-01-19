@@ -10,7 +10,6 @@ import { Customer } from '../entities/customer.entity';
 import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { Receipt } from '../entities/receipt.entity';
-import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
 import { InventoryDocument } from '../entities/inventory-document.entity';
@@ -18,16 +17,6 @@ import { InventoryDocumentItem } from '../entities/inventory-document-item.entit
 import { Product } from '../entities/product.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { ProductPrice } from '../entities/product-price.entity';
-import {
-  RevenueSalesReportQueryDto,
-  RevenueSalesReportResponse,
-  StoreDetail,
-  ProductDetail,
-  PricePeriod,
-  SalesByCustomerReportQueryDto,
-  SalesByCustomerReportResponse,
-  CustomerDetail,
-} from './dto/revenue-sales-report.dto';
 
 @Injectable()
 export class ReportsService {
@@ -50,8 +39,6 @@ export class ReportsService {
     private shiftDebtSaleRepository: Repository<ShiftDebtSale>,
     @InjectRepository(Receipt)
     private receiptRepository: Repository<Receipt>,
-    @InjectRepository(ReceiptDetail)
-    private receiptDetailRepository: Repository<ReceiptDetail>,
     @InjectRepository(CashDeposit)
     private cashDepositRepository: Repository<CashDeposit>,
     @InjectRepository(PumpReading)
@@ -616,6 +603,468 @@ export class ReportsService {
   // ==================== Báo cáo phiếu nhập kho ====================
 
   /**
+    try {
+      // Simplified query
+      const query = this.pumpReadingRepository
+        .createQueryBuilder('pr')
+        .leftJoin('pr.shift', 'shift')
+        .leftJoin('pr.product', 'product')
+        .select('pr.pump_code', 'pumpCode')
+        .addSelect('product.name', 'productName')
+        .addSelect('pr.unit_price', 'unitPrice')
+        .addSelect('SUM(pr.quantity)', 'totalQuantity')
+        .addSelect('SUM(pr.quantity * pr.unit_price)', 'totalAmount')
+        .where('shift.store_id = :storeId', { storeId })
+        .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+          fromDate,
+          toDate,
+        })
+        .andWhere('shift.status = :status', { status: 'CLOSED' })
+        .groupBy('pr.pump_code')
+        .addGroupBy('product.name')
+        .addGroupBy('pr.unit_price');
+
+      // Filter theo kỳ giá nếu có
+      if (priceId) {
+        query
+          .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+          .andWhere('pr.unit_price = pp.price');
+      }
+
+      const results = await query.getRawMany();
+
+      return results;
+    } catch (error) {
+      console.error('Error in getSalesByPumpReport:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Báo cáo xuất hàng theo mặt hàng
+   */
+  async getSalesByProductReport(storeId: number, fromDate: Date, toDate: Date, productId?: number, priceValidFrom?: Date, priceValidTo?: Date) {
+    const query = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('pr.product', 'product')
+      .select('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('COALESCE(AVG(pr.unit_price), 0)', 'unitPrice')
+      .addSelect('COALESCE(SUM(pr.quantity), 0)', 'totalQuantity')
+      .addSelect('COALESCE(SUM(pr.quantity * pr.unit_price), 0)', 'totalAmount')
+      .where('shift.store_id = :storeId', { storeId })
+      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
+      .andWhere('shift.status = :status', { status: 'CLOSED' })
+      .groupBy('product.id')
+      .addGroupBy('product.name')
+      .orderBy('product.name', 'ASC');
+
+    // Filter theo mặt hàng nếu có
+    if (productId) {
+      query.andWhere('product.id = :productId', { productId });
+    }
+
+    // Filter theo kỳ giá
+    if (priceValidFrom || priceValidTo) {
+      query.leftJoin('product.productPrices', 'productPrice',
+        'productPrice.product_id = product.id AND CAST(pr.unit_price AS DECIMAL(18,2)) = CAST(productPrice.price AS DECIMAL(18,2))');
+
+      // Logic: Giá có hiệu lực trong khoảng [priceValidFrom, priceValidTo]
+      // valid_from <= priceValidTo (hoặc priceValidFrom nếu không có To)
+      // AND (valid_to IS NULL OR valid_to >= priceValidFrom)
+      if (priceValidFrom && priceValidTo) {
+        query.andWhere('productPrice.valid_from <= :priceValidTo', { priceValidTo });
+        query.andWhere('(productPrice.valid_to IS NULL OR productPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidFrom) {
+        // Chỉ có from: lấy giá có hiệu lực từ ngày đó trở đi
+        query.andWhere('(productPrice.valid_to IS NULL OR productPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidTo) {
+        // Chỉ có to: lấy giá có hiệu lực đến ngày đó
+        query.andWhere('productPrice.valid_from <= :priceValidTo', { priceValidTo });
+      }
+    }
+
+    return query.getRawMany();
+  }
+
+  /**
+   * Báo cáo xuất hàng chi tiết theo từng ca
+   */
+  async getSalesByShiftReport(storeId: number, fromDate: Date, toDate: Date, priceId?: number) {
+    const query = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('pr.product', 'product')
+      .leftJoin('pumps', 'pump', 'pr.pump_code = pump.pump_code AND pump.store_id = shift.store_id')
+      .select('shift.id', 'shiftId')
+      .addSelect('shift.shift_no', 'shiftNo')
+      .addSelect('shift.shift_date', 'shiftDate')
+      .addSelect('pump.id', 'pumpId')
+      .addSelect('pump.pump_code', 'pumpCode')
+      .addSelect('pump.name', 'pumpName')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('COALESCE(pr.start_value, 0)', 'startValue')
+      .addSelect('COALESCE(pr.end_value, 0)', 'endValue')
+      .addSelect('COALESCE(pr.test_export, 0)', 'testExport')
+      .addSelect('COALESCE(pr.quantity, 0)', 'quantity')
+      .addSelect('COALESCE(pr.unit_price, 0)', 'unitPrice')
+      .addSelect('COALESCE(pr.quantity * pr.unit_price, 0)', 'amount')
+      .where('shift.store_id = :storeId', { storeId })
+      .andWhere('shift.shift_date BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
+      .andWhere('shift.status = :status', { status: 'CLOSED' })
+      .orderBy('shift.shift_date', 'ASC')
+      .addOrderBy('shift.shift_no', 'ASC')
+      .addOrderBy('pump.pump_code', 'ASC');
+
+    // Filter theo kỳ giá nếu có
+    if (priceId) {
+      query
+        .leftJoin('product.productPrices', 'pp', 'pp.id = :priceId', { priceId })
+        .andWhere('pr.unit_price = pp.price');
+    }
+
+    return query.getRawMany();
+  }
+
+  /**
+   * Báo cáo xuất hàng theo khách hàng
+   * - Công nợ: Lấy từ shift_debt_sales
+   * - Bán lẻ: Tính từ pump_readings - shift_debt_sales (nhóm theo product)
+   */
+  async getSalesByCustomerReport(params: {
+    storeId?: number;
+    customerId?: number;
+    fromDate?: Date;
+    toDate?: Date;
+    productId?: number;
+    priceValidFrom?: Date;
+    priceValidTo?: Date;
+  }) {
+    const { storeId, customerId, fromDate, toDate, productId, priceValidFrom, priceValidTo } = params;
+
+    console.log('🔍 getSalesByCustomerReport params:', { storeId, customerId, fromDate, toDate, productId, priceValidFrom, priceValidTo });
+
+    // 1. Query bán công nợ từ shift_debt_sales
+    const debtSalesQuery = this.shiftDebtSaleRepository
+      .createQueryBuilder('sds')
+      .leftJoin('sds.shift', 'shift')
+      .leftJoin('sds.customer', 'customer')
+      .leftJoin('sds.product', 'product')
+      .select('customer.id', 'customerId')
+      .addSelect('customer.code', 'customerCode')
+      .addSelect('customer.name', 'customerName')
+      .addSelect('customer.type', 'customerType')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('COALESCE(SUM(sds.quantity), 0)', 'totalQuantity')
+      .addSelect('COALESCE(AVG(sds.unit_price), 0)', 'unitPrice')
+      .addSelect('COALESCE(SUM(sds.quantity * sds.unit_price), 0)', 'totalAmount')
+      .addSelect("'DEBT'", 'saleType')
+      .where('shift.status = :status', { status: 'CLOSED' });
+
+    if (storeId) {
+      debtSalesQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+    if (customerId) {
+      debtSalesQuery.andWhere('sds.customer_id = :customerId', { customerId });
+    }
+    if (fromDate) {
+      debtSalesQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      debtSalesQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+
+    debtSalesQuery
+      .groupBy('customer.id, customer.code, customer.name, customer.type, product.id, product.name')
+      .orderBy('customer.name', 'ASC')
+      .addOrderBy('product.name', 'ASC');
+
+    // Nếu có productId, áp dụng filter
+    if (productId) {
+      debtSalesQuery.andWhere('sds.product_id = :productId', { productId });
+    }
+
+    // Filter theo kỳ giá (price valid period)
+    if (priceValidFrom || priceValidTo) {
+      debtSalesQuery.leftJoin('product.productPrices', 'debtPrice',
+        'debtPrice.product_id = product.id AND CAST(sds.unit_price AS DECIMAL(18,2)) = CAST(debtPrice.price AS DECIMAL(18,2))');
+
+      if (priceValidFrom && priceValidTo) {
+        debtSalesQuery.andWhere('debtPrice.valid_from <= :priceValidTo', { priceValidTo });
+        debtSalesQuery.andWhere('(debtPrice.valid_to IS NULL OR debtPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidFrom) {
+        debtSalesQuery.andWhere('(debtPrice.valid_to IS NULL OR debtPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidTo) {
+        debtSalesQuery.andWhere('debtPrice.valid_from <= :priceValidTo', { priceValidTo });
+      }
+    }
+
+    // Execute debt query sau khi đã áp dụng tất cả filters
+    const debtResults = await debtSalesQuery.getRawMany();
+
+    // 2. Query bán lẻ: Tính từ pump_readings - debt_sales (theo product)
+    // Lưu ý: pump_readings có product_id riêng, không cần join qua pump
+    const retailSalesQuery = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('shift.store', 'store')
+      .leftJoin('pr.product', 'product') // Join trực tiếp từ pump_reading.product_id
+      .select('store.id', 'customerId')
+      .addSelect('store.code', 'customerCode')
+      .addSelect('store.name', 'customerName')
+      .addSelect("'INTERNAL'", 'customerType')
+      .addSelect('product.id', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('COALESCE(SUM(pr.end_value - pr.start_value), 0)', 'pumpQuantity')
+      .addSelect('COALESCE(AVG(pr.unit_price), 0)', 'unitPrice')
+      .where('shift.status = :status', { status: 'CLOSED' })
+      .andWhere('pr.product_id IS NOT NULL'); // Chỉ lấy pump readings có product
+
+    if (storeId) {
+      retailSalesQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+    if (customerId) {
+      retailSalesQuery.andWhere('store.id = :customerId', { customerId });
+    }
+    if (fromDate) {
+      retailSalesQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      retailSalesQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+
+    retailSalesQuery
+      .groupBy('store.id, store.code, store.name, product.id, product.name')
+      .orderBy('store.name', 'ASC')
+      .addOrderBy('product.name', 'ASC');
+
+    // Nếu có productId, áp dụng filter
+    if (productId) {
+      retailSalesQuery.andWhere('product.id = :productId', { productId });
+    }
+
+    // Filter theo kỳ giá (price valid period)
+    if (priceValidFrom || priceValidTo) {
+      retailSalesQuery.leftJoin('product.productPrices', 'retailPrice',
+        'retailPrice.product_id = product.id AND CAST(pr.unit_price AS DECIMAL(18,2)) = CAST(retailPrice.price AS DECIMAL(18,2))');
+
+      if (priceValidFrom && priceValidTo) {
+        retailSalesQuery.andWhere('retailPrice.valid_from <= :priceValidTo', { priceValidTo });
+        retailSalesQuery.andWhere('(retailPrice.valid_to IS NULL OR retailPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidFrom) {
+        retailSalesQuery.andWhere('(retailPrice.valid_to IS NULL OR retailPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidTo) {
+        retailSalesQuery.andWhere('retailPrice.valid_from <= :priceValidTo', { priceValidTo });
+      }
+    }
+
+    // Execute query sau khi đã áp dụng tất cả filters
+    const pumpResults = await retailSalesQuery.getRawMany();
+
+    console.log('========================================');
+    console.log('🔍 RETAIL SALES QUERY RESULTS');
+    console.log('========================================');
+    console.log('🔍 DEBUG pumpResults count:', pumpResults.length);
+    console.log('🔍 DEBUG pumpResults:', JSON.stringify(pumpResults, null, 2));
+    pumpResults.forEach((p, idx) => {
+      console.log(`  [${idx}] Store: ${p.customerName}, Product: ${p.productName} (ID: ${p.productId}), Qty: ${p.pumpQuantity}`);
+    });
+    console.log('🔍 DEBUG debtResults count:', debtResults.length);
+    console.log('🔍 DEBUG debtResults:', JSON.stringify(debtResults, null, 2));
+
+    // Tính debt cho từng shift + product
+    const debtByShiftProduct = new Map<string, number>();
+    debtResults.forEach(debt => {
+      // Cần query lại để lấy shiftId cho mỗi debt
+      // Hoặc đơn giản hơn: tính tổng debt theo product, không theo shift
+    });
+
+    // Cách đơn giản hơn: Query debt theo store + product (không cần theo shift)
+    const debtByStoreProductQuery = this.shiftDebtSaleRepository
+      .createQueryBuilder('sds')
+      .leftJoin('sds.shift', 'shift')
+      .leftJoin('sds.customer', 'customer')
+      .leftJoin('sds.product', 'product')
+      .select('shift.store_id', 'storeId')
+      .addSelect('product.id', 'productId')
+      .addSelect('COALESCE(SUM(sds.quantity), 0)', 'debtQuantity')
+      .where('shift.status = :status', { status: 'CLOSED' });
+
+    if (storeId) {
+      debtByStoreProductQuery.andWhere('shift.store_id = :storeId', { storeId });
+    }
+    if (fromDate) {
+      debtByStoreProductQuery.andWhere('shift.shift_date >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      debtByStoreProductQuery.andWhere('shift.shift_date <= :toDate', { toDate });
+    }
+    if (productId) {
+      debtByStoreProductQuery.andWhere('sds.product_id = :productId', { productId });
+    }
+
+    // Filter theo kỳ giá
+    if (priceValidFrom || priceValidTo) {
+      debtByStoreProductQuery.leftJoin('product.productPrices', 'storeDebtPrice',
+        'storeDebtPrice.product_id = product.id AND CAST(sds.unit_price AS DECIMAL(18,2)) = CAST(storeDebtPrice.price AS DECIMAL(18,2))');
+
+      if (priceValidFrom && priceValidTo) {
+        debtByStoreProductQuery.andWhere('storeDebtPrice.valid_from <= :priceValidTo', { priceValidTo });
+        debtByStoreProductQuery.andWhere('(storeDebtPrice.valid_to IS NULL OR storeDebtPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidFrom) {
+        debtByStoreProductQuery.andWhere('(storeDebtPrice.valid_to IS NULL OR storeDebtPrice.valid_to >= :priceValidFrom)', { priceValidFrom });
+      } else if (priceValidTo) {
+        debtByStoreProductQuery.andWhere('storeDebtPrice.valid_from <= :priceValidTo', { priceValidTo });
+      }
+    }
+
+    debtByStoreProductQuery.groupBy('shift.store_id, product.id');
+
+    const debtByStoreProduct = await debtByStoreProductQuery.getRawMany();
+
+    console.log('🔍 DEBUG debtByStoreProduct:', JSON.stringify(debtByStoreProduct, null, 2));
+
+    // Map để lookup debt nhanh
+    const debtMap = new Map<string, number>();
+    const debtByStoreMap = new Map<number, number>(); // Tổng debt theo store (tất cả products)
+
+    debtByStoreProduct.forEach(d => {
+      const key = `${d.storeId}_${d.productId}`;
+      const debtQty = (d.debtQuantity === null || d.debtQuantity === undefined)
+        ? 0
+        : Number(d.debtQuantity);
+      debtMap.set(key, debtQty);
+
+      // Cộng dồn tổng debt cho mỗi store
+      const currentTotal = debtByStoreMap.get(d.storeId) || 0;
+      debtByStoreMap.set(d.storeId, currentTotal + debtQty);
+
+      console.log(`🔍 debtMap.set("${key}", ${debtQty})`);
+    });
+
+    // Tính retail = pump - debt cho mỗi product (pump đã được SUM trong query)
+    const retailResults: any[] = [];
+    pumpResults.forEach(p => {
+      const key = `${p.customerId}_${p.productId}`;
+      const pumpQty = (p.pumpQuantity === null || p.pumpQuantity === undefined)
+        ? 0
+        : Number(p.pumpQuantity);
+
+      // Nếu productId = null, trừ đi TỔNG TẤT CẢ debt của store đó
+      let debtQty = 0;
+      if (p.productId === null) {
+        debtQty = debtByStoreMap.get(p.customerId) || 0;
+        console.log(`🔍 productId=null, using total debt for store ${p.customerId}: ${debtQty}`);
+      } else {
+        debtQty = debtMap.get(key) || 0;
+      }
+
+      const retailQty = pumpQty - debtQty;
+      const unitPrice = (p.unitPrice === null || p.unitPrice === undefined)
+        ? 0
+        : Number(p.unitPrice);
+      const totalAmount = retailQty * unitPrice;
+
+      console.log(`🔍 RETAIL: ${p.customerName} - ${p.productName}: pump=${pumpQty}, debt=${debtQty}, retail=${retailQty}`);
+
+      // Chỉ thêm kết quả khi có dữ liệu thực sự (quantity > 0 hoặc amount > 0)
+      if (retailQty > 0 || totalAmount > 0) {
+        retailResults.push({
+          customerId: p.customerId,
+          customerCode: p.customerCode,
+          customerName: p.customerName,
+          customerType: p.customerType,
+          productId: p.productId,
+          productName: p.productName,
+          totalQuantity: retailQty,
+          unitPrice: unitPrice,
+          totalAmount: totalAmount,
+          saleType: 'RETAIL'
+        });
+      }
+    });
+
+    console.log('========================================');
+    console.log('🔍 RETAIL RESULTS AFTER CALCULATION');
+    console.log('========================================');
+    console.log('🔍 DEBUG retailResults count:', retailResults.length);
+    console.log('🔍 DEBUG retailResults:', JSON.stringify(retailResults, null, 2));
+
+    // Merge results
+    const allResults = [...debtResults, ...retailResults];
+
+    console.log('========================================');
+    console.log('🔍 ALL RESULTS (MERGED)');
+    console.log('========================================');
+    console.log('🔍 DEBUG allResults count:', allResults.length, '(debt:', debtResults.length, ', retail:', retailResults.length, ')');
+    console.log('🔍 DEBUG allResults:', JSON.stringify(allResults, null, 2));
+
+    // Format kết quả theo khách hàng
+    const customerMap = new Map<number, any>();
+
+    allResults.forEach((row) => {
+      const customerId = row.customerId;
+      if (!customerMap.has(customerId)) {
+        customerMap.set(customerId, {
+          customerId: row.customerId,
+          customerCode: row.customerCode,
+          customerName: row.customerName,
+          customerType: row.customerType,
+          products: [],
+          totalQuantity: 0,
+          totalAmount: 0,
+        });
+      }
+
+      const customer = customerMap.get(customerId);
+
+      // Xử lý an toàn các giá trị number
+      const quantity = (row.totalQuantity === null || row.totalQuantity === undefined)
+        ? 0
+        : Number(row.totalQuantity);
+      const amount = (row.totalAmount === null || row.totalAmount === undefined)
+        ? 0
+        : Number(row.totalAmount);
+      const unitPrice = (row.unitPrice === null || row.unitPrice === undefined)
+        ? 0
+        : Number(row.unitPrice);
+
+      // Chỉ thêm vào products khi có dữ liệu thực sự
+      // Lọc bỏ các entry có quantity = 0 và amount = 0 (không có giao dịch)
+      if (quantity > 0 || amount > 0) {
+        customer.products.push({
+          productId: row.productId,
+          productName: row.productName || 'Sản phẩm không xác định',
+          quantity: quantity,
+          unitPrice: unitPrice,
+          amount: amount,
+          saleType: row.saleType,
+        });
+
+        // Cộng vào tổng
+        customer.totalQuantity += quantity;
+        customer.totalAmount += amount;
+      }
+    });
+
+    // Lọc bỏ các khách hàng không có sản phẩm nào (sau khi filter)
+    const result = Array.from(customerMap.values()).filter(customer => customer.products.length > 0);
+
+    return result;
+  }
+
+  // ==================== Báo cáo phiếu nhập kho ====================
+
+  /**
    * Báo cáo bảng kê nhập kho (In Bảng Kê Nhập)
    * Tương tự như báo cáo công nợ, nhưng cho phiếu nhập kho
    * @param params - Tham số lọc
@@ -897,359 +1346,41 @@ export class ReportsService {
     }));
   }
 
-  // ==================== BÁO CÁO DOANH THU / XUẤT HÀNG ====================
-
+  // ==================== DANH SÁCH KỲ GIÁ ====================
+  
   /**
-   * Báo cáo doanh thu / xuất hàng
-   * Kết hợp:
-   * - Bán công nợ (từ bảng sales với customerId)
-   * - Bán lẻ (từ bảng sales không có customerId - tính theo shift)
-   * Filter theo:
-   * - Mặt hàng (productId)
-   * - Kỳ giá (validFrom -> validTo từ product_prices)
-   * - Khách hàng (customerId) - chỉ áp dụng cho bán công nợ
-   * - Cửa hàng (storeId)
-   * - Loại bán (saleType: all/debt/retail)
+   * Lấy danh sách các kỳ giá (price periods) để filter
+   * Trả về các khoảng thời gian valid_from/valid_to duy nhất
    */
-  /**
-   * Lấy danh sách kỳ giá để hiển thị trong dropdown filter
-   * Chỉ trả về các khoảng thời gian duy nhất (không lặp theo mặt hàng)
-   * Vì tất cả mặt hàng cùng đổi giá cùng 1 thời điểm
-   * @returns Danh sách kỳ giá với label đã format
-   */
-  async getPricePeriods(): Promise<PricePeriod[]> {
-    // Lấy các khoảng thời gian duy nhất (DISTINCT validFrom, validTo)
-    const prices = await this.productPriceRepository
-      .createQueryBuilder('price')
-      .select([
-        'DISTINCT price.validFrom AS "validFrom"',
-        'price.validTo AS "validTo"',
-      ])
-      .orderBy('price.validFrom', 'DESC')
-      .getRawMany();
+  async getPricePeriods(storeId?: number) {
+    const query = this.productPriceRepository
+      .createQueryBuilder('pp')
+      .select('DISTINCT pp.valid_from', 'validFrom')
+      .addSelect('pp.valid_to', 'validTo')
+      .orderBy('pp.valid_from', 'DESC');
 
-    return prices.map((row, index) => {
-      const validFromStr = row.validFrom
-        ? new Date(row.validFrom).toLocaleString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : '';
-      const validToStr = row.validTo
-        ? new Date(row.validTo).toLocaleString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : 'Hiện tại';
-
-      return {
-        priceId: index + 1, // Dùng index vì không có id duy nhất
-        productId: 0, // Không cần productId vì kỳ giá áp dụng cho tất cả mặt hàng
-        productCode: '',
-        productName: '',
-        validFrom: row.validFrom,
-        validTo: row.validTo,
-        price: 0, // Không cần giá cụ thể
-        label: `${validFromStr} → ${validToStr}`,
-      };
-    });
-  }
-
-  /**
-   * Báo cáo doanh thu/xuất hàng
-   * - Nhóm theo Cửa hàng -> Mặt hàng
-   * - Filter: Thời gian (datetime), Cửa hàng, Mặt hàng
-   * - Kỳ giá: Frontend chọn từ dropdown và tự set fromDateTime/toDateTime
-   */
-  async getRevenueSalesReport(
-    query: RevenueSalesReportQueryDto,
-  ): Promise<RevenueSalesReportResponse> {
-    const { productId, storeId, fromDateTime, toDateTime } = query;
-
-    // Query sales với GROUP BY để tránh duplicate và tính SUM đúng
-    // Chỉ lấy các record KHÔNG có customerId (bán lẻ từ ca)
-    // vì bán công nợ đã được ghi trong tổng ca rồi
-    const salesQuery = this.saleRepository
-      .createQueryBuilder('sale')
-      .leftJoin('sale.product', 'product')
-      .leftJoin('sale.store', 'store')
-      .leftJoin('sale.shift', 'shift')
-      .where('sale.customerId IS NULL')
-      .select([
-        'sale.storeId AS "storeId"',
-        'store.code AS "storeCode"',
-        'store.name AS "storeName"',
-        'sale.productId AS "productId"',
-        'product.code AS "productCode"',
-        'product.name AS "productName"',
-        'SUM(sale.quantity) AS "quantity"',
-        'SUM(sale.amount) AS "amount"',
-      ])
-      .groupBy('sale.storeId')
-      .addGroupBy('store.code')
-      .addGroupBy('store.name')
-      .addGroupBy('sale.productId')
-      .addGroupBy('product.code')
-      .addGroupBy('product.name');
-
-    // Filter theo productId
-    if (productId) {
-      salesQuery.andWhere('sale.productId = :productId', { productId });
-    }
-
-    // Filter theo storeId
+    // Nếu có storeId, lọc theo region của store đó
     if (storeId) {
-      salesQuery.andWhere('sale.storeId = :storeId', { storeId });
+      query
+        .innerJoin('stores', 's', 's.id = :storeId', { storeId })
+        .andWhere('pp.region_id = s.region_id');
     }
 
-    // Filter theo kỳ giá không cần xử lý ở đây
-    // Vì frontend đã gửi fromDateTime và toDateTime dựa trên kỳ giá được chọn
+    const results = await query.getRawMany();
 
-    // Filter theo thời gian
-    if (fromDateTime) {
-      salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateTime),
-      });
-    }
-    if (toDateTime) {
-      salesQuery.andWhere('shift.openedAt <= :toDateTime', {
-        toDateTime: new Date(toDateTime),
-      });
-    }
-
-    const salesResults = await salesQuery.getRawMany();
-
-    // ========== GROUP DỮ LIỆU: Cửa hàng -> Mặt hàng ==========
-    const storesMap = new Map<number, StoreDetail>();
-
-    for (const row of salesResults) {
-      // Get or create store
-      if (!storesMap.has(row.storeId)) {
-        storesMap.set(row.storeId, {
-          storeId: row.storeId,
-          storeCode: row.storeCode || '',
-          storeName: row.storeName || '',
-          totalQuantity: 0,
-          totalAmount: 0,
-          products: [],
-        });
-      }
-      const store = storesMap.get(row.storeId)!;
-
-      // Add product (đã SUM sẵn từ query)
-      const qty = Number(row.quantity) || 0;
-      const amt = Number(row.amount) || 0;
-
-      store.products.push({
-        productId: row.productId,
-        productCode: row.productCode || '',
-        productName: row.productName || '',
-        quantity: qty,
-        amount: amt,
-      });
-
-      store.totalQuantity += qty;
-      store.totalAmount += amt;
-    }
-
-    // Convert map to array and sort
-    const stores: StoreDetail[] = Array.from(storesMap.values());
-    stores.sort((a, b) =>
-      (a.storeCode || '').localeCompare(b.storeCode || ''),
-    );
-    stores.forEach((store) => {
-      store.products.sort((a, b) =>
-        (a.productCode || '').localeCompare(b.productCode || ''),
-      );
-    });
-
-    // Tính tổng
-    const summary = {
-      totalQuantity: stores.reduce((sum, s) => sum + s.totalQuantity, 0),
-      totalAmount: stores.reduce((sum, s) => sum + s.totalAmount, 0),
-    };
-
-    return {
-      stores,
-      summary,
-    };
+    return results.map((r) => ({
+      validFrom: r.validFrom,
+      validTo: r.validTo,
+      label: this.formatPricePeriodLabel(r.validFrom, r.validTo),
+    }));
   }
 
-  // ==================== BÁO CÁO THEO KHÁCH HÀNG ====================
-
-  /**
-   * Báo cáo doanh thu theo khách hàng
-   * - Nhóm theo Khách hàng -> Mặt hàng
-   * - Chỉ lấy các record có customerId (bán công nợ)
-   */
-  async getSalesByCustomerReport(
-    query: SalesByCustomerReportQueryDto,
-  ): Promise<SalesByCustomerReportResponse> {
-    const { customerId, storeId, productId, fromDateTime, toDateTime } = query;
-
-    // Query sales có customerId (bán công nợ)
-    const salesQuery = this.saleRepository
-      .createQueryBuilder('sale')
-      .leftJoin('sale.product', 'product')
-      .leftJoin('sale.customer', 'customer')
-      .leftJoin('sale.shift', 'shift')
-      .where('sale.customerId IS NOT NULL')
-      .select([
-        'sale.customerId AS "customerId"',
-        'customer.code AS "customerCode"',
-        'customer.name AS "customerName"',
-        'sale.productId AS "productId"',
-        'product.code AS "productCode"',
-        'product.name AS "productName"',
-        'SUM(sale.quantity) AS "quantity"',
-        'SUM(sale.amount) AS "amount"',
-      ])
-      .groupBy('sale.customerId')
-      .addGroupBy('customer.code')
-      .addGroupBy('customer.name')
-      .addGroupBy('sale.productId')
-      .addGroupBy('product.code')
-      .addGroupBy('product.name');
-
-    // Filter theo customerId
-    if (customerId) {
-      salesQuery.andWhere('sale.customerId = :customerId', { customerId });
+  private formatPricePeriodLabel(validFrom: Date, validTo: Date | null): string {
+    const fromStr = new Date(validFrom).toLocaleDateString('vi-VN');
+    if (!validTo) {
+      return `Từ ${fromStr} (hiện tại)`;
     }
-
-    // Filter theo storeId
-    if (storeId) {
-      salesQuery.andWhere('sale.storeId = :storeId', { storeId });
-    }
-
-    // Filter theo productId
-    if (productId) {
-      salesQuery.andWhere('sale.productId = :productId', { productId });
-    }
-
-    // Filter theo thời gian
-    if (fromDateTime) {
-      salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateTime),
-      });
-    }
-    if (toDateTime) {
-      salesQuery.andWhere('shift.openedAt <= :toDateTime', {
-        toDateTime: new Date(toDateTime),
-      });
-    }
-
-    const salesResults = await salesQuery.getRawMany();
-
-    // ========== GROUP DỮ LIỆU: Khách hàng -> Mặt hàng ==========
-    const customersMap = new Map<number, CustomerDetail>();
-
-    for (const row of salesResults) {
-      // Get or create customer
-      if (!customersMap.has(row.customerId)) {
-        customersMap.set(row.customerId, {
-          customerId: row.customerId,
-          customerCode: row.customerCode || '',
-          customerName: row.customerName || '',
-          totalQuantity: 0,
-          totalAmount: 0,
-          products: [],
-        });
-      }
-      const customer = customersMap.get(row.customerId)!;
-
-      // Add product (đã SUM sẵn từ query)
-      const qty = Number(row.quantity) || 0;
-      const amt = Number(row.amount) || 0;
-
-      customer.products.push({
-        productId: row.productId,
-        productCode: row.productCode || '',
-        productName: row.productName || '',
-        quantity: qty,
-        amount: amt,
-      });
-
-      customer.totalQuantity += qty;
-      customer.totalAmount += amt;
-    }
-
-    // Convert map to array and sort
-    const customers: CustomerDetail[] = Array.from(customersMap.values());
-    customers.sort((a, b) =>
-      (a.customerCode || '').localeCompare(b.customerCode || ''),
-    );
-    customers.forEach((customer) => {
-      customer.products.sort((a, b) =>
-        (a.productCode || '').localeCompare(b.productCode || ''),
-      );
-    });
-
-    // Tính tổng
-    const summary = {
-      totalQuantity: customers.reduce((sum, c) => sum + c.totalQuantity, 0),
-      totalAmount: customers.reduce((sum, c) => sum + c.totalAmount, 0),
-    };
-
-    return {
-      customers,
-      summary,
-    };
-  }
-
-  /**
-   * Báo cáo ca - Tổng hợp doanh thu theo pump readings
-   * Dùng cho màn hình "Báo cáo ca"
-   */
-  async getSalesByShiftReport(
-    storeId?: number,
-    fromDate?: Date,
-    toDate?: Date,
-  ) {
-    if (!storeId) {
-      return [];
-    }
-
-    const query = this.pumpReadingRepository
-      .createQueryBuilder('pr')
-      .leftJoin('pr.shift', 'shift')
-      .leftJoin('pr.product', 'product')
-      .leftJoin('pumps', 'pump', 'pr.pump_code = pump.pump_code AND pump.store_id = shift.store_id')
-      .select('shift.id', 'shiftId')
-      .addSelect('shift.shift_no', 'shiftNo')
-      .addSelect('shift.shift_date', 'shiftDate')
-      .addSelect('pump.id', 'pumpId')
-      .addSelect('pump.pump_code', 'pumpCode')
-      .addSelect('pump.name', 'pumpName')
-      .addSelect('product.id', 'productId')
-      .addSelect('product.code', 'productCode')
-      .addSelect('product.name', 'productName')
-      .addSelect('COALESCE(pr.start_value, 0)', 'startValue')
-      .addSelect('COALESCE(pr.end_value, 0)', 'endValue')
-      .addSelect('COALESCE(pr.test_export, 0)', 'testExport')
-      .addSelect('COALESCE(pr.quantity, 0)', 'quantity')
-      .addSelect('COALESCE(pr.unit_price, 0)', 'unitPrice')
-      .addSelect('COALESCE(pr.quantity * pr.unit_price, 0)', 'amount')
-      .where('shift.store_id = :storeId', { storeId })
-      .andWhere('shift.status = :status', { status: 'CLOSED' });
-
-    if (fromDate) {
-      query.andWhere('shift.shift_date >= :fromDate', { fromDate });
-    }
-    if (toDate) {
-      query.andWhere('shift.shift_date <= :toDate', { toDate });
-    }
-
-    query
-      .orderBy('shift.shift_date', 'ASC')
-      .addOrderBy('shift.shift_no', 'ASC')
-      .addOrderBy('pump.pump_code', 'ASC');
-
-    return query.getRawMany();
+    const toStr = new Date(validTo).toLocaleDateString('vi-VN');
+    return `${fromStr} - ${toStr}`;
   }
 }

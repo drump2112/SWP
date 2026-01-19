@@ -27,3 +27,48 @@
     @apply py-4 px-4 !important;
   }
 }
+
+/* React-Select consistent height */
+.react-select-container .react-select__control {
+  min-height: 42px !important;
+  border-radius: 0.5rem !important;
+  border-color: #d1d5db !important;
+  font-size: 0.875rem !important;
+}
+
+.react-select-container .react-select__control:hover {
+  border-color: #3b82f6 !important;
+}
+
+.react-select-container .react-select__control--is-focused {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1) !important;
+}
+
+.react-select-container .react-select__placeholder {
+  color: #9ca3af !important;
+  font-size: 0.875rem !important;
+}
+
+.react-select-container .react-select__single-value {
+  color: #1f2937 !important;
+  font-size: 0.875rem !important;
+}
+
+.react-select-container .react-select__menu {
+  border-radius: 0.5rem !important;
+  z-index: 9999 !important;
+}
+
+.react-select-container .react-select__option {
+  font-size: 0.875rem !important;
+  padding: 10px 12px !important;
+}
+
+.react-select-container .react-select__option--is-focused {
+  background-color: #eff6ff !important;
+}
+
+.react-select-container .react-select__option--is-selected {
+  background-color: #3b82f6 !important;
+}

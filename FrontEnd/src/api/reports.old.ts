@@ -113,7 +113,80 @@ export interface CashReportData {
   }>;
 }
 
+export interface SalesReportParams {
+  fromDate: string;
+  toDate: string;
+  storeIds?: number[];
+  productId?: number;
+}
+
+export interface SalesReportItem {
+  storeId: number;
+  storeName: string;
+  productId: number;
+  productName: string;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+export interface SalesByPumpItem {
+  pumpId: number;
+  pumpCode: string;
+  pumpName: string;
+  productName: string;
+  unitPrice: number;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+export interface SalesByProductItem {
+  productId: number;
+  productName: string;
+  unitPrice: number;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+export interface SalesByCustomerItem {
+  customerId: number;
+  customerCode: string;
+  customerName: string;
+  customerType: 'INTERNAL' | 'EXTERNAL';
+  products: Array<{
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    saleType: 'DEBT' | 'RETAIL';
+  }>;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+export interface PricePeriod {
+  validFrom: string;
+  validTo: string | null;
+  label: string;
+}
+
 export const reportsApi = {
+  // Báo cáo doanh thu bán hàng
+  getSalesReport: async (params: SalesReportParams): Promise<SalesReportItem[]> => {
+    const queryParams: any = {
+      fromDate: params.fromDate,
+      toDate: params.toDate,
+    };
+    if (params.storeIds && params.storeIds.length > 0) {
+      queryParams.storeIds = params.storeIds.join(",");
+    }
+    if (params.productId) {
+      queryParams.productId = params.productId;
+    }
+    const { data } = await api.get("/reports/sales", { params: queryParams });
+    return data;
+  },
+
   // Báo cáo công nợ
   getDebtReport: async (params: DebtReportParams): Promise<DebtReportItem[]> => {
     const { data } = await api.get("/reports/debt", { params });
@@ -132,110 +205,54 @@ export const reportsApi = {
     return data;
   },
 
-  // Báo cáo doanh thu / xuất hàng
-  getRevenueSalesReport: async (params: RevenueSalesReportParams): Promise<RevenueSalesReportResponse> => {
-    const { data } = await api.get("/reports/revenue-sales", { params });
+  // Báo cáo xuất hàng theo cột bơm
+  getSalesByPump: async (params: {
+    storeId?: number;
+    fromDate: string;
+    toDate: string;
+    priceId?: number;
+  }): Promise<SalesByPumpItem[]> => {
+    const { data } = await api.get("/reports/sales/by-pump", { params });
     return data;
   },
 
-  // Lấy danh sách kỳ giá (dropdown)
-  getPricePeriods: async (): Promise<PricePeriod[]> => {
-    const { data } = await api.get("/reports/price-periods");
+  // Báo cáo xuất hàng theo mặt hàng
+  getSalesByProduct: async (params: {
+    storeId?: number;
+    fromDate: string;
+    toDate: string;
+    productId?: number;
+    priceValidFrom?: string;
+    priceValidTo?: string;
+  }): Promise<SalesByProductItem[]> => {
+    const { data } = await api.get("/reports/sales/by-product", { params });
     return data;
   },
 
-  // Báo cáo doanh thu theo khách hàng
-  getSalesByCustomerReport: async (params: SalesByCustomerReportParams): Promise<SalesByCustomerReportResponse> => {
-    const { data } = await api.get("/reports/sales-by-customer", { params });
+  getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string; priceId?: number }): Promise<any[]> => {
+    const { data } = await api.get("/reports/sales/by-shift", { params });
     return data;
   },
 
-  // Báo cáo ca (theo shift/pump readings)
-  getSalesByShift: async (params: { storeId?: number; fromDate: string; toDate: string }): Promise<any[]> => {
-    const { data } = await api.get("/reports/sales-by-shift", { params });
+  // Báo cáo xuất hàng theo khách hàng (hỗ trợ lọc khách hàng nội bộ)
+  getSalesByCustomer: async (params: {
+    storeId?: number;
+    customerId?: number;
+    fromDate?: string;
+    toDate?: string;
+    productId?: number;
+    priceValidFrom?: string;
+    priceValidTo?: string;
+  }): Promise<SalesByCustomerItem[]> => {
+    const { data } = await api.get("/reports/sales/by-customer", { params });
+    return data;
+  },
+
+  // Lấy danh sách các kỳ giá
+  getPricePeriods: async (storeId?: number): Promise<PricePeriod[]> => {
+    const { data } = await api.get("/reports/price-periods", { 
+      params: storeId ? { storeId } : undefined 
+    });
     return data;
   },
 };
-
-// ========== REVENUE SALES REPORT ==========
-export interface RevenueSalesReportParams {
-  productId?: number;
-  storeId?: number;
-  fromDateTime?: string; // Thời gian bắt đầu (có giờ/phút/giây)
-  toDateTime?: string; // Thời gian kết thúc (có giờ/phút/giây)
-}
-
-// Kỳ giá (dropdown)
-export interface PricePeriod {
-  priceId: number;
-  productId: number;
-  productCode: string;
-  productName: string;
-  validFrom: string;
-  validTo: string | null;
-  price: number;
-  label: string; // "Xăng RON95: 01/01/2025 15:00 → 08/01/2025 15:00"
-}
-
-// Chi tiết mặt hàng trong cửa hàng
-export interface ProductDetail {
-  productId: number;
-  productCode: string;
-  productName: string;
-  quantity: number;
-  amount: number;
-}
-
-// Chi tiết cửa hàng
-export interface StoreDetail {
-  storeId: number;
-  storeCode: string;
-  storeName: string;
-  totalQuantity: number;
-  totalAmount: number;
-  products: ProductDetail[];
-}
-
-export interface RevenueSalesReportSummary {
-  totalQuantity: number;
-  totalAmount: number;
-}
-
-export interface RevenueSalesReportResponse {
-  stores: StoreDetail[];
-  summary: RevenueSalesReportSummary;
-}
-
-// ========== SALES BY CUSTOMER REPORT ==========
-export interface SalesByCustomerReportParams {
-  customerId?: number;
-  storeId?: number;
-  productId?: number;
-  fromDateTime?: string;
-  toDateTime?: string;
-}
-
-export interface CustomerProductDetail {
-  productId: number;
-  productCode: string;
-  productName: string;
-  quantity: number;
-  amount: number;
-}
-
-export interface CustomerDetail {
-  customerId: number;
-  customerCode: string;
-  customerName: string;
-  totalQuantity: number;
-  totalAmount: number;
-  products: CustomerProductDetail[];
-}
-
-export interface SalesByCustomerReportResponse {
-  customers: CustomerDetail[];
-  summary: {
-    totalQuantity: number;
-    totalAmount: number;
-  };
-}

@@ -9,6 +9,7 @@ import { Customer } from '../entities/customer.entity';
 import { Store } from '../entities/store.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { Receipt } from '../entities/receipt.entity';
+import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
 import { PumpReading } from '../entities/pump-reading.entity';
 import { InventoryDocument } from '../entities/inventory-document.entity';
@@ -31,6 +32,7 @@ import { ReportsController } from './reports.controller';
       Store,
       ShiftDebtSale,
       Receipt,
+      ReceiptDetail,
       CashDeposit,
       PumpReading,
       InventoryDocument,

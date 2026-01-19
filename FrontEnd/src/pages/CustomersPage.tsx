@@ -28,6 +28,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { useAuth } from "../contexts/AuthContext";
 import SearchableSelect from "../components/SearchableSelect";
+import * as XLSX from "xlsx";
 
 const CustomersPage: React.FC = () => {
   const { user } = useAuth();
@@ -241,16 +242,59 @@ const CustomersPage: React.FC = () => {
   };
 
   const handleDownloadTemplate = (type: "EXTERNAL" | "INTERNAL") => {
-    const filename =
-      type === "EXTERNAL"
-        ? "MauImportKhachCongNo.xlsx"
-        : "MauImportKhachBo.xlsx";
-    const link = document.createElement("a");
-    link.href = `/mau so/${filename}`;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const isExternal = type === "EXTERNAL";
+    const filename = isExternal ? "MauImportKhachCongNo.xlsx" : "MauImportKhachBo.xlsx";
+
+    // Tạo workbook mới
+    const wb = XLSX.utils.book_new();
+
+    // Dữ liệu cho sheet
+    const data: any[][] = [
+      // Row 1: Tiêu đề
+      [isExternal ? 'MẪU IMPORT KHÁCH HÀNG CÔNG NỢ (EXTERNAL)' : 'MẪU IMPORT KHÁCH HÀNG BỘ (INTERNAL)'],
+      // Row 2: Hướng dẫn
+      ['Hướng dẫn: Điền thông tin từ dòng 5 trở xuống. Các cột có dấu (*) là bắt buộc. Mã KH có thể bỏ trống để hệ thống tự sinh.'],
+      // Row 3: Loại khách hàng (ẩn - dùng cho code parse)
+      [type],
+      // Row 4: Header
+      isExternal
+        ? ['Mã KH', 'Tên khách hàng (*)', 'Số điện thoại (*)', 'Mã số thuế', 'Địa chỉ', 'Hạn mức công nợ', 'Ghi chú']
+        : ['Mã KH', 'Tên khách hàng (*)', 'Số điện thoại (*)', 'Mã số thuế', 'Địa chỉ', 'Ghi chú'],
+      // Row 5-6: Ví dụ
+      ...(isExternal ? [
+        ['', 'Công ty TNHH ABC', '0912345678', '0123456789', '123 Đường ABC, Quận 1, TP.HCM', '50000000', 'Khách hàng VIP'],
+        ['KH00999', 'Công ty XYZ', '0987654321', '9876543210', '456 Đường XYZ, Quận 2, TP.HCM', '30000000', 'Khách hàng thường xuyên'],
+      ] : [
+        ['', 'Nguyễn Văn A', '0901234567', '', '789 Đường DEF, Quận 3, TP.HCM', 'Khách bộ thường xuyên'],
+        ['KH00888', 'Trần Thị B', '0911234567', '', '321 Đường GHI, Quận 4, TP.HCM', 'Khách quen'],
+      ])
+    ];
+
+    // Tạo worksheet
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Set độ rộng cột
+    const colWidths = isExternal
+      ? [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 35 }, { wch: 18 }, { wch: 25 }]
+      : [{ wch: 12 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 35 }, { wch: 25 }];
+    ws['!cols'] = colWidths;
+
+    // Merge cells cho tiêu đề và hướng dẫn
+    const lastCol = isExternal ? 6 : 5;
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: lastCol } }, // Title
+      { s: { r: 1, c: 0 }, e: { r: 1, c: lastCol } }, // Instruction
+    ];
+
+    // Ẩn row 3 (type indicator)
+    if (!ws['!rows']) ws['!rows'] = [];
+    ws['!rows'][2] = { hidden: true };
+
+    // Thêm sheet vào workbook
+    XLSX.utils.book_append_sheet(wb, ws, 'Khách hàng');
+
+    // Download file
+    XLSX.writeFile(wb, filename);
   };
 
   const handleManageCreditLimit = (customer: Customer) => {
@@ -775,7 +819,7 @@ const CustomersPage: React.FC = () => {
                       onClick={() => handleDownloadTemplate("INTERNAL")}
                       className="px-4 py-3 bg-white border-2 border-green-300 rounded-lg hover:bg-green-50 transition-all text-sm font-medium text-green-700"
                     >
-                      💵 Khách bộ (INTERNAL)
+                      💵 Khách nội bộ (INTERNAL)
                     </button>
                   </div>
                 </div>

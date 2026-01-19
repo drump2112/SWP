@@ -6,6 +6,7 @@ export interface PumpReadingDto {
   startValue: number;
   endValue: number;
   testExport?: number; // Xuất kiểm thử / Quay kho
+  unitPrice?: number; // Giá đã lưu khi chốt ca (để hiển thị đúng khi xem lại)
 }
 
 export interface InventoryImportDto {

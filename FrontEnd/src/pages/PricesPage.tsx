@@ -21,7 +21,10 @@ const PricesPage: React.FC = () => {
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [priceItems, setPriceItems] = useState<ProductPriceItem[]>([]);
-  const [validFrom, setValidFrom] = useState<string>(new Date().toISOString().split('T')[0]);
+  // Khởi tạo với datetime đầy đủ (ISO 8601 format: YYYY-MM-DDTHH:mm)
+  const [validFrom, setValidFrom] = useState<string>(
+    new Date().toISOString().slice(0, 16) // Format: 2024-01-15T08:30
+  );
   const queryClient = useQueryClient();
 
   // Fetch regions
@@ -111,12 +114,13 @@ const PricesPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('vi-VN', {
+    return new Date(dateString).toLocaleString('vi-VN', {
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
     });
   };
 
@@ -308,14 +312,17 @@ const PricesPage: React.FC = () => {
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   <CalendarIcon className="h-4 w-4 inline mr-1" />
-                  Ngày áp dụng <span className="text-red-500">*</span>
+                  Ngày và giờ áp dụng <span className="text-red-500">*</span>
                 </label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
-                  className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                  className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Giá sẽ bắt đầu áp dụng từ thời điểm này
+                </p>
               </div>
 
               <div className="mb-4 flex justify-between items-center">

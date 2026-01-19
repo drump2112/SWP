@@ -404,16 +404,14 @@ const ShiftOperationsPage: React.FC = () => {
     }
   }, [report, storeUsers]);
 
-  // Initialize for Edit Mode
+  // Initialize data for both CLOSED (view mode) and Edit Mode
   useEffect(() => {
-    if (!isEditMode || !report || !pumps || pumps.length === 0) return;
+    if (!report || !pumps || pumps.length === 0) return;
+
+    // Skip if shift is OPEN (fresh shift with no data)
+    if (report.shift.status === "OPEN") return;
 
     // Only init if empty to avoid overwriting user edits during re-renders
-    // But since we want to load existing data, we should check if we already loaded it.
-    // We can use a simple check: if pumpReadings has keys, we assume loaded (or user edited).
-    // However, for better UX, we might want to force load ONCE.
-    // relying on 'hasData' might prevent reloading if we navigate away and back?
-    // But component unmounts so state clears.
     const hasData = Object.keys(pumpReadings).length > 0;
     if (hasData) return;
 
@@ -427,6 +425,7 @@ const ShiftOperationsPage: React.FC = () => {
         startValue: reportReading ? Number(reportReading.startValue) : 0,
         endValue: reportReading ? Number(reportReading.endValue) : 0,
         testExport: reportReading ? Number(reportReading.testExport) : 0,
+        unitPrice: reportReading ? Number(reportReading.unitPrice) : undefined, // Lưu giá đã chốt
       };
     });
     setPumpReadings(initialReadings);
@@ -516,7 +515,9 @@ const ShiftOperationsPage: React.FC = () => {
     });
     setDeclaredRetailQuantities(initialDeclared);
 
-    toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
+    if (isEditMode) {
+      toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
+    }
   }, [isEditMode, report, pumps, shiftId, storeCustomers, user]);
 
   // Fetch prices
@@ -579,7 +580,7 @@ const ShiftOperationsPage: React.FC = () => {
       setDraftReceipts([]);
       setDraftDeposits([]);
       setHasUnsavedChanges(false);
-      toast.success("Đã chốt ca thành công! Tất cả dữ liệu đã được lưu vào database.", {
+      toast.success("Đã chốt ca thành công!", {
         position: "top-right",
         autoClose: 3000,
       });
@@ -1393,7 +1394,8 @@ const ShiftOperationsPage: React.FC = () => {
     let total = 0;
     Object.values(pumpReadings).forEach((reading) => {
       const quantity = calculateQuantity(reading);
-      const price = productPrices[reading.productId] || 0;
+      // Ưu tiên dùng giá đã lưu (unitPrice) khi xem ca đã chốt, fallback sang giá hiện tại khi đang nhập liệu
+      const price = reading.unitPrice ?? productPrices[reading.productId] ?? 0;
       total += quantity * price;
     });
     return total;
@@ -1407,7 +1409,7 @@ const ShiftOperationsPage: React.FC = () => {
   // Tính toán real-time
   const totalFromPumps = calculateTotalFromPumps();
   const totalRetailSales = totalFromPumps - totalDebtSales;
-  const totalRevenue = totalFromPumps + totalReceipts;
+  const totalRevenue = totalFromPumps; // Tổng doanh thu = Tổng từ vòi bơm (bao gồm cả bán lẻ và bán công nợ)
 
   const activePumps = pumps?.filter((p: any) => p.isActive) || [];
   const fuelPumps = activePumps.filter((p: any) => p.product?.isFuel);
@@ -2259,7 +2261,12 @@ const ShiftOperationsPage: React.FC = () => {
                         <td></td>
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-4 py-2 bg-green-600 text-white rounded-lg font-bold">
-                            {formatCurrency(report?.summary?.totalRevenue || 0)}
+                            {formatCurrency(
+                              report?.pumpReadings?.reduce((sum: number, r: any) => {
+                                const amount = Number(r.amount || 0) || (Number(r.quantity || 0) * Number(r.unitPrice || r.price || 0));
+                                return sum + amount;
+                              }, 0) || 0
+                            )}
                           </span>
                         </td>
                       </tr>

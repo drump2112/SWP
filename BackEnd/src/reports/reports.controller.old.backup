@@ -11,7 +11,6 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RevenueSalesReportQueryDto, SalesByCustomerReportQueryDto } from './dto/revenue-sales-report.dto';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -53,6 +52,169 @@ export class ReportsController {
   @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getShiftDetailReport(@Param('shiftId') shiftId: string) {
     return this.reportsService.getShiftDetailReport(+shiftId);
+  }
+
+  @Get('sales')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesReport(
+    @CurrentUser() user: any,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('storeIds') storeIds?: string,
+    @Query('productId') productId?: string,
+  ) {
+    // Nếu user là STORE, tự động lấy storeId của user
+    let effectiveStoreIds: number[] | undefined;
+
+    if (user.roleCode === 'STORE') {
+      effectiveStoreIds = [user.storeId];
+    } else if (storeIds) {
+      effectiveStoreIds = storeIds.split(',').map(Number);
+    }
+
+    return this.reportsService.getSalesReport(
+      new Date(fromDate),
+      new Date(toDate),
+      effectiveStoreIds,
+      productId ? +productId : undefined,
+    );
+  }
+
+  /**
+   * GET /reports/sales/listing
+   * Báo cáo tổng hợp doanh thu
+   */
+  @Get('sales/listing')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesListing(
+    @CurrentUser() user: any,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('storeIds') storeIds?: string,
+  ) {
+    let effectiveStoreIds: number[] | undefined;
+
+    if (user.roleCode === 'STORE') {
+      effectiveStoreIds = [user.storeId];
+    } else if (storeIds) {
+      effectiveStoreIds = storeIds.split(',').map(Number);
+    }
+
+    return this.reportsService.getSalesReport(
+      new Date(fromDate),
+      new Date(toDate),
+      effectiveStoreIds,
+    );
+  }
+
+  /**
+   * GET /reports/sales/by-pump
+   * Báo cáo doanh thu theo vòi bơm
+   */
+  @Get('sales/by-pump')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByPumpReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('priceId') priceId?: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+
+    if (!effectiveStoreId) {
+      throw new BadRequestException('Store ID is required');
+    }
+
+    return this.reportsService.getSalesByPumpReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
+      priceId ? +priceId : undefined,
+    );
+  }
+
+  /**
+   * GET /reports/sales/by-product
+   * Báo cáo doanh thu theo sản phẩm
+   */
+  @Get('sales/by-product')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByProductReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('productId') productId?: string,
+    @Query('priceValidFrom') priceValidFrom?: string,
+    @Query('priceValidTo') priceValidTo?: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+    return this.reportsService.getSalesByProductReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
+      productId ? +productId : undefined,
+      priceValidFrom ? new Date(priceValidFrom) : undefined,
+      priceValidTo ? new Date(priceValidTo) : undefined,
+    );
+  }
+
+  /**
+   * GET /reports/sales/by-shift
+   * Báo cáo doanh thu theo ca làm việc
+   */
+  @Get('sales/by-shift')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByShiftReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId: string,
+    @Query('fromDate') fromDate: string,
+    @Query('toDate') toDate: string,
+    @Query('priceId') priceId?: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+    return this.reportsService.getSalesByShiftReport(
+      effectiveStoreId,
+      new Date(fromDate),
+      new Date(toDate),
+      priceId ? +priceId : undefined,
+    );
+  }
+
+  /**
+   * GET /reports/sales/by-customer
+   * Báo cáo xuất hàng theo khách hàng (hỗ trợ lọc khách hàng nội bộ)
+   * - Hỗ trợ lọc theo customerId (nội bộ hoặc bên ngoài)
+   * - Có thể kết hợp với storeId, fromDate, toDate, productId
+   */
+  @Get('sales/by-customer')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getSalesByCustomerReport(
+    @CurrentUser() user: any,
+    @Query('storeId') storeId?: string,
+    @Query('customerId') customerId?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+    @Query('productId') productId?: string,
+    @Query('priceValidFrom') priceValidFrom?: string,
+    @Query('priceValidTo') priceValidTo?: string,
+  ) {
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+
+    return this.reportsService.getSalesByCustomerReport({
+      storeId: effectiveStoreId,
+      customerId: customerId ? +customerId : undefined,
+      fromDate: fromDate ? new Date(fromDate) : undefined,
+      toDate: toDate ? new Date(toDate) : undefined,
+      productId: productId ? +productId : undefined,
+      priceValidFrom: priceValidFrom ? new Date(priceValidFrom) : undefined,
+      priceValidTo: priceValidTo ? new Date(priceValidTo) : undefined,
+    });
   }
 
   /**
@@ -191,108 +353,18 @@ export class ReportsController {
     });
   }
 
-  // ==================== REVENUE / SALES REPORTS ====================
-
   /**
-   * GET /reports/price-periods
-   * Lấy danh sách kỳ giá để hiển thị trong dropdown filter
+   * GET /reports/price-periods?storeId=1
+   * Lấy danh sách các kỳ giá để filter
    */
   @Get('price-periods')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getPricePeriods() {
-    return this.reportsService.getPricePeriods();
-  }
-
-  /**
-   * GET /reports/revenue-sales?productId=1&storeId=2&priceId=3&fromDateTime=2024-01-01T00:00:00&toDateTime=2024-12-31T23:59:59
-   * Báo cáo doanh thu / xuất hàng
-   *
-   * Filters:
-   * - productId: Lọc theo mặt hàng
-   * - storeId: Lọc theo cửa hàng (STORE role tự động lấy storeId của user)
-   * - priceId: Lọc theo kỳ giá (từ dropdown)
-   * - fromDateTime, toDateTime: Lọc theo thời gian (có thể chọn giờ/phút/giây)
-   *
-   * Response bao gồm:
-   * - stores: Danh sách cửa hàng với mặt hàng
-   * - summary: Tổng hợp (tổng số lượng, tổng tiền)
-   */
-  @Get('revenue-sales')
-  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getRevenueSalesReport(
-    @CurrentUser() user: any,
-    @Query() queryDto: RevenueSalesReportQueryDto,
-  ) {
-    // Nếu user là STORE, tự động lấy storeId của user
-    const effectiveStoreId =
-      user.roleCode === 'STORE' ? user.storeId : queryDto.storeId;
-
-    // Override storeId trong query
-    const finalQuery: RevenueSalesReportQueryDto = {
-      ...queryDto,
-      storeId: effectiveStoreId,
-    };
-
-    return this.reportsService.getRevenueSalesReport(finalQuery);
-  }
-
-  /**
-   * GET /reports/sales-by-customer?customerId=1&storeId=2&productId=3&fromDateTime=2024-01-01T00:00:00&toDateTime=2024-12-31T23:59:59
-   * Báo cáo doanh thu theo khách hàng
-   *
-   * Filters:
-   * - customerId: Lọc theo khách hàng
-   * - storeId: Lọc theo cửa hàng (STORE role tự động lấy storeId của user)
-   * - productId: Lọc theo mặt hàng
-   * - fromDateTime, toDateTime: Lọc theo thời gian
-   *
-   * Response bao gồm:
-   * - customers: Danh sách khách hàng với mặt hàng
-   * - summary: Tổng hợp (tổng số lượng, tổng tiền)
-   */
-  @Get('sales-by-customer')
-  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getSalesByCustomerReport(
-    @CurrentUser() user: any,
-    @Query() queryDto: SalesByCustomerReportQueryDto,
-  ) {
-    // Nếu user là STORE, tự động lấy storeId của user
-    const effectiveStoreId =
-      user.roleCode === 'STORE' ? user.storeId : queryDto.storeId;
-
-    // Override storeId trong query
-    const finalQuery: SalesByCustomerReportQueryDto = {
-      ...queryDto,
-      storeId: effectiveStoreId,
-    };
-
-    return this.reportsService.getSalesByCustomerReport(finalQuery);
-  }
-
-  /**
-   * Báo cáo ca (theo pump readings)
-   * GET /reports/sales-by-shift
-   *
-   * Query params:
-   * - storeId: Lọc theo cửa hàng (bắt buộc)
-   * - fromDate, toDate: Lọc theo ngày
-   */
-  @Get('sales-by-shift')
-  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getSalesByShiftReport(
+  getPricePeriods(
     @CurrentUser() user: any,
     @Query('storeId') storeId?: string,
-    @Query('fromDate') fromDate?: string,
-    @Query('toDate') toDate?: string,
   ) {
-    // Nếu user là STORE, tự động lấy storeId của user
     const effectiveStoreId =
-      user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
-
-    return this.reportsService.getSalesByShiftReport(
-      effectiveStoreId,
-      fromDate ? new Date(fromDate) : undefined,
-      toDate ? new Date(toDate) : undefined,
-    );
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
+    return this.reportsService.getPricePeriods(effectiveStoreId);
   }
 }

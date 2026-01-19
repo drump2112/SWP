@@ -18,9 +18,9 @@ import StoreDetailPage from './pages/StoreDetailPage';
 import CustomersPage from './pages/CustomersPage';
 import CustomerCreditPage from './pages/CustomerCreditPage';
 import DebtReportPage from './pages/DebtReportPage';
-import SalesReportPage from './pages/SalesReportPage';
-import SalesReportByCustomerPage from './pages/SalesReportByCustomerPage';
+import ShiftReportPage from './pages/ShiftReportPage';
 import CashReportPage from './pages/CashReportPage';
+import RevenueSalesReportPage from './pages/RevenueSalesReportPage';
 import InventoryImportPage from './pages/InventoryImportPage';
 import InventoryReportPage from './pages/InventoryReportPage';
 import InitialStock from './pages/InitialStock';
@@ -261,17 +261,17 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardLayout>
-                    <SalesReportPage />
+                    <RevenueSalesReportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/reports/sales-by-customer"
+              path="/reports/shifts"
               element={
                 <ProtectedRoute>
                   <DashboardLayout>
-                    <SalesReportByCustomerPage />
+                    <ShiftReportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
