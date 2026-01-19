@@ -1,0 +1,34 @@
+version : "4.8"
+services:
+	postgres:
+		image: postgres:15-alpine
+		container_name: swp-postgres
+		restart: unless-stopped
+		env_file:
+			.env
+		volumes:
+			pgdata:/var/lib/postgresql/data
+	backend:
+		image: swp-backend:1.2
+		container_name: swp-backend
+		restart: unless-stopped
+		env_file:
+			- .env
+		depends_on:
+			- postgres
+		expose:
+			- "3000"
+	frontend:
+		image: swp-frontend:1.2
+		container_name: swp-frontend
+		restart: unless-stopped
+		depends_on:
+			- backend
+		ports:
+			- "80:80"
+			- "443:443"
+		volumes:
+			- ./ssl:/etc/nginx/ssl:ro
+
+volumes:
+	pgdata:
