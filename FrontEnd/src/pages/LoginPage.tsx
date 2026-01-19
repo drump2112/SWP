@@ -18,7 +18,7 @@ const LoginPage: React.FC = () => {
     const serverMessage = err.response?.data?.message || err.message || '';
 
     // Kiểm tra thông báo "Invalid credentials" từ server
-    if (serverMessage.toLowerCase().includes('invalid credentials') || 
+    if (serverMessage.toLowerCase().includes('invalid credentials') ||
         serverMessage.toLowerCase().includes('unauthorized') ||
         serverMessage.toLowerCase().includes('sai mật khẩu') ||
         serverMessage.toLowerCase().includes('sai thông tin')) {
