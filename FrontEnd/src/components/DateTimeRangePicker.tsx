@@ -74,23 +74,23 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-gray-700">
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-5">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+            <span className="text-sm font-semibold text-gray-800">
               Chọn khoảng thời gian
             </span>
             <button
               onClick={() => setIsOpen(false)}
-              className="p-1 hover:bg-gray-100 rounded"
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <XMarkIcon className="h-4 w-4 text-gray-500" />
             </button>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex gap-6">
             {/* Start Date */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Từ</label>
+              <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Từ ngày</label>
               <DatePicker
                 selected={startDateObj}
                 onChange={(date) => {
@@ -114,7 +114,7 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
 
             {/* End Date */}
             <div>
-              <label className="block text-xs text-gray-500 mb-1">Đến</label>
+              <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Đến ngày</label>
               <DatePicker
                 selected={endDateObj}
                 onChange={(date) => {
@@ -138,13 +138,13 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
           </div>
 
           {/* Quick Actions */}
-          <div className="flex gap-2 mt-3 pt-3 border-t">
+          <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-gray-100">
             <button
               onClick={() => {
                 onStartDateChange(dayjs().startOf("day").format("YYYY-MM-DDTHH:mm"));
                 onEndDateChange(dayjs().endOf("day").format("YYYY-MM-DDTHH:mm"));
               }}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+              className="px-3 py-1.5 text-xs font-medium bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors"
             >
               Hôm nay
             </button>
@@ -153,7 +153,7 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
                 onStartDateChange(dayjs().subtract(1, "day").startOf("day").format("YYYY-MM-DDTHH:mm"));
                 onEndDateChange(dayjs().subtract(1, "day").endOf("day").format("YYYY-MM-DDTHH:mm"));
               }}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+              className="px-3 py-1.5 text-xs font-medium bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors"
             >
               Hôm qua
             </button>
@@ -162,7 +162,7 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
                 onStartDateChange(dayjs().startOf("week").format("YYYY-MM-DDTHH:mm"));
                 onEndDateChange(dayjs().format("YYYY-MM-DDTHH:mm"));
               }}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+              className="px-3 py-1.5 text-xs font-medium bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors"
             >
               Tuần này
             </button>
@@ -171,13 +171,13 @@ const DateTimeRangePicker: React.FC<DateTimeRangePickerProps> = ({
                 onStartDateChange(dayjs().startOf("month").format("YYYY-MM-DDTHH:mm"));
                 onEndDateChange(dayjs().format("YYYY-MM-DDTHH:mm"));
               }}
-              className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
+              className="px-3 py-1.5 text-xs font-medium bg-gray-50 hover:bg-gray-100 text-gray-700 rounded-lg border border-gray-200 transition-colors"
             >
               Tháng này
             </button>
             <button
               onClick={() => setIsOpen(false)}
-              className="ml-auto px-3 py-1 text-xs bg-blue-600 text-white hover:bg-blue-700 rounded"
+              className="ml-auto px-4 py-1.5 text-xs font-medium bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors shadow-sm"
             >
               Áp dụng
             </button>
