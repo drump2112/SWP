@@ -15,8 +15,19 @@ const LoginPage: React.FC = () => {
   // Hàm xử lý thông báo lỗi chuyên nghiệp
   const getLoginErrorMessage = (err: any): { title: string; description: string } => {
     const status = err.response?.status;
-    const serverMessage = err.response?.data?.message;
-    
+    const serverMessage = err.response?.data?.message || err.message || '';
+
+    // Kiểm tra thông báo "Invalid credentials" từ server
+    if (serverMessage.toLowerCase().includes('invalid credentials') || 
+        serverMessage.toLowerCase().includes('unauthorized') ||
+        serverMessage.toLowerCase().includes('sai mật khẩu') ||
+        serverMessage.toLowerCase().includes('sai thông tin')) {
+      return {
+        title: 'Thông tin đăng nhập không chính xác',
+        description: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra và thử lại.'
+      };
+    }
+
     // Lỗi 401 - Sai thông tin đăng nhập
     if (status === 401) {
       if (serverMessage?.toLowerCase().includes('locked') || serverMessage?.toLowerCase().includes('khóa')) {
@@ -36,7 +47,7 @@ const LoginPage: React.FC = () => {
         description: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin.'
       };
     }
-    
+
     // Lỗi 403 - Không có quyền
     if (status === 403) {
       return {
@@ -44,7 +55,7 @@ const LoginPage: React.FC = () => {
         description: 'Bạn không có quyền truy cập hệ thống. Vui lòng liên hệ quản trị viên.'
       };
     }
-    
+
     // Lỗi 429 - Too many requests
     if (status === 429) {
       return {
@@ -52,7 +63,7 @@ const LoginPage: React.FC = () => {
         description: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi vài phút và thử lại.'
       };
     }
-    
+
     // Lỗi 500 - Server error
     if (status >= 500) {
       return {
@@ -60,7 +71,7 @@ const LoginPage: React.FC = () => {
         description: 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau hoặc liên hệ bộ phận kỹ thuật.'
       };
     }
-    
+
     // Lỗi mạng
     if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
       return {
@@ -68,7 +79,7 @@ const LoginPage: React.FC = () => {
         description: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của bạn.'
       };
     }
-    
+
     // Timeout
     if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
       return {
@@ -76,7 +87,7 @@ const LoginPage: React.FC = () => {
         description: 'Máy chủ phản hồi quá chậm. Vui lòng thử lại sau.'
       };
     }
-    
+
     // Lỗi mặc định
     return {
       title: 'Đăng nhập thất bại',
