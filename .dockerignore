@@ -10,3 +10,4 @@ BackEnd/node_modules
 BackEnd/dist
 FrontEnd/node_modules
 FrontEnd/dist
+docker-compose.yml
