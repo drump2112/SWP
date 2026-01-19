@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, type Product, type CreateProductDto } from '../api/products';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
+import { HybridTable } from '../components/ResponsiveTable';
 
 const ProductsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -139,73 +140,47 @@ const ProductsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
-              <tr>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Mã SP
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Tên mặt hàng
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Đơn vị
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Loại
-                </th>
-                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                  Thao tác
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProducts?.map((product) => (
-                <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm font-medium text-gray-900">{product.code}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-900">{product.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="text-sm text-gray-500">{product.unit || '-'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <span
-                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${product.isFuel
-                          ? 'bg-orange-100 text-orange-800'
-                          : 'bg-gray-100 text-gray-800'
-                        }`}
-                    >
-                      {product.isFuel ? 'Nhiên liệu' : 'Hàng hóa'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="text-blue-600 hover:text-blue-900 mr-4"
-                    >
-                      <PencilIcon className="h-5 w-5 inline" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(product.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      <TrashIcon className="h-5 w-5 inline" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {filteredProducts?.length === 0 && (
-            <div className="text-center py-12">
-              <p className="text-gray-500">Không tìm thấy mặt hàng nào</p>
-            </div>
-          )}
+        <div className="p-4">
+          <HybridTable
+            data={filteredProducts || []}
+            keyField="id"
+            title={(product) => product.name}
+            subtitle={(product) => product.code}
+            columns={[
+              { key: 'code', header: 'Mã SP', mobileLabel: 'Mã' },
+              { key: 'name', header: 'Tên mặt hàng', mobileLabel: 'Tên' },
+              { key: 'unit', header: 'Đơn vị', render: (p) => p.unit || '-' },
+              {
+                key: 'isFuel',
+                header: 'Loại',
+                render: (p) => (
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    p.isFuel ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {p.isFuel ? 'Nhiên liệu' : 'Hàng hóa'}
+                  </span>
+                )
+              },
+            ]}
+            actions={(product) => (
+              <div className="flex gap-2 justify-center">
+                <button
+                  onClick={() => handleEdit(product)}
+                  className="text-blue-600 hover:text-blue-900 p-2"
+                >
+                  <PencilIcon className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="text-red-600 hover:text-red-900 p-2"
+                >
+                  <TrashIcon className="h-5 w-5" />
+                </button>
+              </div>
+            )}
+            emptyMessage="Không tìm thấy mặt hàng nào"
+            isLoading={isLoading}
+          />
         </div>
       </div>
 

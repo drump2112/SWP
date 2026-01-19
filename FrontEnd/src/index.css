@@ -241,3 +241,56 @@
 .react-datepicker__time-container .react-datepicker__time-list-item--selected:hover {
   background-color: #2563eb !important;
 }
+
+/* =============== MOBILE RESPONSIVE =============== */
+
+/* Tables responsive - horizontal scroll on mobile */
+.table-responsive {
+  @apply overflow-x-auto -mx-2 sm:mx-0;
+}
+
+.table-responsive table {
+  @apply min-w-full;
+}
+
+/* Cards stack on mobile */
+@media (max-width: 640px) {
+  .card-grid {
+    @apply grid-cols-1 !important;
+  }
+
+  /* Smaller padding on mobile */
+  .mobile-compact {
+    @apply p-2 !important;
+  }
+
+  /* Tables: smaller text and padding on mobile */
+  td, th {
+    @apply py-2 px-2 text-xs !important;
+  }
+
+  /* Hide less important columns on mobile */
+  .hide-mobile {
+    @apply hidden !important;
+  }
+}
+
+/* Extra small breakpoint */
+@media (max-width: 480px) {
+  h1 {
+    @apply text-lg !important;
+  }
+  h2 {
+    @apply text-base !important;
+  }
+  h3 {
+    @apply text-sm !important;
+  }
+}
+
+/* Ensure buttons are touch-friendly */
+@media (max-width: 768px) {
+  button, a {
+    min-height: 44px;
+  }
+}

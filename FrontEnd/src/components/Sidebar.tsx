@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HomeIcon,
@@ -18,6 +18,7 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -27,6 +28,10 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   children?: NavItem[];
   roles?: string[]; // Các role được phép truy cập
+}
+
+interface SidebarProps {
+  onCloseMobile?: () => void;
 }
 
 const navigation: NavItem[] = [
@@ -81,7 +86,7 @@ const navigation: NavItem[] = [
   },
 ];
 
-const Sidebar: React.FC = () => {
+const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   const location = useLocation();
   const { user } = useAuth();
 
@@ -103,6 +108,22 @@ const Sidebar: React.FC = () => {
 
   const [openMenus, setOpenMenus] = useState<string[]>(getInitialOpenMenus());
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
+  const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleMenuMouseEnter = (menuName: string) => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredMenu(menuName);
+  };
+
+  const handleMenuMouseLeave = () => {
+    hoverTimeoutRef.current = setTimeout(() => {
+      setHoveredMenu(null);
+    }, 150); // 150ms delay before hiding
+  };
 
   // Hàm kiểm tra quyền truy cập
   const hasPermission = (item: NavItem): boolean => {
@@ -170,7 +191,7 @@ const Sidebar: React.FC = () => {
   return (
     <div
       className={`flex flex-col min-h-screen shadow-2xl transition-all duration-300 ease-in-out relative ${
-        isCollapsed ? 'w-20' : 'w-64'
+        isCollapsed ? 'w-20 lg:w-20' : 'w-64'
       }`}
       style={{
         background: 'linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%)',
@@ -178,10 +199,19 @@ const Sidebar: React.FC = () => {
         zIndex: 1000,
       }}
     >
-      {/* Toggle Button */}
+      {/* Mobile close button */}
+      <button
+        onClick={onCloseMobile}
+        className="lg:hidden absolute right-2 top-2 z-50 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        aria-label="Đóng menu"
+      >
+        <XMarkIcon className="h-6 w-6 text-gray-600" />
+      </button>
+
+      {/* Toggle Button - hidden on mobile */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-8 z-50 bg-white rounded-full p-1.5 shadow-lg border border-gray-200 hover:bg-blue-50 transition-all duration-200 hover:shadow-xl"
+        className="hidden lg:block absolute -right-3 top-8 z-50 bg-white rounded-full p-1.5 shadow-lg border border-gray-200 hover:bg-blue-50 transition-all duration-200 hover:shadow-xl"
         title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}
       >
         {isCollapsed ? (
@@ -220,7 +250,12 @@ const Sidebar: React.FC = () => {
           const Icon = item.icon;
 
           return (
-            <div key={item.name} className="relative menu-item-wrapper">
+            <div
+              key={item.name}
+              className="relative menu-item-wrapper"
+              onMouseEnter={() => isCollapsed && hasChildren && handleMenuMouseEnter(item.name)}
+              onMouseLeave={handleMenuMouseLeave}
+            >
               {hasChildren ? (
                 <div className="relative">
                   <button
@@ -245,7 +280,7 @@ const Sidebar: React.FC = () => {
                         e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
                       }
                       // Update tooltip position
-                      if (isCollapsed) {
+                      if (isCollapsed && hasChildren) {
                         const rect = e.currentTarget.getBoundingClientRect();
                         const tooltip = e.currentTarget.parentElement?.querySelector('.submenu-tooltip') as HTMLElement;
                         if (tooltip) {
@@ -298,6 +333,7 @@ const Sidebar: React.FC = () => {
                           <Link
                             key={child.name}
                             to={child.href}
+                            onClick={onCloseMobile}
                             className={`
                               group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg
                               transition-all duration-200 ease-in-out relative
@@ -340,7 +376,11 @@ const Sidebar: React.FC = () => {
 
                   {/* Tooltip for collapsed state */}
                   {isCollapsed && item.children && item.children.length > 0 && (
-                    <div className="submenu-tooltip">
+                    <div
+                      className={`submenu-tooltip ${hoveredMenu === item.name ? 'submenu-tooltip-visible' : ''}`}
+                      onMouseEnter={() => handleMenuMouseEnter(item.name)}
+                      onMouseLeave={handleMenuMouseLeave}
+                    >
                       <div className="bg-white rounded-lg shadow-2xl border border-gray-200 py-1 min-w-[220px]">
                         <div className="px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wider bg-gradient-to-r from-blue-50 to-white border-b border-gray-100">
                           {item.name}
@@ -353,6 +393,7 @@ const Sidebar: React.FC = () => {
                               <Link
                                 key={child.name}
                                 to={child.href}
+                                onClick={onCloseMobile}
                                 className={`flex items-center px-4 py-2.5 text-sm transition-all duration-150
                                   ${childActive
                                     ? 'bg-blue-50 text-blue-900 font-semibold border-l-4 border-blue-600'
@@ -373,6 +414,7 @@ const Sidebar: React.FC = () => {
               ) : (
                 <Link
                   to={item.href}
+                  onClick={onCloseMobile}
                   className={`
                     group flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-semibold rounded-lg
                     transition-all duration-200 ease-in-out relative overflow-hidden
@@ -440,16 +482,28 @@ const Sidebar: React.FC = () => {
         /* Submenu tooltip styles */
         .submenu-tooltip {
           position: fixed;
-          left: calc(80px + 8px); /* width of collapsed sidebar + margin */
+          left: 80px; /* width of collapsed sidebar */
           z-index: 9999 !important;
           opacity: 0;
           visibility: hidden;
           pointer-events: none;
-          transition: opacity 0.2s, visibility 0.2s;
+          transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+          padding-left: 12px; /* invisible hover bridge */
         }
 
-        .menu-item-wrapper:hover .submenu-tooltip,
-        .submenu-tooltip:hover {
+        /* Create a hover bridge between menu item and tooltip */
+        .submenu-tooltip::before {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 20px; /* bridge width */
+          background: transparent;
+        }
+
+        /* Show tooltip when hovered (controlled by React state) */
+        .submenu-tooltip-visible {
           opacity: 1 !important;
           visibility: visible !important;
           pointer-events: auto !important;
