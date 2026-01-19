@@ -1,6 +1,3 @@
-# =====================
-# Docker Compose cho SWP
-# =====================
 version: '3.8'
 
 services:

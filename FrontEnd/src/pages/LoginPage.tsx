@@ -12,6 +12,78 @@ const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
+  // Hàm xử lý thông báo lỗi chuyên nghiệp
+  const getLoginErrorMessage = (err: any): { title: string; description: string } => {
+    const status = err.response?.status;
+    const serverMessage = err.response?.data?.message;
+    
+    // Lỗi 401 - Sai thông tin đăng nhập
+    if (status === 401) {
+      if (serverMessage?.toLowerCase().includes('locked') || serverMessage?.toLowerCase().includes('khóa')) {
+        return {
+          title: 'Tài khoản bị khóa',
+          description: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.'
+        };
+      }
+      if (serverMessage?.toLowerCase().includes('inactive') || serverMessage?.toLowerCase().includes('vô hiệu')) {
+        return {
+          title: 'Tài khoản chưa kích hoạt',
+          description: 'Tài khoản của bạn chưa được kích hoạt. Vui lòng liên hệ quản trị viên.'
+        };
+      }
+      return {
+        title: 'Thông tin đăng nhập không chính xác',
+        description: 'Tên đăng nhập hoặc mật khẩu không đúng. Vui lòng kiểm tra lại thông tin.'
+      };
+    }
+    
+    // Lỗi 403 - Không có quyền
+    if (status === 403) {
+      return {
+        title: 'Truy cập bị từ chối',
+        description: 'Bạn không có quyền truy cập hệ thống. Vui lòng liên hệ quản trị viên.'
+      };
+    }
+    
+    // Lỗi 429 - Too many requests
+    if (status === 429) {
+      return {
+        title: 'Quá nhiều lần thử',
+        description: 'Bạn đã thử đăng nhập quá nhiều lần. Vui lòng đợi vài phút và thử lại.'
+      };
+    }
+    
+    // Lỗi 500 - Server error
+    if (status >= 500) {
+      return {
+        title: 'Lỗi hệ thống',
+        description: 'Máy chủ đang gặp sự cố. Vui lòng thử lại sau hoặc liên hệ bộ phận kỹ thuật.'
+      };
+    }
+    
+    // Lỗi mạng
+    if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+      return {
+        title: 'Lỗi kết nối',
+        description: 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra kết nối mạng của bạn.'
+      };
+    }
+    
+    // Timeout
+    if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      return {
+        title: 'Kết nối quá thời gian',
+        description: 'Máy chủ phản hồi quá chậm. Vui lòng thử lại sau.'
+      };
+    }
+    
+    // Lỗi mặc định
+    return {
+      title: 'Đăng nhập thất bại',
+      description: serverMessage || 'Đã xảy ra lỗi không xác định. Vui lòng thử lại sau.'
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -24,8 +96,8 @@ const LoginPage: React.FC = () => {
       navigate('/');
     } catch (err: any) {
       console.error('Lỗi đăng nhập:', err);
-      const errorMessage = err.response?.data?.message || err.message || 'Đăng nhập thất bại';
-      setError(errorMessage);
+      const errorInfo = getLoginErrorMessage(err);
+      setError(`${errorInfo.title}|${errorInfo.description}`);
     } finally {
       setLoading(false);
     }
@@ -55,16 +127,32 @@ const LoginPage: React.FC = () => {
               </div>
 
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 p-4 rounded">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4 shadow-sm animate-shake">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 mt-0.5">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-red-800 mb-1">
+                    {error.includes('|') ? error.split('|')[0] : 'Đăng nhập thất bại'}
+                  </h3>
+                  <p className="text-sm text-red-600 leading-relaxed">
+                    {error.includes('|') ? error.split('|')[1] : error}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setError('')}
+                  className="flex-shrink-0 text-red-400 hover:text-red-600 transition-colors"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-red-700 font-medium">{error}</p>
-                </div>
+                </button>
               </div>
             </div>
           )}
