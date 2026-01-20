@@ -254,7 +254,7 @@ const LoginPage: React.FC = () => {
               {/* Footer */}
               <div className="mt-8">
                 <p className="text-xs text-gray-500 text-center">
-                  © 2026 QLXD. SWP.
+                  © 2026 S.W.P - QLXD - TTD
                 </p>
               </div>
             </div>
