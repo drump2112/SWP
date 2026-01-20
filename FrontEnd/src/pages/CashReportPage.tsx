@@ -453,7 +453,7 @@ const CashReportPage: React.FC = () => {
             <thead>
               {/* Opening Balance Row */}
               <tr className="bg-blue-50 border-l-4 border-blue-500">
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={5}>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={4}>
                   Số dư đầu kỳ
                 </th>
                 <th className="px-6 py-4 text-right text-base" colSpan={2}>
@@ -465,19 +465,16 @@ const CashReportPage: React.FC = () => {
                   Ngày giờ
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Loại chứng từ
-                </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Hình thức
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Tiền thu (₫)
+                  Số phát sinh
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Tiền chi (₫)
+                  Số Đã nộp
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Lũy kế (₫)
+                  Tồn Quỹ TIền mặt
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Thao tác
@@ -492,17 +489,6 @@ const CashReportPage: React.FC = () => {
                     <tr className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-center text-sm text-gray-900 whitespace-nowrap">
                         {dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}
-                      </td>
-                      <td className="px-6 py-4 text-center text-sm">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          ledger.refType === 'RECEIPT'
-                            ? 'bg-green-100 text-green-700'
-                            : ledger.refType === 'DEPOSIT'
-                            ? 'bg-red-100 text-red-700'
-                            : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {getRefTypeLabel(ledger.refType)}
-                        </span>
                       </td>
                       <td className="px-6 py-4 text-center text-sm">
                         {ledger.details?.paymentMethod === 'BANK_TRANSFER' ? (
@@ -551,7 +537,7 @@ const CashReportPage: React.FC = () => {
                     {/* Detail Rows */}
                     {showDetails === ledger.id && ledger.details && (
                       <tr>
-                        <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                        <td colSpan={5} className="px-6 py-4 bg-gray-50">
                           <div className="text-sm font-semibold text-gray-700 mb-2">
                             Chi tiết {getRefTypeLabel(ledger.refType)}:
                           </div>
@@ -640,7 +626,7 @@ const CashReportPage: React.FC = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
                     Không có giao dịch trong kỳ này
                   </td>
                 </tr>
@@ -649,7 +635,7 @@ const CashReportPage: React.FC = () => {
               {/* Closing Balance Row */}
               {report?.ledgers && report.ledgers.length > 0 && (
                 <tr className="bg-purple-50 border-l-4 border-purple-500">
-                  <td className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={5}>
+                  <td className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={4}>
                     Số dư cuối kỳ
                   </td>
                   <td className="px-6 py-4 text-right text-base" colSpan={2}>
