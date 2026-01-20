@@ -977,73 +977,74 @@ export class ReportsService {
   ): Promise<RevenueSalesReportResponse> {
     const { productId, storeId, fromDateTime, toDateTime } = query;
 
-    // ========== QUERY 1: TỔNG XUẤT BÁN (tất cả sales, không filter customerId) ==========
-    const totalSalesQuery = this.saleRepository
-      .createQueryBuilder('sale')
-      .leftJoin('sale.product', 'product')
-      .leftJoin('sale.store', 'store')
-      .leftJoin('sale.shift', 'shift')
+    // ========== QUERY 1: TỔNG XUẤT BÁN từ PUMP_READINGS (lượng bơm qua vòi) ==========
+    // Đây là tổng thực sự = Bán lẻ + Bán công nợ
+    const pumpReadingsQuery = this.pumpReadingRepository
+      .createQueryBuilder('pr')
+      .leftJoin('pr.shift', 'shift')
+      .leftJoin('shift.store', 'store')
+      .leftJoin('pr.product', 'product')
+      .where('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] })
       .select([
-        'sale.storeId AS "storeId"',
+        'shift.storeId AS "storeId"',
         'store.code AS "storeCode"',
         'store.name AS "storeName"',
-        'sale.productId AS "productId"',
+        'pr.productId AS "productId"',
         'product.code AS "productCode"',
         'product.name AS "productName"',
-        'SUM(sale.quantity) AS "totalQuantity"',
-        'SUM(sale.amount) AS "totalAmount"',
+        'SUM(pr.quantity) AS "totalQuantity"',
+        'SUM(pr.quantity * pr.unitPrice) AS "totalAmount"',
       ])
-      .groupBy('sale.storeId')
+      .groupBy('shift.storeId')
       .addGroupBy('store.code')
       .addGroupBy('store.name')
-      .addGroupBy('sale.productId')
+      .addGroupBy('pr.productId')
       .addGroupBy('product.code')
       .addGroupBy('product.name');
 
     // Filter theo productId
     if (productId) {
-      totalSalesQuery.andWhere('sale.productId = :productId', { productId });
+      pumpReadingsQuery.andWhere('pr.productId = :productId', { productId });
     }
 
     // Filter theo storeId
     if (storeId) {
-      totalSalesQuery.andWhere('sale.storeId = :storeId', { storeId });
+      pumpReadingsQuery.andWhere('shift.storeId = :storeId', { storeId });
     }
 
     // Filter theo thời gian
     if (fromDateTime) {
-      totalSalesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+      pumpReadingsQuery.andWhere('shift.openedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      totalSalesQuery.andWhere('shift.openedAt <= :toDateTime', {
+      pumpReadingsQuery.andWhere('shift.openedAt <= :toDateTime', {
         toDateTime: new Date(toDateTime),
       });
     }
 
-    // ========== QUERY 2: BÁN CÔNG NỢ (chỉ có customerId) ==========
-    const debtSalesQuery = this.saleRepository
-      .createQueryBuilder('sale')
-      .leftJoin('sale.product', 'product')
-      .leftJoin('sale.store', 'store')
-      .leftJoin('sale.shift', 'shift')
-      .where('sale.customerId IS NOT NULL')
+    // ========== QUERY 2: BÁN CÔNG NỢ từ SHIFT_DEBT_SALES ==========
+    const debtSalesQuery = this.shiftDebtSaleRepository
+      .createQueryBuilder('sds')
+      .leftJoin('sds.shift', 'shift')
+      .leftJoin('shift.store', 'store')
+      .where('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] })
       .select([
-        'sale.storeId AS "storeId"',
-        'sale.productId AS "productId"',
-        'SUM(sale.quantity) AS "debtQuantity"',
-        'SUM(sale.amount) AS "debtAmount"',
+        'shift.storeId AS "storeId"',
+        'sds.productId AS "productId"',
+        'SUM(sds.quantity) AS "debtQuantity"',
+        'SUM(sds.amount) AS "debtAmount"',
       ])
-      .groupBy('sale.storeId')
-      .addGroupBy('sale.productId');
+      .groupBy('shift.storeId')
+      .addGroupBy('sds.productId');
 
     // Apply same filters
     if (productId) {
-      debtSalesQuery.andWhere('sale.productId = :productId', { productId });
+      debtSalesQuery.andWhere('sds.productId = :productId', { productId });
     }
     if (storeId) {
-      debtSalesQuery.andWhere('sale.storeId = :storeId', { storeId });
+      debtSalesQuery.andWhere('shift.storeId = :storeId', { storeId });
     }
     if (fromDateTime) {
       debtSalesQuery.andWhere('shift.openedAt >= :fromDateTime', {
@@ -1058,7 +1059,7 @@ export class ReportsService {
 
     // Execute both queries
     const [totalResults, debtResults] = await Promise.all([
-      totalSalesQuery.getRawMany(),
+      pumpReadingsQuery.getRawMany(),
       debtSalesQuery.getRawMany(),
     ]);
 
@@ -1098,10 +1099,13 @@ export class ReportsService {
       const debt = debtMap.get(key) || { debtQuantity: 0, debtAmount: 0 };
 
       // Calculate quantities
+      // Tổng bán = từ pump readings
       const totalQty = Number(row.totalQuantity) || 0;
       const totalAmt = Number(row.totalAmount) || 0;
+      // Công nợ = từ shift_debt_sales
       const debtQty = debt.debtQuantity;
       const debtAmt = debt.debtAmount;
+      // Bán lẻ = Tổng bán - Công nợ
       const retailQty = totalQty - debtQty;
       const retailAmt = totalAmt - debtAmt;
 
