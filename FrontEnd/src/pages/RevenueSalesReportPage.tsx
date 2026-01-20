@@ -218,27 +218,63 @@ const RevenueSalesReportPage: React.FC = () => {
       toDate: toDateTime,
     });
 
-    // Table header
-    const headerRow = worksheet.addRow([
-      "Mặt hàng",
-      "Số lượng (lít)",
-      "Tổng tiền",
+    // Table header - 2 dòng header
+    // Row 1: Group headers (Công nợ → Bán lẻ → Tổng xuất)
+    const headerRow1 = worksheet.addRow([
+      "Cửa hàng / Mặt hàng",
+      "Công nợ", "",
+      "Bán lẻ", "",
+      "Tổng xuất", "",
     ]);
-    headerRow.font = STYLES.headerFont;
-    headerRow.alignment = STYLES.centerAlign;
-    headerRow.eachCell((cell) => {
+    headerRow1.font = STYLES.headerFont;
+    headerRow1.alignment = STYLES.centerAlign;
+    headerRow1.eachCell((cell, colNumber) => {
       cell.border = STYLES.borderStyle;
-      cell.fill = {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFD9E1F2" },
-      };
+      if (colNumber === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
+      } else if (colNumber >= 2 && colNumber <= 3) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFED7AA" } }; // orange - Công nợ
+      } else if (colNumber >= 4 && colNumber <= 5) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBBF7D0" } }; // green - Bán lẻ
+      } else {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } }; // blue - Tổng
+      }
+    });
+    // Merge cells for group headers
+    worksheet.mergeCells(headerRow1.number, 2, headerRow1.number, 3);
+    worksheet.mergeCells(headerRow1.number, 4, headerRow1.number, 5);
+    worksheet.mergeCells(headerRow1.number, 6, headerRow1.number, 7);
+
+    // Row 2: Sub headers
+    const headerRow2 = worksheet.addRow([
+      "",
+      "Lượng (lít)", "Tiền (₫)",
+      "Lượng (lít)", "Tiền (₫)",
+      "Lượng (lít)", "Tiền (₫)",
+    ]);
+    headerRow2.font = STYLES.headerFont;
+    headerRow2.alignment = STYLES.centerAlign;
+    headerRow2.eachCell((cell, colNumber) => {
+      cell.border = STYLES.borderStyle;
+      if (colNumber === 1) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFD9E1F2" } };
+      } else if (colNumber >= 2 && colNumber <= 3) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFED7AA" } }; // orange
+      } else if (colNumber >= 4 && colNumber <= 5) {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFBBF7D0" } }; // green
+      } else {
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFDBEAFE" } }; // blue
+      }
     });
 
-    // Data rows
+    // Data rows (Công nợ → Bán lẻ → Tổng)
     reportData.stores.forEach((store) => {
       const storeRow = worksheet.addRow([
         `${store.storeCode} - ${store.storeName}`,
+        store.debtQuantity,
+        store.debtAmount,
+        store.retailQuantity,
+        store.retailAmount,
         store.totalQuantity,
         store.totalAmount,
       ]);
@@ -250,11 +286,11 @@ const RevenueSalesReportPage: React.FC = () => {
           pattern: "solid",
           fgColor: { argb: "FFFEF3C7" },
         };
-        if (colNumber === 2) {
+        if (colNumber === 2 || colNumber === 4 || colNumber === 6) {
           cell.numFmt = "#,##0.00";
           cell.alignment = STYLES.rightAlign;
         }
-        if (colNumber === 3) {
+        if (colNumber === 3 || colNumber === 5 || colNumber === 7) {
           cell.numFmt = "#,##0";
           cell.alignment = STYLES.rightAlign;
         }
@@ -263,17 +299,21 @@ const RevenueSalesReportPage: React.FC = () => {
       store.products.forEach((product) => {
         const productRow = worksheet.addRow([
           `    ${product.productCode} - ${product.productName}`,
-          product.quantity,
-          product.amount,
+          product.debtQuantity,
+          product.debtAmount,
+          product.retailQuantity,
+          product.retailAmount,
+          product.totalQuantity,
+          product.totalAmount,
         ]);
         productRow.font = STYLES.normalFont;
         productRow.eachCell((cell, colNumber) => {
           cell.border = STYLES.borderStyle;
-          if (colNumber === 2) {
+          if (colNumber === 2 || colNumber === 4 || colNumber === 6) {
             cell.numFmt = "#,##0.00";
             cell.alignment = STYLES.rightAlign;
           }
-          if (colNumber === 3) {
+          if (colNumber === 3 || colNumber === 5 || colNumber === 7) {
             cell.numFmt = "#,##0";
             cell.alignment = STYLES.rightAlign;
           }
@@ -284,6 +324,10 @@ const RevenueSalesReportPage: React.FC = () => {
     // Total row
     const totalRow = worksheet.addRow([
       "TỔNG CỘNG",
+      reportData.summary.debtQuantity,
+      reportData.summary.debtAmount,
+      reportData.summary.retailQuantity,
+      reportData.summary.retailAmount,
       reportData.summary.totalQuantity,
       reportData.summary.totalAmount,
     ]);
@@ -295,17 +339,22 @@ const RevenueSalesReportPage: React.FC = () => {
         pattern: "solid",
         fgColor: { argb: "FFFFD966" },
       };
-      if (colNumber === 2) {
+      if (colNumber === 2 || colNumber === 4 || colNumber === 6) {
         cell.numFmt = "#,##0.00";
         cell.alignment = STYLES.rightAlign;
       }
-      if (colNumber === 3) {
+      if (colNumber === 3 || colNumber === 5 || colNumber === 7) {
         cell.numFmt = "#,##0";
         cell.alignment = STYLES.rightAlign;
       }
     });
 
-    worksheet.columns = [{ width: 40 }, { width: 20 }, { width: 20 }];
+    worksheet.columns = [
+      { width: 40 },
+      { width: 15 }, { width: 18 },
+      { width: 15 }, { width: 18 },
+      { width: 15 }, { width: 18 },
+    ];
 
     downloadExcel(workbook, "bao-cao-doanh-thu");
   };
@@ -318,12 +367,21 @@ const RevenueSalesReportPage: React.FC = () => {
     }
 
     let tableHTML = `
-      <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
         <thead>
-          <tr style="background-color: #d9e1f2;">
-            <th style="border: 1px solid #000; padding: 8px; text-align: left;">Mặt hàng</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: right;">Số lượng (lít)</th>
-            <th style="border: 1px solid #000; padding: 8px; text-align: right;">Tổng tiền</th>
+          <tr>
+            <th rowspan="2" style="border: 2px solid #000; padding: 8px; text-align: left; background-color: #d9e1f2; vertical-align: middle;">Cửa hàng / Mặt hàng</th>
+            <th colspan="2" style="border: 2px solid #000; padding: 6px; text-align: center; background-color: #fed7aa; font-weight: bold;">Công nợ</th>
+            <th colspan="2" style="border: 2px solid #000; padding: 6px; text-align: center; background-color: #bbf7d0; font-weight: bold;">Bán lẻ</th>
+            <th colspan="2" style="border: 2px solid #000; padding: 6px; text-align: center; background-color: #dbeafe; font-weight: bold;">Tổng xuất</th>
+          </tr>
+          <tr style="background-color: #f3f4f6;">
+            <th style="border: 1px solid #000; border-left: 2px solid #000; padding: 4px; text-align: right; font-weight: bold;">Lượng</th>
+            <th style="border: 1px solid #000; border-right: 2px solid #000; padding: 4px; text-align: right; font-weight: bold;">Tiền</th>
+            <th style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">Lượng</th>
+            <th style="border: 1px solid #000; border-right: 2px solid #000; padding: 4px; text-align: right; font-weight: bold;">Tiền</th>
+            <th style="border: 1px solid #000; padding: 4px; text-align: right; font-weight: bold;">Lượng</th>
+            <th style="border: 1px solid #000; border-right: 2px solid #000; padding: 4px; text-align: right; font-weight: bold;">Tiền</th>
           </tr>
         </thead>
         <tbody>
@@ -332,17 +390,25 @@ const RevenueSalesReportPage: React.FC = () => {
     reportData.stores.forEach((store) => {
       tableHTML += `
         <tr style="background-color: #fef3c7; font-weight: bold;">
-          <td style="border: 1px solid #000; padding: 6px;">${store.storeCode} - ${store.storeName}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(store.totalQuantity)}</td>
-          <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatCurrency(store.totalAmount)}</td>
+          <td style="border: 1px solid #000; border-left: 2px solid #000; padding: 6px;">${store.storeCode} - ${store.storeName}</td>
+          <td style="border: 1px solid #000; border-left: 2px solid #000; padding: 6px; text-align: right; color: #c2410c;">${formatNumber(store.debtQuantity)}</td>
+          <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #ea580c;">${formatCurrency(store.debtAmount)}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: right; color: #16a34a;">${formatNumber(store.retailQuantity)}</td>
+          <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #22c55e;">${formatCurrency(store.retailAmount)}</td>
+          <td style="border: 1px solid #000; padding: 6px; text-align: right; color: #1d4ed8; background-color: #eff6ff;">${formatNumber(store.totalQuantity)}</td>
+          <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #2563eb; background-color: #eff6ff;">${formatCurrency(store.totalAmount)}</td>
         </tr>
       `;
       store.products.forEach((product) => {
         tableHTML += `
           <tr>
-            <td style="border: 1px solid #000; padding: 6px; padding-left: 20px;">${product.productCode} - ${product.productName}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatNumber(product.quantity)}</td>
-            <td style="border: 1px solid #000; padding: 6px; text-align: right;">${formatCurrency(product.amount)}</td>
+            <td style="border: 1px solid #000; border-left: 2px solid #000; padding: 6px; padding-left: 20px;">${product.productCode} - ${product.productName}</td>
+            <td style="border: 1px solid #000; border-left: 2px solid #000; padding: 6px; text-align: right; color: #c2410c;">${formatNumber(product.debtQuantity)}</td>
+            <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #ea580c;">${formatCurrency(product.debtAmount)}</td>
+            <td style="border: 1px solid #000; padding: 6px; text-align: right; color: #16a34a;">${formatNumber(product.retailQuantity)}</td>
+            <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #22c55e;">${formatCurrency(product.retailAmount)}</td>
+            <td style="border: 1px solid #000; padding: 6px; text-align: right; color: #1d4ed8; background-color: #f0f9ff;">${formatNumber(product.totalQuantity)}</td>
+            <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 6px; text-align: right; color: #2563eb; background-color: #f0f9ff;">${formatCurrency(product.totalAmount)}</td>
           </tr>
         `;
       });
@@ -350,9 +416,13 @@ const RevenueSalesReportPage: React.FC = () => {
 
     tableHTML += `
           <tr style="background-color: #ffd966; font-weight: bold;">
-            <td style="border: 1px solid #000; padding: 8px;">TỔNG CỘNG</td>
+            <td style="border: 2px solid #000; padding: 8px;">TỔNG CỘNG</td>
+            <td style="border: 1px solid #000; border-left: 2px solid #000; padding: 8px; text-align: right;">${formatNumber(reportData.summary.debtQuantity)}</td>
+            <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 8px; text-align: right;">${formatCurrency(reportData.summary.debtAmount)}</td>
+            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(reportData.summary.retailQuantity)}</td>
+            <td style="border: 1px solid #000; border-right: 2px solid #000; padding: 8px; text-align: right;">${formatCurrency(reportData.summary.retailAmount)}</td>
             <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatNumber(reportData.summary.totalQuantity)}</td>
-            <td style="border: 1px solid #000; padding: 8px; text-align: right;">${formatCurrency(reportData.summary.totalAmount)}</td>
+            <td style="border: 2px solid #000; padding: 8px; text-align: right;">${formatCurrency(reportData.summary.totalAmount)}</td>
           </tr>
         </tbody>
       </table>
@@ -852,17 +922,32 @@ const RevenueSalesReportPage: React.FC = () => {
               {reportData.stores.length > 0 ? (
                 <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
                   {/* Summary Row */}
-                  <div className="bg-blue-50 p-4 border-b border-gray-200">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Tổng số lượng</p>
-                        <p className="text-xl font-bold text-blue-600">
-                          {formatNumber(reportData.summary.totalQuantity)} lít
+                  <div className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 border-b border-gray-200">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-white rounded-lg p-4 border-l-4 border-orange-400 shadow-sm">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">💳 Bán công nợ</p>
+                        <p className="text-xl font-bold text-orange-600 mt-1">
+                          {formatNumber(reportData.summary.debtQuantity)} <span className="text-sm font-normal">lít</span>
+                        </p>
+                        <p className="text-sm text-orange-500 mt-0.5">
+                          {formatCurrency(reportData.summary.debtAmount)} ₫
                         </p>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Tổng doanh thu</p>
-                        <p className="text-xl font-bold text-green-600">
+                      <div className="bg-white rounded-lg p-4 border-l-4 border-green-400 shadow-sm">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">🛒 Bán lẻ</p>
+                        <p className="text-xl font-bold text-green-600 mt-1">
+                          {formatNumber(reportData.summary.retailQuantity)} <span className="text-sm font-normal">lít</span>
+                        </p>
+                        <p className="text-sm text-green-500 mt-0.5">
+                          {formatCurrency(reportData.summary.retailAmount)} ₫
+                        </p>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500 shadow-sm">
+                        <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">📦 Tổng xuất bán</p>
+                        <p className="text-xl font-bold text-blue-600 mt-1">
+                          {formatNumber(reportData.summary.totalQuantity)} <span className="text-sm font-normal">lít</span>
+                        </p>
+                        <p className="text-sm text-blue-500 mt-0.5">
                           {formatCurrency(reportData.summary.totalAmount)} ₫
                         </p>
                       </div>
@@ -874,29 +959,44 @@ const RevenueSalesReportPage: React.FC = () => {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={expandAll}
-                                className="text-blue-500 hover:text-blue-700 text-xs"
-                              >
-                                Mở tất cả
-                              </button>
-                              <span>|</span>
-                              <button
-                                onClick={collapseAll}
-                                className="text-blue-500 hover:text-blue-700 text-xs"
-                              >
-                                Thu gọn
-                              </button>
+                          <th rowSpan={2} className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider align-middle border-b border-r-2 border-gray-300 min-w-[200px]">
+                            <div className="flex items-center justify-between">
+                              <span className="text-gray-700 font-semibold">Cửa hàng / Mặt hàng</span>
+                              <div className="flex items-center gap-1 ml-4">
+                                <button
+                                  onClick={expandAll}
+                                  className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                  title="Mở tất cả"
+                                >
+                                  ⊕ Mở
+                                </button>
+                                <button
+                                  onClick={collapseAll}
+                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                                  title="Thu gọn tất cả"
+                                >
+                                  ⊖ Gọn
+                                </button>
+                              </div>
                             </div>
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Số lượng (lít)
+                          <th colSpan={2} className="px-4 py-2 text-center text-xs font-semibold text-orange-700 uppercase tracking-wider bg-orange-50 border-b border-orange-200 border-r-2 border-r-gray-300">
+                            💳 Công nợ
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                            Thành tiền (₫)
+                          <th colSpan={2} className="px-4 py-2 text-center text-xs font-semibold text-green-700 uppercase tracking-wider bg-green-50 border-b border-green-200 border-r-2 border-r-gray-300">
+                            🛒 Bán lẻ
                           </th>
+                          <th colSpan={2} className="px-4 py-2 text-center text-xs font-semibold text-blue-700 uppercase tracking-wider bg-blue-50 border-b border-blue-200">
+                            📦 Tổng xuất
+                          </th>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <th className="px-3 py-2 text-right text-xs font-bold text-orange-600 border-b border-gray-200">Lượng</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold text-orange-600 border-b border-gray-200 border-r-2 border-r-gray-300">Tiền</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold text-green-600 border-b border-gray-200">Lượng</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold text-green-600 border-b border-gray-200 border-r-2 border-r-gray-300">Tiền</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold text-blue-600 border-b border-gray-200">Lượng</th>
+                          <th className="px-3 py-2 text-right text-xs font-bold text-blue-600 border-b border-gray-200">Tiền</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
@@ -907,7 +1007,7 @@ const RevenueSalesReportPage: React.FC = () => {
                               className="bg-amber-50 cursor-pointer hover:bg-amber-100 transition-colors"
                               onClick={() => toggleStore(store.storeId)}
                             >
-                              <td className="px-4 py-3 whitespace-nowrap">
+                              <td className="px-4 py-3 whitespace-nowrap border-r-2 border-r-gray-300">
                                 <div className="flex items-center gap-2">
                                   {expandedStores.has(store.storeId) ? (
                                     <ChevronDownIcon className="h-4 w-4 text-gray-500" />
@@ -920,10 +1020,22 @@ const RevenueSalesReportPage: React.FC = () => {
                                   </span>
                                 </div>
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-800">
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-orange-700">
+                                {formatNumber(store.debtQuantity)}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-orange-600 border-r-2 border-r-gray-300">
+                                {formatCurrency(store.debtAmount)}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-green-700">
+                                {formatNumber(store.retailQuantity)}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-green-600 border-r-2 border-r-gray-300">
+                                {formatCurrency(store.retailAmount)}
+                              </td>
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-blue-700 bg-blue-50/50">
                                 {formatNumber(store.totalQuantity)}
                               </td>
-                              <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-800">
+                              <td className="px-3 py-3 whitespace-nowrap text-right font-semibold text-blue-600 bg-blue-50/50">
                                 {formatCurrency(store.totalAmount)}
                               </td>
                             </tr>
@@ -935,7 +1047,7 @@ const RevenueSalesReportPage: React.FC = () => {
                                   key={`store-${store.storeId}-product-${product.productId}`}
                                   className="bg-white hover:bg-gray-50"
                                 >
-                                  <td className="px-4 py-2 pl-12 whitespace-nowrap">
+                                  <td className="px-4 py-2 pl-12 whitespace-nowrap border-r-2 border-r-gray-300">
                                     <div className="flex items-center gap-2">
                                       <ShoppingCartIcon className="h-4 w-4 text-gray-400" />
                                       <span className="text-gray-700">
@@ -943,11 +1055,23 @@ const RevenueSalesReportPage: React.FC = () => {
                                       </span>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-2 whitespace-nowrap text-right text-gray-600">
-                                    {formatNumber(product.quantity)}
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-orange-600">
+                                    {formatNumber(product.debtQuantity)}
                                   </td>
-                                  <td className="px-4 py-2 whitespace-nowrap text-right text-gray-600">
-                                    {formatCurrency(product.amount)}
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-orange-500 border-r-2 border-r-gray-300">
+                                    {formatCurrency(product.debtAmount)}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-green-600 font-medium">
+                                    {formatNumber(product.retailQuantity)}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-green-500 font-medium border-r-2 border-r-gray-300">
+                                    {formatCurrency(product.retailAmount)}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-blue-600 bg-blue-50/30">
+                                    {formatNumber(product.totalQuantity)}
+                                  </td>
+                                  <td className="px-3 py-2 whitespace-nowrap text-right text-blue-500 bg-blue-50/30">
+                                    {formatCurrency(product.totalAmount)}
                                   </td>
                                 </tr>
                               ))}

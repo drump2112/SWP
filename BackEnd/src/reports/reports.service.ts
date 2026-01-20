@@ -966,21 +966,23 @@ export class ReportsService {
    * - Nhóm theo Cửa hàng -> Mặt hàng
    * - Filter: Thời gian (datetime), Cửa hàng, Mặt hàng
    * - Kỳ giá: Frontend chọn từ dropdown và tự set fromDateTime/toDateTime
+   *
+   * UPDATED: Tính toán 3 loại số liệu:
+   * - Tổng xuất bán (tất cả sales)
+   * - Bán công nợ (có customerId)
+   * - Bán lẻ = Tổng - Công nợ
    */
   async getRevenueSalesReport(
     query: RevenueSalesReportQueryDto,
   ): Promise<RevenueSalesReportResponse> {
     const { productId, storeId, fromDateTime, toDateTime } = query;
 
-    // Query sales với GROUP BY để tránh duplicate và tính SUM đúng
-    // Chỉ lấy các record KHÔNG có customerId (bán lẻ từ ca)
-    // vì bán công nợ đã được ghi trong tổng ca rồi
-    const salesQuery = this.saleRepository
+    // ========== QUERY 1: TỔNG XUẤT BÁN (tất cả sales, không filter customerId) ==========
+    const totalSalesQuery = this.saleRepository
       .createQueryBuilder('sale')
       .leftJoin('sale.product', 'product')
       .leftJoin('sale.store', 'store')
       .leftJoin('sale.shift', 'shift')
-      .where('sale.customerId IS NULL')
       .select([
         'sale.storeId AS "storeId"',
         'store.code AS "storeCode"',
@@ -988,8 +990,8 @@ export class ReportsService {
         'sale.productId AS "productId"',
         'product.code AS "productCode"',
         'product.name AS "productName"',
-        'SUM(sale.quantity) AS "quantity"',
-        'SUM(sale.amount) AS "amount"',
+        'SUM(sale.quantity) AS "totalQuantity"',
+        'SUM(sale.amount) AS "totalAmount"',
       ])
       .groupBy('sale.storeId')
       .addGroupBy('store.code')
@@ -1000,35 +1002,80 @@ export class ReportsService {
 
     // Filter theo productId
     if (productId) {
-      salesQuery.andWhere('sale.productId = :productId', { productId });
+      totalSalesQuery.andWhere('sale.productId = :productId', { productId });
     }
 
     // Filter theo storeId
     if (storeId) {
-      salesQuery.andWhere('sale.storeId = :storeId', { storeId });
+      totalSalesQuery.andWhere('sale.storeId = :storeId', { storeId });
     }
-
-    // Filter theo kỳ giá không cần xử lý ở đây
-    // Vì frontend đã gửi fromDateTime và toDateTime dựa trên kỳ giá được chọn
 
     // Filter theo thời gian
     if (fromDateTime) {
-      salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+      totalSalesQuery.andWhere('shift.openedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      salesQuery.andWhere('shift.openedAt <= :toDateTime', {
+      totalSalesQuery.andWhere('shift.openedAt <= :toDateTime', {
         toDateTime: new Date(toDateTime),
       });
     }
 
-    const salesResults = await salesQuery.getRawMany();
+    // ========== QUERY 2: BÁN CÔNG NỢ (chỉ có customerId) ==========
+    const debtSalesQuery = this.saleRepository
+      .createQueryBuilder('sale')
+      .leftJoin('sale.product', 'product')
+      .leftJoin('sale.store', 'store')
+      .leftJoin('sale.shift', 'shift')
+      .where('sale.customerId IS NOT NULL')
+      .select([
+        'sale.storeId AS "storeId"',
+        'sale.productId AS "productId"',
+        'SUM(sale.quantity) AS "debtQuantity"',
+        'SUM(sale.amount) AS "debtAmount"',
+      ])
+      .groupBy('sale.storeId')
+      .addGroupBy('sale.productId');
+
+    // Apply same filters
+    if (productId) {
+      debtSalesQuery.andWhere('sale.productId = :productId', { productId });
+    }
+    if (storeId) {
+      debtSalesQuery.andWhere('sale.storeId = :storeId', { storeId });
+    }
+    if (fromDateTime) {
+      debtSalesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+        fromDateTime: new Date(fromDateTime),
+      });
+    }
+    if (toDateTime) {
+      debtSalesQuery.andWhere('shift.openedAt <= :toDateTime', {
+        toDateTime: new Date(toDateTime),
+      });
+    }
+
+    // Execute both queries
+    const [totalResults, debtResults] = await Promise.all([
+      totalSalesQuery.getRawMany(),
+      debtSalesQuery.getRawMany(),
+    ]);
+
+    // Create a map for debt data lookup: storeId-productId -> {debtQuantity, debtAmount}
+    const debtMap = new Map<string, { debtQuantity: number; debtAmount: number }>();
+    for (const row of debtResults) {
+      const key = `${row.storeId}-${row.productId}`;
+      debtMap.set(key, {
+        debtQuantity: Number(row.debtQuantity) || 0,
+        debtAmount: Number(row.debtAmount) || 0,
+      });
+    }
 
     // ========== GROUP DỮ LIỆU: Cửa hàng -> Mặt hàng ==========
     const storesMap = new Map<number, StoreDetail>();
 
-    for (const row of salesResults) {
+    for (const row of totalResults) {
       // Get or create store
       if (!storesMap.has(row.storeId)) {
         storesMap.set(row.storeId, {
@@ -1037,25 +1084,47 @@ export class ReportsService {
           storeName: row.storeName || '',
           totalQuantity: 0,
           totalAmount: 0,
+          debtQuantity: 0,
+          debtAmount: 0,
+          retailQuantity: 0,
+          retailAmount: 0,
           products: [],
         });
       }
       const store = storesMap.get(row.storeId)!;
 
-      // Add product (đã SUM sẵn từ query)
-      const qty = Number(row.quantity) || 0;
-      const amt = Number(row.amount) || 0;
+      // Get debt data for this store-product
+      const key = `${row.storeId}-${row.productId}`;
+      const debt = debtMap.get(key) || { debtQuantity: 0, debtAmount: 0 };
 
+      // Calculate quantities
+      const totalQty = Number(row.totalQuantity) || 0;
+      const totalAmt = Number(row.totalAmount) || 0;
+      const debtQty = debt.debtQuantity;
+      const debtAmt = debt.debtAmount;
+      const retailQty = totalQty - debtQty;
+      const retailAmt = totalAmt - debtAmt;
+
+      // Add product
       store.products.push({
         productId: row.productId,
         productCode: row.productCode || '',
         productName: row.productName || '',
-        quantity: qty,
-        amount: amt,
+        totalQuantity: totalQty,
+        totalAmount: totalAmt,
+        debtQuantity: debtQty,
+        debtAmount: debtAmt,
+        retailQuantity: retailQty,
+        retailAmount: retailAmt,
       });
 
-      store.totalQuantity += qty;
-      store.totalAmount += amt;
+      // Accumulate store totals
+      store.totalQuantity += totalQty;
+      store.totalAmount += totalAmt;
+      store.debtQuantity += debtQty;
+      store.debtAmount += debtAmt;
+      store.retailQuantity += retailQty;
+      store.retailAmount += retailAmt;
     }
 
     // Convert map to array and sort
@@ -1073,6 +1142,10 @@ export class ReportsService {
     const summary = {
       totalQuantity: stores.reduce((sum, s) => sum + s.totalQuantity, 0),
       totalAmount: stores.reduce((sum, s) => sum + s.totalAmount, 0),
+      debtQuantity: stores.reduce((sum, s) => sum + s.debtQuantity, 0),
+      debtAmount: stores.reduce((sum, s) => sum + s.debtAmount, 0),
+      retailQuantity: stores.reduce((sum, s) => sum + s.retailQuantity, 0),
+      retailAmount: stores.reduce((sum, s) => sum + s.retailAmount, 0),
     };
 
     return {

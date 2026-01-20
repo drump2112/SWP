@@ -178,12 +178,20 @@ export interface PricePeriod {
 }
 
 // Chi tiết mặt hàng trong cửa hàng
+// Bao gồm: Tổng xuất, Công nợ, Bán lẻ
 export interface ProductDetail {
   productId: number;
   productCode: string;
   productName: string;
-  quantity: number;
-  amount: number;
+  // Tổng xuất bán (tất cả sales)
+  totalQuantity: number;
+  totalAmount: number;
+  // Bán công nợ (có customerId)
+  debtQuantity: number;
+  debtAmount: number;
+  // Bán lẻ = Tổng - Công nợ
+  retailQuantity: number;
+  retailAmount: number;
 }
 
 // Chi tiết cửa hàng
@@ -191,14 +199,25 @@ export interface StoreDetail {
   storeId: number;
   storeCode: string;
   storeName: string;
+  // Tổng xuất bán
   totalQuantity: number;
   totalAmount: number;
+  // Bán công nợ
+  debtQuantity: number;
+  debtAmount: number;
+  // Bán lẻ = Tổng - Công nợ
+  retailQuantity: number;
+  retailAmount: number;
   products: ProductDetail[];
 }
 
 export interface RevenueSalesReportSummary {
   totalQuantity: number;
   totalAmount: number;
+  debtQuantity: number;
+  debtAmount: number;
+  retailQuantity: number;
+  retailAmount: number;
 }
 
 export interface RevenueSalesReportResponse {
