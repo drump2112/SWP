@@ -367,7 +367,7 @@ const ManagementDashboard: React.FC<{
         {storeTrends && (
           <StoreTrendsChart
             data={storeTrends}
-            title="Xu hướng doanh thu của từng cửa hàng qua 6 tháng"
+            title="Doanh thu theo cửa hàng"
           />
         )}
       </div>
