@@ -2,9 +2,10 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { shiftsApi, type CreateShiftDto } from "../api/shifts";
+import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
 import { showSuccess, showError, showWarning } from "../utils/sweetalert";
-import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
 
@@ -18,6 +19,17 @@ const ShiftManagementPage: React.FC = () => {
   const [newShiftNo, setNewShiftNo] = useState(1);
   const [newShiftTime, setNewShiftTime] = useState(dayjs().format("HH:mm"));
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedStoreFilter, setSelectedStoreFilter] = useState<number | undefined>(undefined);
+
+  // Check if user is admin
+  const isAdmin = user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING";
+
+  // Fetch stores for admin filter
+  const { data: stores } = useQuery({
+    queryKey: ["stores"],
+    queryFn: storesApi.getAll,
+    enabled: isAdmin, // Only fetch if user is admin
+  });
 
   // Fetch shifts - Admin xem tất cả, Store xem của mình
   const { data: shifts, isLoading } = useQuery({
@@ -136,8 +148,14 @@ const ShiftManagementPage: React.FC = () => {
 
   const filteredShifts = shifts?.filter((shift) => {
     const matchesSearch =
-      shift.shiftNo.toString().includes(searchTerm) || dayjs(shift.shiftDate).format("DD/MM/YYYY").includes(searchTerm);
-    return matchesSearch;
+      shift.shiftNo.toString().includes(searchTerm) ||
+      dayjs(shift.shiftDate).format("DD/MM/YYYY").includes(searchTerm) ||
+      shift.store?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    // Apply store filter for admin
+    const matchesStore = !selectedStoreFilter || shift.storeId === selectedStoreFilter;
+
+    return matchesSearch && matchesStore;
   });
 
   if (isLoading) {
@@ -161,21 +179,48 @@ const ShiftManagementPage: React.FC = () => {
       {/* Shifts List */}
       <div className="bg-white rounded-lg shadow">
         <div className="p-6 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <input
-              type="text"
-              placeholder="Tìm kiếm theo ca, ngày..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
-            />
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
-            >
-              <PlusIcon className="h-5 w-5 mr-2" />
-              Tạo ca mới
-            </button>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <input
+                type="text"
+                placeholder={isAdmin ? "Tìm kiếm theo ca, ngày, cửa hàng..." : "Tìm kiếm theo ca, ngày..."}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+              />
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+              >
+                <PlusIcon className="h-5 w-5 mr-2" />
+                Tạo ca mới
+              </button>
+            </div>
+
+            {/* Store filter for Admin */}
+            {isAdmin && (
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <BuildingStorefrontIcon className="h-5 w-5 text-gray-500" />
+                  Lọc theo cửa hàng:
+                </div>
+                <div className="w-64">
+                  <SearchableSelect
+                    options={[
+                      { value: 0, label: "Tất cả cửa hàng" },
+                      ...(stores?.map((store) => ({
+                        value: store.id,
+                        label: store.name,
+                      })) || []),
+                    ]}
+                    value={selectedStoreFilter || 0}
+                    onChange={(val) => setSelectedStoreFilter(val === 0 ? undefined : (val as number))}
+                    placeholder="Chọn cửa hàng"
+                    isClearable={false}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -234,12 +279,12 @@ const ShiftManagementPage: React.FC = () => {
                   )}
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">
-                      {shift.openedAt ? dayjs(shift.openedAt).format("HH:mm") : "-"}
+                      {shift.openedAt ? dayjs(shift.openedAt).format("HH:mm DD/MM/YYYY") : "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-500">
-                      {shift.closedAt ? dayjs(shift.closedAt).format("HH:mm DD/MM") : "-"}
+                      {shift.closedAt ? dayjs(shift.closedAt).format("HH:mm DD/MM/YYYY") : "-"}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center">

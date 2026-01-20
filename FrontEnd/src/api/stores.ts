@@ -34,6 +34,11 @@ export const storesApi = {
     return response.data;
   },
 
+  getAllIncludingInactive: async (): Promise<Store[]> => {
+    const response = await api.get('/stores/all');
+    return response.data;
+  },
+
   getById: async (id: number): Promise<Store> => {
     const response = await api.get(`/stores/${id}`);
     return response.data;
@@ -51,5 +56,10 @@ export const storesApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/stores/${id}`);
+  },
+
+  restore: async (id: number): Promise<Store> => {
+    const response = await api.patch(`/stores/${id}/restore`);
+    return response.data;
   },
 };

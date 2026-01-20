@@ -11,6 +11,7 @@ import {
   XMarkIcon,
   EyeIcon,
   BuildingStorefrontIcon,
+  ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import { showConfirm } from '../utils/sweetalert';
 import SearchableSelect from '../components/SearchableSelect';
@@ -28,10 +29,10 @@ const StoresPage: React.FC = () => {
     regionId: 0,
   });
 
-  // Fetch stores
+  // Fetch stores (including inactive ones for admin management)
   const { data: stores, isLoading } = useQuery({
     queryKey: ['stores'],
-    queryFn: storesApi.getAll,
+    queryFn: storesApi.getAllIncludingInactive,
   });
 
   // Fetch regions
@@ -59,9 +60,17 @@ const StoresPage: React.FC = () => {
     },
   });
 
-  // Delete mutation
+  // Delete mutation (soft delete)
   const deleteMutation = useMutation({
     mutationFn: storesApi.delete,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stores'] });
+    },
+  });
+
+  // Restore mutation
+  const restoreMutation = useMutation({
+    mutationFn: storesApi.restore,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stores'] });
     },
@@ -106,11 +115,21 @@ const StoresPage: React.FC = () => {
 
   const handleDelete = async (id: number) => {
     const confirmed = await showConfirm(
-      'Bạn có chắc chắn muốn xóa cửa hàng này?',
-      'Xác nhận xóa'
+      'Bạn có chắc chắn muốn ngừng hoạt động cửa hàng này?',
+      'Xác nhận ngừng hoạt động'
     );
     if (confirmed) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  const handleRestore = async (id: number) => {
+    const confirmed = await showConfirm(
+      'Bạn có chắc chắn muốn khôi phục cửa hàng này?',
+      'Xác nhận khôi phục'
+    );
+    if (confirmed) {
+      restoreMutation.mutate(id);
     }
   };
 
@@ -209,15 +228,27 @@ const StoresPage: React.FC = () => {
                     style={{ color: '#315eac' }}
                     onMouseEnter={(e) => e.currentTarget.style.color = '#2a4f8f'}
                     onMouseLeave={(e) => e.currentTarget.style.color = '#315eac'}
+                    title="Sửa"
                   >
                     <PencilIcon className="h-5 w-5" />
                   </button>
-                  <button
-                    onClick={() => handleDelete(store.id)}
-                    className="text-red-600 hover:text-red-900"
-                  >
-                    <TrashIcon className="h-5 w-5" />
-                  </button>
+                  {store.isActive ? (
+                    <button
+                      onClick={() => handleDelete(store.id)}
+                      className="text-red-600 hover:text-red-900"
+                      title="Ngừng hoạt động"
+                    >
+                      <TrashIcon className="h-5 w-5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleRestore(store.id)}
+                      className="text-green-600 hover:text-green-900"
+                      title="Khôi phục"
+                    >
+                      <ArrowPathIcon className="h-5 w-5" />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}

@@ -216,7 +216,7 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dung tích</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tồn kho</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">TT</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trạng Thái</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                 </tr>
               </thead>
@@ -261,7 +261,7 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tên</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Bồn bể</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">TT</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trạng Thái</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                 </tr>
               </thead>

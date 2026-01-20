@@ -33,6 +33,18 @@ export class StoresService {
   }
 
   async remove(id: number) {
-    return this.storeRepository.delete(id);
+    // Soft delete: set isActive = false instead of deleting
+    await this.storeRepository.update(id, { isActive: false });
+    return { message: 'Store has been deactivated successfully' };
+  }
+
+  async restore(id: number) {
+    // Restore: set isActive = true
+    await this.storeRepository.update(id, { isActive: true });
+    return this.findOne(id);
+  }
+
+  async findAllIncludingInactive() {
+    return this.storeRepository.find({ relations: ['region'] });
   }
 }

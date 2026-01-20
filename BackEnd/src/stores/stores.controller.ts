@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards } from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -21,6 +21,12 @@ export class StoresController {
     return this.storesService.findAll();
   }
 
+  @Get('all')
+  @Roles('ADMIN')
+  findAllIncludingInactive() {
+    return this.storesService.findAllIncludingInactive();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.storesService.findOne(+id);
@@ -36,5 +42,11 @@ export class StoresController {
   @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.storesService.remove(+id);
+  }
+
+  @Patch(':id/restore')
+  @Roles('ADMIN')
+  restore(@Param('id') id: string) {
+    return this.storesService.restore(+id);
   }
 }

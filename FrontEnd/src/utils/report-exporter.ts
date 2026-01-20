@@ -63,7 +63,7 @@ export const addReportHeader = (
   if (options.storeName) {
     worksheet.mergeCells("A2:E2");
     const storeCell = worksheet.getCell("A2");
-    storeCell.value = `Cửa hàng: ${options.storeName}`;
+    storeCell.value = `${options.storeName}`;
     storeCell.font = STYLES.boldFont;
     storeCell.alignment = STYLES.leftAlign;
   }
