@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   customersApi,
   type Customer,
@@ -31,6 +32,7 @@ import SearchableSelect from "../components/SearchableSelect";
 import * as XLSX from "xlsx";
 
 const CustomersPage: React.FC = () => {
+  usePageTitle('Khách hàng');
   const { user } = useAuth();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);

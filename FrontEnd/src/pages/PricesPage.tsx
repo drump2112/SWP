@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   productsApi,
   type SetRegionPricesDto,
@@ -18,6 +19,7 @@ import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
 import SearchableSelect from '../components/SearchableSelect';
 
 const PricesPage: React.FC = () => {
+  usePageTitle('Giá');
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [priceItems, setPriceItems] = useState<ProductPriceItem[]>([]);

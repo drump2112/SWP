@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { pumpsApi, type Pump, type CreatePumpDto, type UpdatePumpDto } from '../api/pumps';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { tanksApi } from '../api/tanks';
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
@@ -9,6 +10,7 @@ import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, BeakerIcon } from '@heroico
 import SearchableSelect from '../components/SearchableSelect';
 
 const PumpsPage: React.FC = () => {
+  usePageTitle('Vòi bơm');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPump, setEditingPump] = useState<Pump | null>(null);
   const [searchTerm, setSearchTerm] = useState('');

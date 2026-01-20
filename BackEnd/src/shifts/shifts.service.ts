@@ -883,7 +883,6 @@ export class ShiftsService {
         .update('cash_ledger')
         .set({
           supersededByShiftId: () => 'NULL',
-          notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`,
         })
         .where('ref_type = :refType', { refType: 'SHIFT_CLOSE' })
         .andWhere('ref_id = :refId', { refId: shiftId })
@@ -897,36 +896,23 @@ export class ShiftsService {
           .update('debt_ledger')
           .set({
             supersededByShiftId: () => 'NULL',
-            notes: () => `CONCAT(COALESCE(notes, ''), ' [ĐIỀU CHỈNH]')`,
           })
           .where('ref_type = :refType', { refType: 'DEBT_SALE' })
           .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
           .execute();
       }
 
-      // 4. Đánh dấu pump_readings (không xóa để audit)
-      await manager
-        .createQueryBuilder()
-        .update('pump_readings')
-        .set({ supersededByShiftId: () => 'NULL' })
-        .where('shift_id = :shiftId', { shiftId })
-        .execute();
-
-      // 5. Đánh dấu sales
-      await manager
-        .createQueryBuilder()
-        .update('sales')
-        .set({ supersededByShiftId: () => 'NULL' })
-        .where('shift_id = :shiftId', { shiftId })
-        .execute();
+      // Note: pump_readings và sales không có field supersededByShiftId
+      // Dữ liệu sẽ được xử lý khi chốt ca lại
 
       console.log(
         `🔄 Marked all data from shift ${shiftId} as SUPERSEDED (kept for audit)`,
       );
 
-      // 6. Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
+      // Mở lại ca (KHÔNG tạo ca mới, dùng luôn ca cũ)
+      // Giữ lại closedAt để frontend biết đây là ca đã từng chốt (cho phép hiển thị nút Sửa)
       shift.status = 'OPEN';
-      shift.closedAt = null;
+      // shift.closedAt = null; // Không xóa closedAt
       const reopenedShift = await manager.save(Shift, shift);
 
       // Ghi audit log
@@ -948,6 +934,42 @@ export class ShiftsService {
       );
       return reopenedShift;
     });
+  }
+
+  /**
+   * Khóa ca - Admin đóng lại ca mà giữ nguyên dữ liệu (chỉ đổi status về CLOSED)
+   */
+  async lockShift(shiftId: number, user: any): Promise<Shift> {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: ['store'],
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    if (shift.status !== 'OPEN') {
+      throw new BadRequestException('Chỉ có thể khóa ca đang mở');
+    }
+
+    const oldStatus = shift.status;
+    shift.status = 'CLOSED';
+
+    const lockedShift = await this.shiftRepository.save(shift);
+
+    // Ghi audit log
+    await this.auditLogRepository.save({
+      tableName: 'shifts',
+      recordId: shift.id,
+      action: 'LOCK',
+      oldData: { status: oldStatus },
+      newData: { status: 'CLOSED' },
+      changedBy: user?.id,
+    });
+
+    console.log(`🔒 Shift ${shiftId} locked by user ${user?.id}`);
+    return lockedShift;
   }
 
   async findOne(id: number): Promise<Shift> {

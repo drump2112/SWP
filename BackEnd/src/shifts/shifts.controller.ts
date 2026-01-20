@@ -68,6 +68,12 @@ export class ShiftsController {
     return this.shiftsService.reopenShift(+id, user);
   }
 
+  @Put(':id/lock')
+  @Roles('ADMIN')
+  lockShift(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.shiftsService.lockShift(+id, user);
+  }
+
   @Get('report/:id')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getShiftReport(@Param('id') id: string) {

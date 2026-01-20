@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryApi } from '../api/inventory';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
 import { useAuth } from '../contexts/AuthContext';
@@ -24,6 +25,7 @@ import { printReport, formatCurrency, formatNumber, formatDate } from '../utils/
 import DateRangePicker from '../components/DateRangePicker';
 
 const InventoryReportPage: React.FC = () => {
+  usePageTitle('Nhập Xuất Tồn');
   const { user } = useAuth();
   const [fromDate, setFromDate] = useState(dayjs().startOf('month').format('YYYY-MM-DD'));
   const [toDate, setToDate] = useState(dayjs().endOf('month').format('YYYY-MM-DD'));

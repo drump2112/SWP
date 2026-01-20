@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "../contexts/AuthContext";
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from "../api/stores";
 import { inventoryApi } from "../api/inventory";
 import {
@@ -16,6 +17,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import dayjs from "dayjs";
 
 const StockReport: React.FC = () => {
+  usePageTitle('Báo cáo tồn kho');
   const { user } = useAuth();
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(user?.storeId || null);
   const [isAllStores, setIsAllStores] = useState(false);

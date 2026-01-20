@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
+import { usePageTitle } from '../hooks/usePageTitle';
 import { shiftsApi, type CreateShiftDto } from "../api/shifts";
 import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,6 +11,7 @@ import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
 
 const ShiftManagementPage: React.FC = () => {
+  usePageTitle('Quản lý ca');
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -74,8 +76,24 @@ const ShiftManagementPage: React.FC = () => {
     },
   });
 
+  // Lock shift mutation - khóa ca giữ nguyên dữ liệu
+  const lockShiftMutation = useMutation({
+    mutationFn: shiftsApi.lockShift,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      showSuccess("Đã khóa ca thành công!");
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || "Khóa ca thất bại");
+    },
+  });
+
   const handleReopenShift = (shiftId: number) => {
     reopenShiftMutation.mutate(shiftId);
+  };
+
+  const handleLockShift = (shiftId: number) => {
+    lockShiftMutation.mutate(shiftId);
   };
 
   const handleCreateShift = () => {
@@ -309,14 +327,44 @@ const ShiftManagementPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                     <div className="flex items-center justify-center gap-2">
                       {shift.status === "OPEN" && (
-                        <button
-                          onClick={() => navigate(`/shifts/${shift.id}/operations`)}
-                          className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          title="Nhập số liệu và chốt ca"
-                        >
-                          <DocumentTextIcon className="h-5 w-5 mr-2" />
-                          Chốt ca
-                        </button>
+                        <>
+                          {/* Ca mới tạo (chưa từng chốt) - hiện nút Chốt ca */}
+                          {!shift.closedAt && (
+                            <button
+                              onClick={() => navigate(`/shifts/${shift.id}/operations`)}
+                              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                              title="Nhập số liệu và chốt ca"
+                            >
+                              <DocumentTextIcon className="h-5 w-5 mr-2" />
+                              Chốt ca
+                            </button>
+                          )}
+                          {/* Ca đã từng chốt (được admin mở lại) */}
+                          {shift.closedAt && (
+                            <>
+                              {/* Nút Sửa - cho user cửa hàng và admin */}
+                              <button
+                                onClick={() => navigate(`/shifts/${shift.id}/operations?mode=edit`)}
+                                className="inline-flex items-center px-3 py-1.5 border border-orange-300 rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100"
+                              >
+                                <PencilIcon className="h-4 w-4 mr-1" />
+                                Sửa
+                              </button>
+                              {/* Nút Khóa - chỉ admin thấy, để đóng lại ca mà giữ nguyên dữ liệu */}
+                              {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
+                                <button
+                                  onClick={() => handleLockShift(shift.id)}
+                                  disabled={lockShiftMutation.isPending}
+                                  className="inline-flex items-center px-3 py-1.5 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  title="Khóa ca - giữ nguyên dữ liệu"
+                                >
+                                  <ClockIcon className="h-4 w-4 mr-1" />
+                                  Khóa
+                                </button>
+                              )}
+                            </>
+                          )}
+                        </>
                       )}
                       {shift.status === "CLOSED" && (
                         <>
@@ -327,19 +375,13 @@ const ShiftManagementPage: React.FC = () => {
                             <DocumentTextIcon className="h-4 w-4 mr-1" />
                             Chi tiết
                           </button>
-                          <button
-                            onClick={() => navigate(`/shifts/${shift.id}/operations?mode=edit`)}
-                            className="inline-flex items-center px-3 py-1.5 border border-orange-300 rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100"
-                          >
-                            <PencilIcon className="h-4 w-4 mr-1" />
-                            Sửa
-                          </button>
+                          {/* Nút Mở ca - chỉ admin mới thấy, dùng để cho phép cửa hàng sửa ca */}
                           {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
                             <button
                               onClick={() => handleReopenShift(shift.id)}
                               disabled={reopenShiftMutation.isPending}
                               className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Mở lại ca"
+                              title="Mở lại ca để cho phép cửa hàng sửa"
                             >
                               <ClockIcon className="h-4 w-4 mr-1" />
                               Mở ca

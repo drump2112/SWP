@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storesApi } from '../api/stores';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { productsApi } from '../api/products';
 import api from '../api/client';
 import { toast } from 'react-toastify';
@@ -40,6 +41,7 @@ interface InitialStockRecord {
 }
 
 const InitialStock: React.FC = () => {
+  usePageTitle('Nhập tồn đầu');
   const { user } = useAuth();
   const queryClient = useQueryClient();
 

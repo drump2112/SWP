@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Select from "react-select";
+import { usePageTitle } from '../hooks/usePageTitle';
 import DateTimeRangePicker from "../components/DateTimeRangePicker";
 import {
   reportsApi,
@@ -36,6 +37,7 @@ import { printReport } from "../utils/report-printer";
 type TabType = "store" | "customer";
 
 const RevenueSalesReportPage: React.FC = () => {
+  usePageTitle('Doanh thu / Xuất hàng');
   const { user } = useAuth();
 
   // Tab state

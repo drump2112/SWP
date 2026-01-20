@@ -1,11 +1,13 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { ArrowLeftIcon, BuildingStorefrontIcon } from '@heroicons/react/24/outline';
 import StoreDetailTabs from '../components/StoreDetailTabs';
 
 const StoreDetailPage: React.FC = () => {
+  usePageTitle('Chi tiết cửa hàng');
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const storeId = Number(id);

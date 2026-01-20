@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { storesApi } from '../api/stores';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { productsApi } from '../api/products';
 import { tanksApi } from '../api/tanks';
 import { inventoryApi, type CreateInventoryDocumentDto, type InventoryItemDto } from '../api/inventory';
@@ -11,6 +12,7 @@ import { PlusIcon, TrashIcon, CircleStackIcon } from '@heroicons/react/24/outlin
 import dayjs from 'dayjs';
 
 const InventoryImportPage: React.FC = () => {
+  usePageTitle('Nhập hàng');
   const { user } = useAuth();
 
   const [storeId, setStoreId] = useState<number | null>(user?.storeId || null);

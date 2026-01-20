@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tanksApi, type Tank, type CreateTankDto, type UpdateTankDto } from '../api/tanks';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
 import { showConfirm } from '../utils/sweetalert';
@@ -8,6 +9,7 @@ import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CircleStackIcon } from '@he
 import SearchableSelect from '../components/SearchableSelect';
 
 const TanksPage: React.FC = () => {
+  usePageTitle('Bồn bể');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTank, setEditingTank] = useState<Tank | null>(null);
   const [searchTerm, setSearchTerm] = useState('');

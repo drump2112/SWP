@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
+import { usePageTitle } from '../hooks/usePageTitle';
 import * as XLSX from 'xlsx';
 import { customersApi } from '../api/customers';
 import { storesApi } from '../api/stores';
@@ -19,6 +20,7 @@ interface OpeningBalanceRecord {
 }
 
 export const OpeningBalancePage: React.FC = () => {
+  usePageTitle('Số dư đầu công nợ');
   const queryClient = useQueryClient();
 
   // State cho form thêm mới

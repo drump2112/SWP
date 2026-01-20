@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productsApi, type Product, type CreateProductDto } from '../api/products';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
 import { HybridTable } from '../components/ResponsiveTable';
 
 const ProductsPage: React.FC = () => {
+  usePageTitle('Mặt hàng');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');

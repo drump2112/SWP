@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi, type CashReportParams } from '../api/reports';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -27,6 +28,7 @@ import {
 import { printReport, formatCurrency, formatDateTime } from '../utils/report-printer';
 
 const CashReportPage: React.FC = () => {
+  usePageTitle('Sổ quỹ');
   const { user } = useAuth();
   const [filters, setFilters] = useState<CashReportParams>({
     storeId: user?.storeId,

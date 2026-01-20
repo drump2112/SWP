@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "../api/reports";
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
 import {
@@ -15,6 +16,7 @@ import SearchableSelect from '../components/SearchableSelect';
 import DateTimeRangePicker from '../components/DateTimeRangePicker';
 
 const ShiftReportPage: React.FC = () => {
+  usePageTitle('Báo cáo ca');
   const { user } = useAuth();
   const [fromDateTime, setFromDateTime] = useState<string>(
     dayjs().startOf("month").format("YYYY-MM-DDTHH:mm")

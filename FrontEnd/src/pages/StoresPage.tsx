@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { regionsApi } from '../api/regions';
 import type { Store, CreateStoreDto } from '../api/stores';
@@ -17,6 +18,7 @@ import { showConfirm } from '../utils/sweetalert';
 import SearchableSelect from '../components/SearchableSelect';
 
 const StoresPage: React.FC = () => {
+  usePageTitle('Cửa hàng');
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);

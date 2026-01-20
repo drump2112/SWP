@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { usePageTitle } from '../hooks/usePageTitle';
 import {
   shiftsApi,
   type ShiftDebtSaleDto,
@@ -39,6 +40,7 @@ import {
 import dayjs from "dayjs";
 
 const ShiftOperationsPage: React.FC = () => {
+  usePageTitle('Thao tác ca');
   const { shiftId } = useParams<{ shiftId: string }>();
   const [searchParams] = useSearchParams();
   const isEditMode = searchParams.get("mode") === "edit";

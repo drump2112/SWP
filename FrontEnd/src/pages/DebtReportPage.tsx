@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi, type DebtReportParams } from '../api/reports';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { customersApi } from '../api/customers';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +27,7 @@ import {
 import { printReport, formatCurrency } from '../utils/report-printer';
 
 const DebtReportPage: React.FC = () => {
+  usePageTitle('Báo cáo công nợ');
   const { user } = useAuth();
   const [filters, setFilters] = useState<DebtReportParams>({
     storeId: user?.storeId,

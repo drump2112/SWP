@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { storesApi } from '../api/stores';
+import { usePageTitle } from '../hooks/usePageTitle';
 import api from '../api/client';
 import { toast } from 'react-toastify';
 import { useAuth } from '../contexts/AuthContext';
@@ -18,6 +19,7 @@ interface OpeningBalanceRecord {
 }
 
 const CashOpeningBalanceManagement: React.FC = () => {
+  usePageTitle('Quản lý số dư đầu sổ quỹ');
   const { user } = useAuth();
   const queryClient = useQueryClient();
 

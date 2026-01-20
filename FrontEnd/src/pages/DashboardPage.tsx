@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { analyticsApi } from '../api/analytics';
 import MetricCard from '../components/MetricCard';
 import RevenueChart from '../components/RevenueChart';
@@ -16,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 const DashboardPage: React.FC = () => {
+  usePageTitle('Trang chủ');
   const { user } = useAuth();
 
   // Date range cho overview (mặc định: tháng hiện tại)
@@ -348,7 +350,7 @@ const ManagementDashboard: React.FC<{
       {/* Charts - Time-based trends */}
       <div className="mt-8 mb-4">
         <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-3">
-          Biểu đồ xu hướng (6 tháng gần nhất)
+          Biểu đồ doanh thu
         </h3>
       </div>
 

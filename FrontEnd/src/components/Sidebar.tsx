@@ -65,7 +65,7 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Cửa hàng', href: '/stores', icon: BuildingStorefrontIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Mặt hàng', href: '/products', icon: CubeIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
-      { name: 'Giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
+      { name: 'Quản Lý Giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
       { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'] },
       { name: 'Tài khoản', href: '/users', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR'] },
     ],
@@ -109,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   const [openMenus, setOpenMenus] = useState<string[]>(getInitialOpenMenus());
   const [isCollapsed, setIsCollapsed] = useState<boolean>(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleMenuMouseEnter = (menuName: string) => {
     if (hoverTimeoutRef.current) {

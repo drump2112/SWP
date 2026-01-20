@@ -1,12 +1,14 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { customersApi, type CreditStatus } from '../api/customers';
+import { usePageTitle } from '../hooks/usePageTitle';
 import { useAuth } from '../contexts/AuthContext';
 import { MagnifyingGlassIcon, ExclamationTriangleIcon, CheckCircleIcon, XCircleIcon, CreditCardIcon, FunnelIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import { exportToExcel } from '../utils/excel';
 
 const CustomerCreditPage: React.FC = () => {
+  usePageTitle('Hạn mức công nợ');
   const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(null);
