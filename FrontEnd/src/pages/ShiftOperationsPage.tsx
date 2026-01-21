@@ -2512,7 +2512,9 @@ const ShiftOperationsPage: React.FC = () => {
                           const amount = parseFloat(e.target.value) || 0;
                           setDebtSaleFormAmount(amount);
                           if (debtSaleFormPrice > 0) {
-                            setDebtSaleFormQuantity(amount / debtSaleFormPrice);
+                            const rawQty = amount / debtSaleFormPrice;
+                            // Lấy 3 số sau dấu phẩy và không làm tròn (truncate)
+                            setDebtSaleFormQuantity(Math.floor(rawQty * 1000) / 1000);
                           }
                         }}
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-blue-50"
