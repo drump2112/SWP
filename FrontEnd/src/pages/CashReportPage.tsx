@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { reportsApi, type CashReportParams } from '../api/reports';
-import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -28,7 +27,6 @@ import {
 import { printReport, formatCurrency, formatDateTime } from '../utils/report-printer';
 
 const CashReportPage: React.FC = () => {
-  usePageTitle('Sổ quỹ');
   const { user } = useAuth();
   const [filters, setFilters] = useState<CashReportParams>({
     storeId: user?.storeId,
@@ -73,36 +71,34 @@ const CashReportPage: React.FC = () => {
     worksheet.columns = [
       { key: 'stt', width: 6 },
       { key: 'date', width: 18 },
-      { key: 'refType', width: 15 },
       { key: 'description', width: 35 },
-      { key: 'cashIn', width: 15 },
-      { key: 'cashOut', width: 15 },
-      { key: 'balance', width: 15 },
+      { key: 'cashIn', width: 18 },
+      { key: 'cashOut', width: 18 },
+      { key: 'balance', width: 20 },
     ];
 
     // Opening Balance Row (Row 7)
     const openingRow = worksheet.getRow(7);
-    openingRow.values = ['', '', '', 'Số dư đầu kỳ', '', '', report.openingBalance];
+    openingRow.values = ['', '', 'Số dư đầu kỳ', '', '', report.openingBalance];
     openingRow.font = STYLES.boldFont;
-    openingRow.getCell(4).alignment = STYLES.leftAlign;
-    openingRow.getCell(7).alignment = STYLES.rightAlign;
-    openingRow.getCell(7).numFmt = '#,##0';
+    openingRow.getCell(3).alignment = STYLES.leftAlign;
+    openingRow.getCell(6).alignment = STYLES.rightAlign;
+    openingRow.getCell(6).numFmt = '#,##0';
     openingRow.eachCell((cell) => {
       cell.border = STYLES.borderStyle;
     });
-    worksheet.mergeCells(`A${openingRow.number}:C${openingRow.number}`);
-    worksheet.mergeCells(`D${openingRow.number}:F${openingRow.number}`);
+    worksheet.mergeCells(`A${openingRow.number}:B${openingRow.number}`);
+    worksheet.mergeCells(`C${openingRow.number}:E${openingRow.number}`);
 
     // Table Header (Row 8)
     const headerRow = worksheet.getRow(8);
     headerRow.values = [
       'STT',
       'Ngày giờ',
-      'Loại chứng từ',
       'Diễn giải',
-      'Thu (₫)',
-      'Chi (₫)',
-      'Tồn (₫)',
+      'Số phát sinh (₫)',
+      'Số đã nộp (₫)',
+      'Tồn quỹ tiền mặt (₫)',
     ];
     headerRow.font = STYLES.headerFont;
     headerRow.alignment = STYLES.centerAlign;
@@ -120,7 +116,6 @@ const CashReportPage: React.FC = () => {
       const row = worksheet.addRow([
         index + 1,
         dayjs(ledger.date).format('DD/MM/YYYY HH:mm'),
-        getRefTypeLabel(ledger.refType),
         description,
         Number(ledger.cashIn),
         Number(ledger.cashOut),
@@ -133,9 +128,9 @@ const CashReportPage: React.FC = () => {
       row.font = STYLES.normalFont;
       row.eachCell((cell, colNumber) => {
         cell.border = STYLES.borderStyle;
-        if (colNumber === 1 || colNumber === 2 || colNumber === 3) {
+        if (colNumber === 1 || colNumber === 2) {
           cell.alignment = STYLES.centerAlign;
-        } else if (colNumber === 4) {
+        } else if (colNumber === 3) {
           cell.alignment = STYLES.leftAlign;
         } else {
           cell.alignment = STYLES.rightAlign;
@@ -148,7 +143,6 @@ const CashReportPage: React.FC = () => {
     const totalRow = worksheet.addRow([
       '',
       '',
-      '',
       'Tổng phát sinh',
       totalCashIn,
       totalCashOut,
@@ -157,18 +151,17 @@ const CashReportPage: React.FC = () => {
     totalRow.font = STYLES.boldFont;
     totalRow.eachCell((cell, colNumber) => {
       cell.border = STYLES.borderStyle;
-      if (colNumber === 4) {
+      if (colNumber === 3) {
         cell.alignment = STYLES.leftAlign;
-      } else if (colNumber === 5 || colNumber === 6) {
+      } else if (colNumber === 4 || colNumber === 5) {
         cell.alignment = STYLES.rightAlign;
         cell.numFmt = '#,##0';
       }
     });
-    worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+    worksheet.mergeCells(`A${totalRow.number}:B${totalRow.number}`);
 
     // Closing Balance Row
     const closingRow = worksheet.addRow([
-      '',
       '',
       '',
       'Số dư cuối kỳ',
@@ -177,14 +170,14 @@ const CashReportPage: React.FC = () => {
       report.closingBalance,
     ]);
     closingRow.font = STYLES.boldFont;
-    closingRow.getCell(4).alignment = STYLES.leftAlign;
-    closingRow.getCell(7).alignment = STYLES.rightAlign;
-    closingRow.getCell(7).numFmt = '#,##0';
+    closingRow.getCell(3).alignment = STYLES.leftAlign;
+    closingRow.getCell(6).alignment = STYLES.rightAlign;
+    closingRow.getCell(6).numFmt = '#,##0';
     closingRow.eachCell((cell) => {
       cell.border = STYLES.borderStyle;
     });
-    worksheet.mergeCells(`A${closingRow.number}:C${closingRow.number}`);
-    worksheet.mergeCells(`D${closingRow.number}:F${closingRow.number}`);
+    worksheet.mergeCells(`A${closingRow.number}:B${closingRow.number}`);
+    worksheet.mergeCells(`C${closingRow.number}:E${closingRow.number}`);
 
     addReportFooter(worksheet, {
       signatures: {
@@ -218,7 +211,6 @@ const CashReportPage: React.FC = () => {
         <tr>
           <td class="text-center">${index + 1}</td>
           <td class="text-center">${formatDateTime(ledger.date)}</td>
-          <td class="text-center">${getRefTypeLabel(ledger.refType)}</td>
           <td class="text-left">${description}</td>
           <td class="text-right">${ledger.cashIn > 0 ? formatCurrency(ledger.cashIn) : '-'}</td>
           <td class="text-right">${ledger.cashOut > 0 ? formatCurrency(ledger.cashOut) : '-'}</td>
@@ -230,31 +222,30 @@ const CashReportPage: React.FC = () => {
     const tableHTML = `
       <table>
         <tr style="background-color: #dbeafe;">
-          <td colspan="4" class="text-left font-bold">Số dư đầu kỳ</td>
-          <td colspan="3" class="text-right font-bold">${formatCurrency(report.openingBalance)} ₫</td>
+          <td colspan="3" class="text-left font-bold">Số dư đầu kỳ</td>
+          <td colspan="3" class="text-right font-bold">${formatCurrency(report.openingBalance)}</td>
         </tr>
         <thead>
           <tr>
             <th>STT</th>
             <th>Ngày giờ</th>
-            <th>Loại chứng từ</th>
             <th>Diễn giải</th>
-            <th>Thu (₫)</th>
-            <th>Chi (₫)</th>
-            <th>Tồn (₫)</th>
+            <th>Số phát sinh (₫)</th>
+            <th>Số đã nộp (₫)</th>
+            <th>Tồn quỹ tiền mặt (₫)</th>
           </tr>
         </thead>
         <tbody>
           ${tableRows}
           <tr class="total-row">
-            <td colspan="4" class="text-left">Tổng phát sinh</td>
+            <td colspan="3" class="text-left">Tổng phát sinh</td>
             <td class="text-right">${formatCurrency(totalCashIn)}</td>
             <td class="text-right">${formatCurrency(totalCashOut)}</td>
             <td></td>
           </tr>
           <tr style="background-color: #f3e8ff;">
-            <td colspan="4" class="text-left font-bold">Số dư cuối kỳ</td>
-            <td colspan="3" class="text-right font-bold">${formatCurrency(report.closingBalance)} ₫</td>
+            <td colspan="3" class="text-left font-bold">Số dư cuối kỳ</td>
+            <td colspan="3" class="text-right font-bold">${formatCurrency(report.closingBalance)}</td>
           </tr>
         </tbody>
       </table>
@@ -416,7 +407,7 @@ const CashReportPage: React.FC = () => {
         <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-4">
           <div className="text-sm text-blue-600 font-medium">Số dư đầu kỳ</div>
           <div className="text-2xl font-bold text-blue-700 mt-1">
-            {report?.openingBalance.toLocaleString('vi-VN')} ₫
+            {report?.openingBalance.toLocaleString('vi-VN')}
           </div>
         </div>
 
@@ -426,7 +417,7 @@ const CashReportPage: React.FC = () => {
             Tổng thu
           </div>
           <div className="text-2xl font-bold text-green-700 mt-1">
-            {report?.totalCashIn.toLocaleString('vi-VN')} ₫
+            {report?.totalCashIn.toLocaleString('vi-VN')}
           </div>
         </div>
 
@@ -436,14 +427,14 @@ const CashReportPage: React.FC = () => {
             Tổng chi
           </div>
           <div className="text-2xl font-bold text-red-700 mt-1">
-            {report?.totalCashOut.toLocaleString('vi-VN')} ₫
+            {report?.totalCashOut.toLocaleString('vi-VN')}
           </div>
         </div>
 
         <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow p-4">
           <div className="text-sm text-purple-600 font-medium">Số dư cuối kỳ</div>
           <div className="text-2xl font-bold text-purple-700 mt-1">
-            {report?.closingBalance.toLocaleString('vi-VN')} ₫
+            {report?.closingBalance.toLocaleString('vi-VN')}
           </div>
         </div>
       </div>
@@ -459,7 +450,7 @@ const CashReportPage: React.FC = () => {
                   Số dư đầu kỳ
                 </th>
                 <th className="px-6 py-4 text-right text-base" colSpan={2}>
-                  <span className="font-bold text-blue-600 text-lg">{report?.openingBalance.toLocaleString('vi-VN')} ₫</span>
+                  <span className="font-bold text-blue-600 text-lg">{report?.openingBalance.toLocaleString('vi-VN')}</span>
                 </th>
               </tr>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -556,7 +547,7 @@ const CashReportPage: React.FC = () => {
                                 <div>
                                   <span className="text-gray-600">Tổng tiền:</span>{' '}
                                   <span className="font-bold text-green-600">
-                                    {ledger.details.totalAmount?.toLocaleString('vi-VN')} ₫
+                                    {ledger.details.totalAmount?.toLocaleString('vi-VN')}
                                   </span>
                                 </div>
                               </div>
@@ -609,7 +600,7 @@ const CashReportPage: React.FC = () => {
                                 <div>
                                   <span className="text-gray-600">Số tiền:</span>{' '}
                                   <span className="font-bold text-red-600">
-                                    {ledger.details.amount?.toLocaleString('vi-VN')} ₫
+                                    {ledger.details.amount?.toLocaleString('vi-VN')}
                                   </span>
                                 </div>
                                 {ledger.details.notes && (
@@ -641,7 +632,7 @@ const CashReportPage: React.FC = () => {
                     Số dư cuối kỳ
                   </td>
                   <td className="px-6 py-4 text-right text-base" colSpan={2}>
-                    <span className="font-bold text-purple-600 text-lg">{report?.closingBalance.toLocaleString('vi-VN')} ₫</span>
+                    <span className="font-bold text-purple-600 text-lg">{report?.closingBalance.toLocaleString('vi-VN')}</span>
                   </td>
                 </tr>
               )}

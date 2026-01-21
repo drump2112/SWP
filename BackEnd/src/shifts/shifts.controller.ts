@@ -68,6 +68,12 @@ export class ShiftsController {
     return this.shiftsService.reopenShift(+id, user);
   }
 
+  @Put(':id/enable-edit')
+  @Roles('ADMIN')
+  enableEdit(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.shiftsService.enableEdit(+id, user);
+  }
+
   @Put(':id/lock')
   @Roles('ADMIN')
   lockShift(@Param('id') id: string, @CurrentUser() user: any) {

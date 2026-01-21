@@ -147,6 +147,11 @@ export const shiftsApi = {
     return response.data;
   },
 
+  enableEdit: async (shiftId: number): Promise<Shift> => {
+    const response = await api.put(`/shifts/${shiftId}/enable-edit`);
+    return response.data;
+  },
+
   lockShift: async (shiftId: number): Promise<Shift> => {
     const response = await api.put(`/shifts/${shiftId}/lock`);
     return response.data;

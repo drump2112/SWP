@@ -1,17 +1,16 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { usePageTitle } from '../hooks/usePageTitle';
 import { shiftsApi, type CreateShiftDto } from "../api/shifts";
 import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
-import { showSuccess, showError, showWarning } from "../utils/sweetalert";
+import { showSuccess, showError, showWarning, showConfirm } from "../utils/sweetalert";
+import { toast } from "react-toastify";
 import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
 
 const ShiftManagementPage: React.FC = () => {
-  usePageTitle('Quản lý ca');
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -64,15 +63,15 @@ const ShiftManagementPage: React.FC = () => {
     },
   });
 
-  // Reopen shift mutation
-  const reopenShiftMutation = useMutation({
-    mutationFn: shiftsApi.reopenShift,
+  // Enable edit mutation - cho phép sửa ca (chỉ đổi status, giữ nguyên dữ liệu)
+  const enableEditMutation = useMutation({
+    mutationFn: shiftsApi.enableEdit,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
-      showSuccess("Đã mở lại ca thành công!");
+      toast.success("Đã mở chế độ sửa ca thành công!");
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || "Mở lại ca thất bại");
+      toast.error(error.response?.data?.message || "Mở chế độ sửa thất bại");
     },
   });
 
@@ -81,15 +80,24 @@ const ShiftManagementPage: React.FC = () => {
     mutationFn: shiftsApi.lockShift,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["shifts"] });
-      showSuccess("Đã khóa ca thành công!");
+      toast.success("Đã khóa ca thành công!");
     },
     onError: (error: any) => {
-      showError(error.response?.data?.message || "Khóa ca thất bại");
+      toast.error(error.response?.data?.message || "Khóa ca thất bại");
     },
   });
 
-  const handleReopenShift = (shiftId: number) => {
-    reopenShiftMutation.mutate(shiftId);
+  const handleEnableEdit = async (shiftId: number, shiftInfo: string) => {
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn mở chế độ sửa cho ${shiftInfo}?\n\nSau khi mở, cửa hàng sẽ thấy nút Sửa và có thể chỉnh sửa ca này.`,
+      "Xác nhận mở ca",
+      "question",
+      "Mở ca",
+      "Hủy"
+    );
+    if (confirmed) {
+      enableEditMutation.mutate(shiftId);
+    }
   };
 
   const handleLockShift = (shiftId: number) => {
@@ -378,10 +386,10 @@ const ShiftManagementPage: React.FC = () => {
                           {/* Nút Mở ca - chỉ admin mới thấy, dùng để cho phép cửa hàng sửa ca */}
                           {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
                             <button
-                              onClick={() => handleReopenShift(shift.id)}
-                              disabled={reopenShiftMutation.isPending}
+                              onClick={() => handleEnableEdit(shift.id, `Ca ${shift.shiftNo} ngày ${dayjs(shift.shiftDate).format("DD/MM/YYYY")}`)}
+                              disabled={enableEditMutation.isPending}
                               className="inline-flex items-center px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                              title="Mở lại ca để cho phép cửa hàng sửa"
+                              title="Mở chế độ sửa để cho phép cửa hàng sửa ca"
                             >
                               <ClockIcon className="h-4 w-4 mr-1" />
                               Mở ca

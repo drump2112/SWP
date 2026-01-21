@@ -410,8 +410,9 @@ const ShiftOperationsPage: React.FC = () => {
   useEffect(() => {
     if (!report || !pumps || pumps.length === 0) return;
 
-    // Skip if shift is OPEN (fresh shift with no data)
-    if (report.shift.status === "OPEN") return;
+    // Skip if shift is OPEN and never been closed (fresh shift with no data)
+    // But if OPEN with closedAt (admin enabled edit), load the existing data
+    if (report.shift.status === "OPEN" && !report.shift.closedAt) return;
 
     // Only init if empty to avoid overwriting user edits during re-renders
     const hasData = Object.keys(pumpReadings).length > 0;

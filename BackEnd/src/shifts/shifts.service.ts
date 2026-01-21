@@ -937,6 +937,81 @@ export class ShiftsService {
   }
 
   /**
+   * Cho phép sửa ca - Admin bật chế độ sửa để user cửa hàng có thể sửa ca đã chốt
+   * CHỈ đổi status từ CLOSED → OPEN, KHÔNG xóa hay thay đổi dữ liệu gì
+   */
+  async enableEdit(shiftId: number, user: any): Promise<Shift> {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: ['store'],
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    if (shift.status !== 'CLOSED') {
+      throw new BadRequestException('Chỉ có thể mở chế độ sửa cho ca đã chốt');
+    }
+
+    // Check nếu đã có payment cho debt sales từ ca này
+    const debtSales = await this.dataSource.manager.find(ShiftDebtSale, {
+      where: { shiftId },
+      relations: ['customer'],
+    });
+
+    for (const debtSale of debtSales) {
+      const debtSaleEntry = await this.dataSource.manager.findOne(DebtLedger, {
+        where: {
+          customerId: debtSale.customerId,
+          refType: 'DEBT_SALE',
+          refId: debtSale.id,
+        },
+      });
+
+      if (debtSaleEntry) {
+        const paymentsAfterSale = await this.dataSource.manager
+          .createQueryBuilder(DebtLedger, 'dl')
+          .where('dl.customerId = :customerId', {
+            customerId: debtSale.customerId,
+          })
+          .andWhere('dl.refType = :refType', { refType: 'PAYMENT' })
+          .andWhere('dl.createdAt > :saleTime', {
+            saleTime: debtSaleEntry.createdAt,
+          })
+          .getCount();
+
+        if (paymentsAfterSale > 0) {
+          throw new BadRequestException(
+            `❌ KHÔNG THỂ MỞ CHẾ ĐỘ SỬA!\n` +
+              `Khách hàng "${debtSale.customer?.name}" đã thanh toán công nợ từ ca này.\n` +
+              `Nếu sửa số tiền bán sẽ gây lỗi số dư công nợ.`,
+          );
+        }
+      }
+    }
+
+    const oldStatus = shift.status;
+    shift.status = 'OPEN';
+    // Giữ nguyên closedAt để frontend biết đây là ca đã từng chốt
+
+    const updatedShift = await this.shiftRepository.save(shift);
+
+    // Ghi audit log
+    await this.auditLogRepository.save({
+      tableName: 'shifts',
+      recordId: shift.id,
+      action: 'ENABLE_EDIT',
+      oldData: { status: oldStatus },
+      newData: { status: 'OPEN', note: 'Cho phép sửa ca - giữ nguyên dữ liệu' },
+      changedBy: user?.id,
+    });
+
+    console.log(`✏️ Shift ${shiftId} edit enabled by user ${user?.id}`);
+    return updatedShift;
+  }
+
+  /**
    * Khóa ca - Admin đóng lại ca mà giữ nguyên dữ liệu (chỉ đổi status về CLOSED)
    */
   async lockShift(shiftId: number, user: any): Promise<Shift> {
