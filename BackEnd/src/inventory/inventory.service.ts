@@ -543,6 +543,12 @@ export class InventoryService {
         supplierName: doc.supplierName,
         invoiceNumber: doc.invoiceNumber,
         licensePlate: doc.licensePlate,
+        // Trả về items từ document (format đơn giản)
+        items: doc.items?.map((item) => ({
+          productId: item.productId,
+          productName: item.product?.name,
+          quantity: Number(item.quantity),
+        })) || [],
         compartments: compartments.map((c) => ({
           compartmentNumber: c.compartmentNumber,
           productId: c.productId,
@@ -551,7 +557,8 @@ export class InventoryService {
           receivedVolume: Number(c.receivedVolume),
           lossVolume: Number(c.lossVolume || 0),
         })),
-        totalVolume: compartments.reduce((sum, c) => sum + Number(c.receivedVolume || 0), 0),
+        totalVolume: compartments.reduce((sum, c) => sum + Number(c.receivedVolume || 0), 0)
+                     || doc.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
         calculation: calculation ? {
           status: calculation.excessShortageVolume > 0 ? 'EXCESS' :
                   calculation.excessShortageVolume < 0 ? 'SHORTAGE' : 'NORMAL',

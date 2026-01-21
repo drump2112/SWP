@@ -15,7 +15,7 @@ import { usersApi } from "../api/users";
 import { productsApi } from "../api/products";
 import { pumpsApi } from "../api/pumps";
 import { storesApi } from "../api/stores";
-import { inventoryApi, type CreateInventoryDocumentWithTruckDto } from "../api/inventory";
+import { inventoryApi } from "../api/inventory";
 import { useAuth } from "../contexts/AuthContext";
 import { showConfirm } from "../utils/sweetalert";
 import Swal from "sweetalert2";
@@ -23,7 +23,6 @@ import { toast } from "react-toastify";
 import SearchableSelect from "../components/SearchableSelect";
 import TruckInventoryImportForm, {
   type InventoryImportFormData,
-  type CompartmentData,
 } from "../components/TruckInventoryImportForm";
 import {
   PlusIcon,
@@ -585,16 +584,45 @@ const ShiftOperationsPage: React.FC = () => {
     fetchPrices();
   }, [store, pumps]);
 
-  // Load phiếu nhập kho của ca (nếu có)
+  // Load phiếu nhập kho của ca (nếu có) - load khi xem chi tiết, edit mode
+  // Chỉ KHÔNG load khi ca thực sự đang OPEN (chưa từng chốt)
   useEffect(() => {
     if (!shiftId || !report) return;
+
+    // Nếu đang ở edit mode (mode=edit trong URL) thì luôn load
+    // Nếu không phải edit mode và ca đang OPEN thì không load (chưa có gì trong DB)
+    const shouldLoad = isEditModeFromUrl || report.shift.status !== "OPEN";
+    if (!shouldLoad) {
+      console.log("📦 Skip loading imports - shift is OPEN and not in edit mode");
+      return;
+    }
 
     const loadImportDocuments = async () => {
       try {
         const documents = await inventoryApi.getDocumentsByShift(Number(shiftId));
+        console.log("📦 API returned documents:", documents);
         if (documents && documents.length > 0) {
-          setDraftImports(documents);
-          console.log(`✅ Loaded ${documents.length} import document(s) for shift ${shiftId}`);
+          // Map từ format DB sang format đơn giản
+          const mappedImports = documents.map((doc: any) => {
+            // Ưu tiên lấy từ items, fallback sang compartments
+            const firstItem = doc.items?.[0];
+            const firstCompartment = doc.compartments?.[0];
+            return {
+              id: doc.id,
+              docDate: doc.docDate,
+              supplierName: doc.supplierName,
+              licensePlate: doc.licensePlate,
+              driverName: doc.driverName,
+              productId: firstItem?.productId || firstCompartment?.productId || doc.productId,
+              quantity: firstItem?.quantity || doc.totalVolume || firstCompartment?.receivedVolume || 0,
+              notes: doc.notes,
+            };
+          });
+          setDraftImports(mappedImports);
+          console.log(`✅ Loaded ${mappedImports.length} import document(s) for shift ${shiftId}`, mappedImports);
+        } else {
+          console.log("📦 No import documents found for shift", shiftId);
+          setDraftImports([]);
         }
       } catch (error) {
         console.error("❌ Failed to load import documents:", error);
@@ -602,7 +630,7 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     loadImportDocuments();
-  }, [shiftId, report]);
+  }, [shiftId, report?.shift.status, isEditModeFromUrl]);
 
   // Close shift mutation
   const closeShiftMutation = useMutation({
@@ -955,6 +983,28 @@ const ShiftOperationsPage: React.FC = () => {
         notes: d.notes,
         paymentMethod: d.paymentMethod || "CASH",
       })),
+      inventoryImports: draftImports.map((imp) => {
+        // Xử lý id: draft_ = undefined, doc_123 = 123, number = number
+        let importId: number | undefined = undefined;
+        const idStr = String(imp.id);
+        if (idStr.startsWith("draft_")) {
+          importId = undefined;
+        } else if (idStr.startsWith("doc_")) {
+          importId = Number(idStr.replace("doc_", ""));
+        } else if (!isNaN(Number(imp.id))) {
+          importId = Number(imp.id);
+        }
+        return {
+          id: importId,
+          docDate: imp.docDate,
+          supplierName: imp.supplierName,
+          licensePlate: imp.licensePlate,
+          driverName: imp.driverName,
+          productId: imp.productId,
+          quantity: imp.quantity,
+          notes: imp.notes,
+        };
+      }),
       handoverName: handoverUserId ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName : undefined,
       receiverName: receiverUserId ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName : undefined,
     };
@@ -1240,108 +1290,59 @@ const ShiftOperationsPage: React.FC = () => {
     }
   };
 
-  const handleImportSubmit = async (formData: InventoryImportFormData) => {
-    if (!report?.shift.storeId) {
-      toast.error("Không tìm thấy thông tin cửa hàng");
+  // ✅ Xử lý phiếu nhập hàng - CHỈ lưu vào draft state (giống các phiếu khác)
+  const handleImportSubmit = (formData: InventoryImportFormData) => {
+    if (!formData.productId || formData.productId <= 0) {
+      toast.error("Vui lòng chọn sản phẩm");
       return;
     }
 
-    try {
-      // Nếu đang edit, xóa phiếu cũ trong database trước
-      if (editingImportId) {
-        const existingItem = draftImports.find((i) => i.id === editingImportId);
-        if (existingItem?.documentId) {
-          try {
-            await inventoryApi.deleteDocument(existingItem.documentId);
-            console.log("Đã xóa phiếu nhập cũ:", existingItem.documentId);
-          } catch (error) {
-            console.error("⚠️ Không thể xóa phiếu nhập cũ:", error);
+    if (!formData.quantity || formData.quantity <= 0) {
+      toast.error("Vui lòng nhập số lượng hợp lệ");
+      return;
+    }
+
+    // Nếu đang edit, cập nhật item
+    if (editingImportId) {
+      setDraftImports((prev) =>
+        prev.map((item) => {
+          if (item.id === editingImportId) {
+            return {
+              ...item,
+              docDate: formData.docDate,
+              supplierName: formData.supplierName,
+              licensePlate: formData.licensePlate,
+              driverName: formData.driverName,
+              productId: formData.productId,
+              quantity: formData.quantity,
+              notes: formData.notes,
+            };
           }
-        }
-        // Xóa khỏi draft state
-        setDraftImports((prev) => prev.filter((i) => i.id !== editingImportId));
-      }
-
-      // Xử lý compartments: nếu form gửi legacy format (productId, quantity), chuyển thành compartment
-      let compartments: any[] = [];
-
-      if (formData.compartments && formData.compartments.length > 0) {
-        // Format mới: có chi tiết từng ngăn xe téc
-        compartments = formData.compartments.map((c: CompartmentData) => ({
-          compartmentNumber: c.compartmentNumber,
-          productId: c.productId!,
-          compartmentHeight: c.compartmentHeight || 0,
-          truckTemperature: c.truckTemperature || 15,
-          truckVolume: c.truckVolume || 0,
-          warehouseHeight: c.warehouseHeight || 0,
-          actualTemperature: c.actualTemperature || 15,
-          receivedVolume: c.receivedVolume || 0,
-          heightLossTruck: c.heightLossTruck,
-          heightLossWarehouse: c.heightLossWarehouse,
-        }));
-      } else if (formData.productId && formData.quantity) {
-        // Legacy format: chỉ có productId và quantity, tạo 1 compartment mặc định
-        compartments = [{
-          compartmentNumber: 1,
-          productId: formData.productId,
-          compartmentHeight: 0,
-          truckTemperature: 15,
-          truckVolume: formData.quantity,
-          warehouseHeight: 0,
-          actualTemperature: 15,
-          receivedVolume: formData.quantity,
-          heightLossTruck: 0,
-          heightLossWarehouse: 0,
-        }];
-      } else {
-        toast.error("Vui lòng nhập thông tin mặt hàng hoặc chi tiết ngăn xe téc");
-        return;
-      }
-
-      const submitData: CreateInventoryDocumentWithTruckDto = {
-        storeId: report.shift.storeId,
-        shiftId: Number(shiftId), // ✅ Liên kết phiếu nhập với ca làm việc
-        docType: "IMPORT",
-        docDate: formData.docDate,
-        supplierName: formData.supplierName,
-        invoiceNumber: formData.invoiceNumber,
-        licensePlate: formData.licensePlate,
-        driverName: formData.driverName,
-        driverPhone: formData.driverPhone,
-        compartments,
-        notes: formData.notes,
-      };
-
-      const response = await inventoryApi.createDocumentWithTruck(submitData);
-
-      // Lưu vào draft để hiển thị (dùng compartments đã xử lý, không phải formData.compartments)
-      const totalVolume = compartments.reduce((sum, c) => sum + (c.receivedVolume || 0), 0);
-
+          return item;
+        })
+      );
+      toast.success("Đã cập nhật phiếu nhập", { position: "top-right", autoClose: 3000 });
+    } else {
+      // Thêm mới vào draft
       const newItem = {
         id: `draft_${Date.now()}`,
-        documentId: response.document?.id,
-        docType: "IMPORT",
         docDate: formData.docDate,
         supplierName: formData.supplierName,
-        invoiceNumber: formData.invoiceNumber,
         licensePlate: formData.licensePlate,
         driverName: formData.driverName,
+        productId: formData.productId,
+        quantity: formData.quantity,
         notes: formData.notes,
-        compartments: compartments, // Dùng compartments đã xử lý (bao gồm cả legacy format)
-        totalVolume: totalVolume,
-        calculation: response.calculation,
       };
-
       setDraftImports((prev) => [...prev, newItem]);
-      const successMsg = editingImportId
-        ? "Cập nhật phiếu nhập kho thành công!"
-        : "Đã lưu phiếu nhập kho với xe téc thành công!";
-      toast.success(successMsg, { position: "top-right", autoClose: 3000 });
-      setShowImportForm(false);
-      setEditingImportId(null);
-    } catch (error: any) {
-      toast.error("❌ Lỗi khi lưu phiếu nhập: " + (error.response?.data?.message || error.message));
+      toast.success("Đã thêm vào danh sách nhập hàng (chưa lưu vào database)", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
+
+    setShowImportForm(false);
+    setEditingImportId(null);
   };
 
   const handleExportSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1387,7 +1388,7 @@ const ShiftOperationsPage: React.FC = () => {
     const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu nhập này?", "Xác nhận xóa");
     if (confirmed) {
       setDraftImports((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa phiếu nhập", { position: "top-right", autoClose: 3000 });
     }
   };
 
@@ -3201,23 +3202,17 @@ const ShiftOperationsPage: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Số HĐ</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng lít</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {draftImports.length > 0 ? (
                       draftImports.map((item) => {
-                        // Lấy danh sách mặt hàng từ compartments
-                        const productNames = item.compartments
-                          ?.map((c: any) => {
-                            const product = products?.find((p) => p.id === c.productId);
-                            return product?.name || `SP#${c.productId}`;
-                          })
-                          .filter((name: string, index: number, self: string[]) => self.indexOf(name) === index) // Loại bỏ trùng lặp
-                          .join(", ") || "-";
+                        // Lấy tên mặt hàng từ productId
+                        const product = products?.find((p) => p.id === item.productId);
+                        const productName = product?.name || `SP#${item.productId}`;
 
                         return (
                           <tr key={item.id}>
@@ -3226,36 +3221,12 @@ const ShiftOperationsPage: React.FC = () => {
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-blue-600">{item.licensePlate || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{item.invoiceNumber || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-700">{productNames}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{productName}</td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
-                              {Number(item.totalVolume || 0).toLocaleString("vi-VN")} lít
+                              {Number(item.quantity || 0).toLocaleString("vi-VN")} lít
                             </td>
                             <td className="px-6 py-4 text-right text-sm font-medium">
                               <div className="inline-flex items-center space-x-2">
-                                {item.documentId && (
-                                  <button
-                                    onClick={async () => {
-                                      try {
-                                        const blob = await inventoryApi.exportDocumentToExcel(item.documentId);
-                                        const url = window.URL.createObjectURL(blob);
-                                        const a = document.createElement("a");
-                                        a.href = url;
-                                        a.download = `Bien_ban_giao_nhan_${item.invoiceNumber || item.documentId}.xlsx`;
-                                        a.click();
-                                        window.URL.revokeObjectURL(url);
-                                        toast.success("Đã tải file Excel thành công");
-                                      } catch (error: any) {
-                                        toast.error("Lỗi khi xuất Excel: " + error.message);
-                                      }
-                                    }}
-                                    className="text-green-600 hover:text-green-900"
-                                    type="button"
-                                    title="Xuất Excel"
-                                  >
-                                    <DocumentArrowDownIcon className="h-5 w-5" />
-                                  </button>
-                                )}
                                 {(isShiftOpen || isEditMode) && (
                                   <>
                                     <button
@@ -3283,7 +3254,7 @@ const ShiftOperationsPage: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center text-sm text-gray-500">
+                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
                           Chưa có phiếu nhập hàng
                         </td>
                       </tr>

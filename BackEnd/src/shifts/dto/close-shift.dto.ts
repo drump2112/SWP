@@ -52,7 +52,12 @@ class ExpenseDto {
   paymentMethod?: string; // CASH, BANK_TRANSFER
 }
 
+// DTO đơn giản cho phiếu nhập hàng
 class InventoryImportDto {
+  @IsOptional()
+  @IsNumber()
+  id?: number; // ID của document nếu đang edit
+
   @IsNotEmpty()
   @IsDateString()
   docDate: string;
@@ -63,11 +68,7 @@ class InventoryImportDto {
 
   @IsOptional()
   @IsString()
-  invoiceNumber?: string;
-
-  @IsNotEmpty()
-  @IsString()
-  licensePlate: string;
+  licensePlate?: string;
 
   @IsOptional()
   @IsString()

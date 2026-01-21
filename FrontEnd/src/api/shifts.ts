@@ -10,10 +10,10 @@ export interface PumpReadingDto {
 }
 
 export interface InventoryImportDto {
+  id?: number;
   docDate: string;
   supplierName?: string;
-  invoiceNumber?: string;
-  licensePlate: string;
+  licensePlate?: string;
   driverName?: string;
   productId: number;
   quantity: number;

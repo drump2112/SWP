@@ -19,7 +19,6 @@ export class CashService {
       .createQueryBuilder('cl')
       .select('SUM(cl.cash_in - cl.cash_out)', 'balance')
       .where('cl.store_id = :storeId', { storeId })
-      // TODO: Thêm .andWhere('cl.superseded_by_shift_id IS NULL') sau khi chạy migration
       .getRawOne();
 
     return {

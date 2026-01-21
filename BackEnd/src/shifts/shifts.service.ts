@@ -719,6 +719,46 @@ export class ShiftsService {
       );
     }
 
+    // 6.8. Xử lý phiếu nhập hàng (inventoryImports)
+    if (closeShiftDto.inventoryImports && closeShiftDto.inventoryImports.length > 0) {
+      for (const importItem of closeShiftDto.inventoryImports) {
+        // Tạo document nhập
+        const importDoc = await manager.save(InventoryDocument, {
+          warehouseId: warehouse.id,
+          docType: 'IMPORT',
+          docDate: new Date(importItem.docDate),
+          refShiftId: shift.id,
+          supplierName: importItem.supplierName,
+          licensePlate: importItem.licensePlate,
+          notes: importItem.notes,
+        });
+
+        // Tạo item
+        await manager.save(InventoryDocumentItem, {
+          documentId: importDoc.id,
+          productId: importItem.productId,
+          quantity: importItem.quantity,
+          unitPrice: 0,
+        });
+
+        // Ghi inventory ledger (tăng tồn kho)
+        await manager.save(InventoryLedger, {
+          warehouseId: warehouse.id,
+          productId: importItem.productId,
+          shiftId: shift.id,
+          tankId: null,
+          refType: 'IMPORT',
+          refId: importDoc.id,
+          quantityIn: importItem.quantity,
+          quantityOut: 0,
+        });
+
+        console.log(
+          `📥 Nhập kho: ${importItem.quantity} lít sản phẩm ${importItem.productId} (Nhà cung cấp: ${importItem.supplierName || 'N/A'})`,
+        );
+      }
+    }
+
     // 7. Đóng ca
     if (closeShiftDto.closedAt) {
       shift.closedAt = new Date(closeShiftDto.closedAt);
