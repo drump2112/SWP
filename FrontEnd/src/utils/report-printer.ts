@@ -155,7 +155,7 @@ const generateHeader = (options: PrintOptions): string => {
   return `
     <div class="header-section">
       <div class="company-name">S.W.P - CHI NHÁNH ĐỐNG ĐA</div>
-      ${options.storeName ? `<div class="store-name">Cửa hàng: ${options.storeName}</div>` : ''}
+      ${options.storeName ? `<div class="store-name">${options.storeName}</div>` : ''}
       <div class="report-title">${options.title}</div>
       <div class="report-date">
         ${
