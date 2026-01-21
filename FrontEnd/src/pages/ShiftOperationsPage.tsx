@@ -271,7 +271,8 @@ const ShiftOperationsPage: React.FC = () => {
       .filter((d) => !String(d.id).startsWith("receipt-"))
       .reduce((sum, d) => sum + d.amount, 0);
 
-    return Math.max(0, totalRetail - existingManualDeposits);
+    // Lấy phần nguyên (không lấy số lẻ)
+    return Math.floor(Math.max(0, totalRetail - existingManualDeposits));
   }, [pumpReadings, draftDebtSales, productPrices, draftDeposits]);
 
   // Initialize pump readings
@@ -670,7 +671,8 @@ const ShiftOperationsPage: React.FC = () => {
     }
 
     const amount = quantity * price;
-    return isNaN(amount) ? 0 : amount;
+    // Cắt bỏ phần thập phân ở đây
+    return Math.floor(isNaN(amount) ? 0 : amount);
   };
 
   const handleCloseShift = async () => {
@@ -1405,14 +1407,16 @@ const ShiftOperationsPage: React.FC = () => {
   };
 
   // Tính toán từ draft data (không dùng report API data nữa)
-  const totalDebtSales = draftDebtSales.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0);
+  // const totalDebtSales = draftDebtSales.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0); // Moved down
   const totalReceipts = draftReceipts.reduce((sum, r) => sum + r.amount, 0);
   const totalDeposits = draftDeposits.reduce((sum, d) => sum + d.amount, 0);
 
   // Tính toán real-time
   const totalFromPumps = calculateTotalFromPumps();
-  const totalRetailSales = totalFromPumps - totalDebtSales;
-  const totalRevenue = totalFromPumps; // Tổng doanh thu = Tổng từ vòi bơm (bao gồm cả bán lẻ và bán công nợ)
+  // Math.floor để cắt bỏ phần thập phân
+  const totalDebtSales = Math.floor(draftDebtSales.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0));
+  const totalRetailSales = Math.floor(totalFromPumps) - totalDebtSales;
+  const totalRevenue = Math.floor(totalFromPumps); // Tổng doanh thu = Tổng từ vòi bơm (bao gồm cả bán lẻ và bán công nợ)
 
   const activePumps = pumps?.filter((p: any) => p.isActive) || [];
   const fuelPumps = activePumps.filter((p: any) => p.product?.isFuel);
