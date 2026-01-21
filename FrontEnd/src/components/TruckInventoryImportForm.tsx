@@ -32,17 +32,30 @@ export interface InventoryImportFormData {
 interface Props {
   onSubmit: (data: InventoryImportFormData) => void;
   onCancel: () => void;
+  initialData?: {
+    id?: string;
+    docDate?: string;
+    supplierName?: string;
+    invoiceNumber?: string;
+    licensePlate?: string;
+    driverName?: string;
+    driverPhone?: string;
+    compartments?: CompartmentData[];
+    notes?: string;
+    productId?: number;
+    quantity?: number;
+  };
 }
 
-const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel }) => {
-  const [docDate, setDocDate] = useState(new Date().toISOString().split('T')[0]);
-  const [supplierName, setSupplierName] = useState('');
-  const [invoiceNumber, setInvoiceNumber] = useState('');
-  const [licensePlate, setLicensePlate] = useState('');
-  const [driverName, setDriverName] = useState('');
-  const [productId, setProductId] = useState<number>(0);
-  const [quantity, setQuantity] = useState(0);
-  const [notes, setNotes] = useState('');
+const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initialData }) => {
+  const [docDate, setDocDate] = useState(initialData?.docDate || new Date().toISOString().split('T')[0]);
+  const [supplierName, setSupplierName] = useState(initialData?.supplierName || '');
+  const [invoiceNumber, setInvoiceNumber] = useState(initialData?.invoiceNumber || '');
+  const [licensePlate, setLicensePlate] = useState(initialData?.licensePlate || '');
+  const [driverName, setDriverName] = useState(initialData?.driverName || '');
+  const [productId, setProductId] = useState<number>(initialData?.productId || (initialData?.compartments?.[0]?.productId || 0));
+  const [quantity, setQuantity] = useState(initialData?.quantity || (initialData?.compartments?.reduce((sum, c) => sum + (c.receivedVolume || 0), 0) || 0));
+  const [notes, setNotes] = useState(initialData?.notes || '');
 
   const { data: products } = useQuery({
     queryKey: ['products'],

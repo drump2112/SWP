@@ -35,6 +35,7 @@ export interface TruckCompartmentDto {
 export interface CreateInventoryDocumentWithTruckDto {
   storeId?: number;
   warehouseId?: number;
+  shiftId?: number; // Liên kết phiếu nhập với ca làm việc
   docType: string;
   docDate: string;
   supplierName?: string;
@@ -113,6 +114,10 @@ export const inventoryApi = {
   },
   getDocumentsByShift: async (shiftId: number) => {
     const response = await client.get<any[]>(`/inventory/documents/by-shift/${shiftId}`);
+    return response.data;
+  },
+  deleteDocument: async (documentId: number) => {
+    const response = await client.delete(`/inventory/documents/${documentId}`);
     return response.data;
   },
 };

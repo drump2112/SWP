@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Query, Res, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, Res, BadRequestException } from '@nestjs/common';
 import type { Response } from 'express';
 import { InventoryService } from './inventory.service';
 import { InventoryExportService } from './inventory-export.service';
@@ -194,5 +194,15 @@ export class InventoryController {
   @Roles('ADMIN', 'ACCOUNTING')
   updateInitialStock(@Body() dto: any) {
     return this.inventoryService.updateInitialStock(dto);
+  }
+
+  /**
+   * DELETE /inventory/documents/:id
+   * Xóa phiếu nhập/xuất kho (dùng khi sửa ca)
+   */
+  @Delete('documents/:id')
+  @Roles('STORE', 'ADMIN')
+  deleteDocument(@Param('id') id: string) {
+    return this.inventoryService.deleteDocument(+id);
   }
 }

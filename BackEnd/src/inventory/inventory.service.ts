@@ -1024,4 +1024,51 @@ export class InventoryService {
       };
     });
   }
+
+  /**
+   * Xóa phiếu nhập/xuất kho cùng với tất cả dữ liệu liên quan
+   * Dùng khi sửa ca - xóa phiếu cũ trước khi tạo phiếu mới
+   */
+  async deleteDocument(documentId: number) {
+    return this.dataSource.transaction(async (manager) => {
+      // Kiểm tra document tồn tại
+      const document = await manager.findOne(InventoryDocument, {
+        where: { id: documentId },
+      });
+
+      if (!document) {
+        throw new NotFoundException(`Document #${documentId} không tồn tại`);
+      }
+
+      // 1. Xóa inventory_ledger liên quan
+      await manager.delete(InventoryLedger, {
+        refId: documentId,
+      });
+
+      // 2. Xóa truck compartments (cho phiếu nhập xe téc)
+      await manager.delete(InventoryTruckCompartment, {
+        documentId: documentId,
+      });
+
+      // 3. Xóa loss calculations (cho phiếu nhập xe téc)
+      await manager.delete(InventoryLossCalculation, {
+        documentId: documentId,
+      });
+
+      // 4. Xóa document items
+      await manager.delete(InventoryDocumentItem, {
+        documentId: documentId,
+      });
+
+      // 5. Xóa document chính
+      await manager.delete(InventoryDocument, {
+        id: documentId,
+      });
+
+      return {
+        message: `Đã xóa phiếu #${documentId} thành công`,
+        documentId,
+      };
+    });
+  }
 }

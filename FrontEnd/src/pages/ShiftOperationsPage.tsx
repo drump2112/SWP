@@ -42,8 +42,11 @@ import dayjs from "dayjs";
 const ShiftOperationsPage: React.FC = () => {
   usePageTitle('Thao tác ca');
   const { shiftId } = useParams<{ shiftId: string }>();
-  const [searchParams] = useSearchParams();
-  const isEditMode = searchParams.get("mode") === "edit";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isEditModeFromUrl = searchParams.get("mode") === "edit";
+  const [isEditingComplete, setIsEditingComplete] = useState(false);
+  // isEditMode = true chỉ khi có mode=edit VÀ chưa hoàn thành cập nhật
+  const isEditMode = isEditModeFromUrl && !isEditingComplete;
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -78,6 +81,8 @@ const ShiftOperationsPage: React.FC = () => {
   // Editing state
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
+  const [editingImportId, setEditingImportId] = useState<string | null>(null);
+  const [hasLoadedReportData, setHasLoadedReportData] = useState(false); // Flag để track đã load data từ report chưa
 
   // Draft Mode: Store all data until shift close
   const [draftDebtSales, setDraftDebtSales] = useState<Array<ShiftDebtSaleDto & { id: string }>>([]);
@@ -281,6 +286,14 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
+    // ✅ QUAN TRỌNG: Check Edit Mode TRƯỚC - không fetch previous readings khi sửa ca
+    // Vì Edit Mode sẽ load dữ liệu từ report, không cần fetch số từ ca trước
+    if (isEditMode) {
+      console.log("⏭️ Skip fetching previous readings - Edit Mode");
+      return;
+    }
+
+    // Chỉ chạy cho ca đang OPEN (chưa chốt)
     if (report?.shift.status !== "OPEN") {
       return;
     }
@@ -394,7 +407,7 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     fetchPreviousReadings();
-  }, [pumps, report?.shift.status, shiftId]);
+  }, [pumps, report?.shift.status, shiftId, isEditMode]);
 
   // Initialize handoverName và receiverName từ report
   useEffect(() => {
@@ -409,15 +422,36 @@ const ShiftOperationsPage: React.FC = () => {
 
   // Initialize data for both CLOSED (view mode) and Edit Mode
   useEffect(() => {
+    console.log("🔍 useEffect [Load Report Data] triggered:", {
+      hasReport: !!report,
+      hasPumps: !!pumps && pumps.length > 0,
+      isEditMode,
+      hasLoadedReportData,
+      shiftStatus: report?.shift?.status,
+      closedAt: report?.shift?.closedAt,
+    });
+
     if (!report || !pumps || pumps.length === 0) return;
 
-    // Skip if shift is OPEN and never been closed (fresh shift with no data)
-    // But if OPEN with closedAt (admin enabled edit), load the existing data
-    if (report.shift.status === "OPEN" && !report.shift.closedAt) return;
+    // Xác định đây có phải là ca đã từng chốt không
+    const wasClosedBefore = !!report.shift.closedAt;
 
-    // Only init if empty to avoid overwriting user edits during re-renders
-    const hasData = Object.keys(pumpReadings).length > 0;
-    if (hasData) return;
+    // Skip if shift is OPEN and NEVER been closed (fresh shift with no data)
+    if (report.shift.status === "OPEN" && !wasClosedBefore) {
+      console.log("⏭️ Skip loading - fresh OPEN shift (never closed)");
+      return;
+    }
+
+    // Nếu đã load data từ report rồi, không load lại (tránh overwrite user edits)
+    if (hasLoadedReportData) {
+      console.log("⏭️ Skip loading - already loaded report data");
+      return;
+    }
+
+    console.log("📦 Loading data from report for edit/view mode...", {
+      cashDeposits: report.cashDeposits?.length || 0,
+      receipts: report.receipts?.length || 0
+    });
 
     // 1. Pump Readings
     const initialReadings: Record<number, PumpReadingDto> = {};
@@ -519,10 +553,13 @@ const ShiftOperationsPage: React.FC = () => {
     });
     setDeclaredRetailQuantities(initialDeclared);
 
+    // Đánh dấu đã load data từ report
+    setHasLoadedReportData(true);
+
     if (isEditMode) {
       toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
     }
-  }, [isEditMode, report, pumps, shiftId, storeCustomers, user]);
+  }, [isEditMode, report, pumps, shiftId, hasLoadedReportData]);
 
   // Fetch prices
   useEffect(() => {
@@ -601,19 +638,26 @@ const ShiftOperationsPage: React.FC = () => {
   // Update shift mutation
   const updateShiftMutation = useMutation({
     mutationFn: (data: CloseShiftDto) => shiftsApi.update(Number(shiftId), data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["shift-report", shiftId] });
-      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+    onSuccess: async () => {
+      // Reset flag để cho phép load lại data từ report mới
+      setHasLoadedReportData(false);
+      // Refetch ngay lập tức để cập nhật UI
+      await queryClient.refetchQueries({ queryKey: ["shift-report", shiftId] });
+      await queryClient.invalidateQueries({ queryKey: ["shifts"] });
       // Clear localStorage
       if (shiftId) {
         const draftKey = `shift_${shiftId}_draft_data`;
         localStorage.removeItem(draftKey);
       }
-      toast.success("Đã cập nhật ca thành công!", {
+      // Đánh dấu đã hoàn thành cập nhật - tắt chế độ sửa
+      setIsEditingComplete(true);
+      // Xóa mode=edit khỏi URL
+      setSearchParams({});
+      toast.success(" Đã cập nhật ca thành công! Ca đã được chốt lại.", {
         position: "top-right",
-        autoClose: 3000,
+        autoClose: 5000,
       });
-      navigate("/shifts");
+      // Không navigate đi, ở lại trang để xem kết quả
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || "Cập nhật ca thất bại", {
@@ -880,7 +924,7 @@ const ShiftOperationsPage: React.FC = () => {
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
       closedAt: closedAt ? new Date(closedAt).toISOString() : undefined,
-      pumpReadings: readingsArray,
+      pumpReadings: readingsArray.map(({ unitPrice, ...rest }) => rest),
       debtSales: draftDebtSales.map((ds) => ({
         id: String(ds.id).startsWith("draft_") ? undefined : ds.id,
         shiftId: Number(shiftId),
@@ -892,30 +936,42 @@ const ShiftOperationsPage: React.FC = () => {
       })),
       receipts: draftReceipts.map((r) => ({
         id: String(r.id).startsWith("draft_") ? undefined : r.id,
-        storeId: r.storeId,
+        storeId: r.storeId || report?.shift.storeId || user?.storeId || 0,
         shiftId: Number(shiftId),
         receiptType: r.receiptType,
         amount: r.amount,
         details: r.details,
         notes: r.notes,
+        paymentMethod: r.paymentMethod || "CASH",
       })),
       deposits: draftDeposits.map((d) => ({
         id: String(d.id).startsWith("draft_") || String(d.id).startsWith("receipt-") ? undefined : d.id,
-        storeId: d.storeId,
+        storeId: d.storeId || report?.shift.storeId || user?.storeId || 0,
         shiftId: Number(shiftId),
         amount: d.amount,
         depositDate: d.depositDate,
         depositTime: d.depositTime,
         receiverName: d.receiverName,
         notes: d.notes,
+        paymentMethod: d.paymentMethod || "CASH",
       })),
       handoverName: handoverUserId ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName : undefined,
       receiverName: receiverUserId ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName : undefined,
     };
 
+    console.log("🚀 Submitting shift data:", {
+      isEditMode,
+      depositsCount: dto.deposits?.length,
+      receiptsCount: dto.receipts?.length,
+      draftDepositsState: draftDeposits,
+      dto,
+    });
+
     if (isEditMode) {
+      console.log("📝 Calling updateShiftMutation...");
       updateShiftMutation.mutate(dto);
     } else {
+      console.log("📝 Calling closeShiftMutation...");
       closeShiftMutation.mutate(dto);
     }
   };
@@ -1084,6 +1140,7 @@ const ShiftOperationsPage: React.FC = () => {
 
   const handleDepositSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    console.log("📝 handleDepositSubmit called");
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get("amount"));
     const depositDate = formData.get("depositDate") as string;
@@ -1091,6 +1148,8 @@ const ShiftOperationsPage: React.FC = () => {
     const receiverName = (formData.get("receiverName") as string) || undefined;
     const notes = (formData.get("notes") as string) || undefined;
     const paymentMethod = (formData.get("paymentMethod") as string) || "CASH";
+
+    console.log("📝 Deposit data:", { amount, depositDate, depositTime, receiverName, notes, paymentMethod, editingDepositId });
 
     if (editingDepositId) {
       setDraftDeposits((prev) =>
@@ -1148,6 +1207,11 @@ const ShiftOperationsPage: React.FC = () => {
     setShowDepositForm(true);
   };
 
+  const handleEditImport = (importItem: any) => {
+    setEditingImportId(importItem.id);
+    setShowImportForm(true);
+  };
+
   const handleDeleteDebtSale = async (id: string) => {
     const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa doanh số này?", "Xác nhận xóa");
     if (confirmed) {
@@ -1183,6 +1247,21 @@ const ShiftOperationsPage: React.FC = () => {
     }
 
     try {
+      // Nếu đang edit, xóa phiếu cũ trong database trước
+      if (editingImportId) {
+        const existingItem = draftImports.find((i) => i.id === editingImportId);
+        if (existingItem?.documentId) {
+          try {
+            await inventoryApi.deleteDocument(existingItem.documentId);
+            console.log("Đã xóa phiếu nhập cũ:", existingItem.documentId);
+          } catch (error) {
+            console.error("⚠️ Không thể xóa phiếu nhập cũ:", error);
+          }
+        }
+        // Xóa khỏi draft state
+        setDraftImports((prev) => prev.filter((i) => i.id !== editingImportId));
+      }
+
       // Xử lý compartments: nếu form gửi legacy format (productId, quantity), chuyển thành compartment
       let compartments: any[] = [];
 
@@ -1221,6 +1300,7 @@ const ShiftOperationsPage: React.FC = () => {
 
       const submitData: CreateInventoryDocumentWithTruckDto = {
         storeId: report.shift.storeId,
+        shiftId: Number(shiftId), // ✅ Liên kết phiếu nhập với ca làm việc
         docType: "IMPORT",
         docDate: formData.docDate,
         supplierName: formData.supplierName,
@@ -1253,8 +1333,12 @@ const ShiftOperationsPage: React.FC = () => {
       };
 
       setDraftImports((prev) => [...prev, newItem]);
-      toast.success("✅ Đã lưu phiếu nhập kho với xe téc thành công!", { position: "top-right", autoClose: 3000 });
+      const successMsg = editingImportId
+        ? "Cập nhật phiếu nhập kho thành công!"
+        : "Đã lưu phiếu nhập kho với xe téc thành công!";
+      toast.success(successMsg, { position: "top-right", autoClose: 3000 });
       setShowImportForm(false);
+      setEditingImportId(null);
     } catch (error: any) {
       toast.error("❌ Lỗi khi lưu phiếu nhập: " + (error.response?.data?.message || error.message));
     }
@@ -1440,6 +1524,11 @@ const ShiftOperationsPage: React.FC = () => {
     pumpReadingsData: pumpReadings,
     productPrices,
     isShiftOpen,
+    isEditMode,
+    isEditModeFromUrl,
+    isEditingComplete,
+    canEdit,
+    hasLoadedReportData,
     activeTab,
     shiftStatus: report?.shift.status,
     receiptsCount: isShiftOpen ? draftReceipts.length : report?.receipts?.length || 0,
@@ -3095,7 +3184,15 @@ const ShiftOperationsPage: React.FC = () => {
                 )}
 
                 {showImportForm && (
-                  <TruckInventoryImportForm onSubmit={handleImportSubmit} onCancel={() => setShowImportForm(false)} />
+                  <TruckInventoryImportForm
+                    key={editingImportId || 'new'}
+                    onSubmit={handleImportSubmit}
+                    onCancel={() => {
+                      setShowImportForm(false);
+                      setEditingImportId(null);
+                    }}
+                    initialData={editingImportId ? draftImports.find((i) => i.id === editingImportId) : undefined}
+                  />
                 )}
 
                 <table className="w-full border rounded-lg">
@@ -3134,39 +3231,52 @@ const ShiftOperationsPage: React.FC = () => {
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
                               {Number(item.totalVolume || 0).toLocaleString("vi-VN")} lít
                             </td>
-                            <td className="px-6 py-4 text-right text-sm font-medium space-x-2">
-                              {item.documentId && (
-                                <button
-                                  onClick={async () => {
-                                    try {
-                                      const blob = await inventoryApi.exportDocumentToExcel(item.documentId);
-                                      const url = window.URL.createObjectURL(blob);
-                                      const a = document.createElement("a");
-                                      a.href = url;
-                                      a.download = `Bien_ban_giao_nhan_${item.invoiceNumber || item.documentId}.xlsx`;
-                                      a.click();
-                                      window.URL.revokeObjectURL(url);
-                                      toast.success("Đã tải file Excel thành công");
-                                    } catch (error: any) {
-                                      toast.error("Lỗi khi xuất Excel: " + error.message);
-                                    }
-                                  }}
-                                  className="text-green-600 hover:text-green-900 inline-flex items-center"
-                                  type="button"
-                                  title="Xuất Excel"
-                                >
-                                  <DocumentArrowDownIcon className="h-5 w-5" />
-                                </button>
-                              )}
-                              {(isShiftOpen || isEditMode) && (
-                                <button
-                                  onClick={() => handleDeleteImport(item.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                  type="button"
-                                >
-                                  <TrashIcon className="h-5 w-5 inline" />
-                                </button>
-                              )}
+                            <td className="px-6 py-4 text-right text-sm font-medium">
+                              <div className="inline-flex items-center space-x-2">
+                                {item.documentId && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const blob = await inventoryApi.exportDocumentToExcel(item.documentId);
+                                        const url = window.URL.createObjectURL(blob);
+                                        const a = document.createElement("a");
+                                        a.href = url;
+                                        a.download = `Bien_ban_giao_nhan_${item.invoiceNumber || item.documentId}.xlsx`;
+                                        a.click();
+                                        window.URL.revokeObjectURL(url);
+                                        toast.success("Đã tải file Excel thành công");
+                                      } catch (error: any) {
+                                        toast.error("Lỗi khi xuất Excel: " + error.message);
+                                      }
+                                    }}
+                                    className="text-green-600 hover:text-green-900"
+                                    type="button"
+                                    title="Xuất Excel"
+                                  >
+                                    <DocumentArrowDownIcon className="h-5 w-5" />
+                                  </button>
+                                )}
+                                {(isShiftOpen || isEditMode) && (
+                                  <>
+                                    <button
+                                      onClick={() => handleEditImport(item)}
+                                      className="text-indigo-600 hover:text-indigo-900"
+                                      type="button"
+                                      title="Sửa phiếu nhập"
+                                    >
+                                      <PencilIcon className="h-5 w-5" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteImport(item.id)}
+                                      className="text-red-600 hover:text-red-900"
+                                      type="button"
+                                      title="Xóa phiếu nhập"
+                                    >
+                                      <TrashIcon className="h-5 w-5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

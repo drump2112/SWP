@@ -105,7 +105,7 @@ const ManageInitialStock: React.FC = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('✅ Nhập tồn đầu thành công!');
+      toast.success('Nhập tồn đầu thành công!');
       setShowAddForm(false);
       setNewStockItems([]);
       setNewNotes('');
