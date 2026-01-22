@@ -211,7 +211,7 @@ export class CustomersService {
 
       // 1. Tạo sales records
       for (const item of createDebtSaleDto.items) {
-        const amount = item.quantity * item.unitPrice;
+        const amount = Math.round(item.quantity * item.unitPrice); // Làm tròn để tránh phần thập phân
         totalAmount += amount;
 
         const sale = manager.create(Sale, {

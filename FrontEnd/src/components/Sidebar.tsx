@@ -19,6 +19,16 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   XMarkIcon,
+  CreditCardIcon,
+  CurrencyDollarIcon,
+  ClipboardDocumentListIcon,
+  ArchiveBoxIcon,
+  ArrowsRightLeftIcon,
+  CheckBadgeIcon,
+  AdjustmentsHorizontalIcon,
+  CalculatorIcon,
+  ScaleIcon,
+  DocumentDuplicateIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -48,13 +58,15 @@ const navigation: NavItem[] = [
     icon: ChartBarIcon,
     roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'],
     children: [
-      { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Báo cáo ca', href: '/reports/shifts', icon: ClockIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Báo cáo ca', href: '/reports/shifts', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
-      { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+
+      { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: CreditCardIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: CurrencyDollarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+      { name: 'Chốt Tồn Kho', href: '/inventory/closing', icon: CheckBadgeIcon, roles: ['ADMIN'] },
     ],
   },
   {
@@ -78,10 +90,11 @@ const navigation: NavItem[] = [
     children: [
       { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
       { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: CircleStackIcon, roles: ['ADMIN'] },
-      { name: 'Số dư đầu sổ quỹ', href: '/cash/opening-balance', icon: CircleStackIcon, roles: ['ADMIN', 'ACCOUNTING'] },
-      { name: 'Số dư đầu công nợ', href: '/customers/opening-balance', icon: BanknotesIcon, roles: ['ADMIN'] },
-      { name: 'Hóa đơn', href: '/receipts', icon: DocumentTextIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Hệ số hao hụt', href: '/loss-config', icon: AdjustmentsHorizontalIcon, roles: ['ADMIN'] },
+      { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: ArchiveBoxIcon, roles: ['ADMIN'] },
+      { name: 'Số dư đầu sổ quỹ', href: '/cash/opening-balance', icon: CalculatorIcon, roles: ['ADMIN', 'ACCOUNTING'] },
+      { name: 'Số dư đầu công nợ', href: '/customers/opening-balance', icon: ScaleIcon, roles: ['ADMIN'] },
+      { name: 'Hóa đơn', href: '/receipts', icon: DocumentDuplicateIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
     ],
   },
 ];
@@ -190,7 +203,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
 
   return (
     <div
-      className={`flex flex-col min-h-screen shadow-2xl transition-all duration-300 ease-in-out relative ${
+      className={`flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out relative ${
         isCollapsed ? 'w-20 lg:w-20' : 'w-64'
       }`}
       style={{

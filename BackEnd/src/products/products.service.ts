@@ -66,15 +66,41 @@ export class ProductsService {
     return this.productPriceRepository.save(price);
   }
 
-  async getCurrentPrice(productId: number, regionId: number) {
-    const now = new Date();
+  /**
+   * Lấy giá hiện tại hoặc tại thời điểm cụ thể
+   * @param productId - ID sản phẩm
+   * @param regionId - ID khu vực
+   * @param atTime - Thời điểm cần lấy giá (mặc định là now)
+   */
+  async getCurrentPrice(productId: number, regionId: number, atTime?: Date) {
+    const targetTime = atTime || new Date();
     return this.productPriceRepository
       .createQueryBuilder('pp')
       .where('pp.product_id = :productId', { productId })
       .andWhere('pp.region_id = :regionId', { regionId })
-      .andWhere('pp.valid_from <= :now', { now })
-      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', { now })
+      .andWhere('pp.valid_from <= :targetTime', { targetTime })
+      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :targetTime)', { targetTime })
       .getOne();
+  }
+
+  /**
+   * Lấy giá của nhiều sản phẩm tại thời điểm cụ thể
+   * @param productIds - Danh sách ID sản phẩm
+   * @param regionId - ID khu vực
+   * @param atTime - Thời điểm cần lấy giá
+   */
+  async getPricesAtTime(productIds: number[], regionId: number, atTime: Date) {
+    if (productIds.length === 0) return [];
+
+    return this.productPriceRepository
+      .createQueryBuilder('pp')
+      .leftJoinAndSelect('pp.product', 'product')
+      .where('pp.product_id IN (:...productIds)', { productIds })
+      .andWhere('pp.region_id = :regionId', { regionId })
+      .andWhere('pp.valid_from <= :atTime', { atTime })
+      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :atTime)', { atTime })
+      .orderBy('pp.valid_from', 'DESC')
+      .getMany();
   }
 
   async getPriceHistory(productId: number, regionId: number) {

@@ -1,6 +1,7 @@
 import api from "./client";
 
 export interface PumpReadingDto {
+  pumpId?: number; // ✅ Dùng pumpId để query tankId
   pumpCode: string;
   productId: number;
   startValue: number;
@@ -11,11 +12,12 @@ export interface PumpReadingDto {
 
 export interface InventoryImportDto {
   id?: number;
-  docDate: string;
+  docAt?: string; // Ngày giờ nhập hàng do người dùng chọn
   supplierName?: string;
   licensePlate?: string;
   driverName?: string;
   productId: number;
+  tankId?: number; // ✅ Thêm tankId để nhập vào bể cụ thể
   quantity: number;
   notes?: string;
 }
@@ -107,8 +109,7 @@ export interface CashDepositDto {
   storeId: number;
   shiftId?: number;
   amount: number;
-  depositDate: string;
-  depositTime?: string;
+  depositAt?: string; // ISO datetime string - Thời gian nộp tiền do người dùng chọn
   receiverName?: string;
   notes?: string;
   paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
@@ -129,6 +130,7 @@ export interface CreateReceiptDto {
   details: ReceiptDetailDto[];
   notes?: string;
   paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
+  receiptAt?: string; // ISO datetime string
 }
 
 export const shiftsApi = {

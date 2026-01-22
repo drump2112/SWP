@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Put, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards, Put, Delete, Query } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductPriceDto } from './dto/create-product-price.dto';
@@ -82,12 +82,19 @@ export class ProductsController {
     return this.productsService.remove(+id);
   }
 
+  /**
+   * Lấy giá hiện tại hoặc giá tại thời điểm cụ thể
+   * GET /products/:productId/price/:regionId?atTime=2024-01-22T10:00:00.000Z
+   * @param atTime - ISO string của thời điểm cần lấy giá (optional, mặc định là now)
+   */
   @Get(':productId/price/:regionId')
   getCurrentPrice(
     @Param('productId') productId: string,
     @Param('regionId') regionId: string,
+    @Query('atTime') atTime?: string,
   ) {
-    return this.productsService.getCurrentPrice(+productId, +regionId);
+    const targetTime = atTime ? new Date(atTime) : undefined;
+    return this.productsService.getCurrentPrice(+productId, +regionId, targetTime);
   }
 
   @Get(':productId/price-history/:regionId')

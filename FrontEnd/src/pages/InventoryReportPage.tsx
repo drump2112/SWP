@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { inventoryApi } from '../api/inventory';
+import { lossConfigApi, type ProductCategory } from '../api/loss-config';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { storesApi } from '../api/stores';
 import { productsApi } from '../api/products';
@@ -12,6 +13,7 @@ import {
   BuildingStorefrontIcon,
   PrinterIcon,
   FunnelIcon,
+  CalculatorIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import {
@@ -23,6 +25,7 @@ import {
 } from '../utils/report-exporter';
 import { printReport, formatCurrency, formatNumber, formatDate } from '../utils/report-printer';
 import DateRangePicker from '../components/DateRangePicker';
+import SearchableSelect from '../components/SearchableSelect';
 
 const InventoryReportPage: React.FC = () => {
   usePageTitle('Nhập Xuất Tồn');
@@ -33,6 +36,11 @@ const InventoryReportPage: React.FC = () => {
   const [selectedPriceId, setSelectedPriceId] = useState<number | undefined>(undefined);
   const [reportType, setReportType] = useState<'summary' | 'import' | 'export'>('summary');
   const [isAllStores, setIsAllStores] = useState(false);
+
+  // State cho tính hao hụt
+  const [showLossColumn, setShowLossColumn] = useState(false);
+  const [lossRates, setLossRates] = useState<Record<ProductCategory, number>>({} as Record<ProductCategory, number>);
+  const [isCalculatingLoss, setIsCalculatingLoss] = useState(false);
 
   const isStoreUser = user?.roleCode === 'STORE';
 
@@ -59,26 +67,42 @@ const InventoryReportPage: React.FC = () => {
     setSelectedPriceId(undefined);
   }, [selectedStoreId]);
 
-  // Fetch inventory report (Summary) - single store
-  const { data: report, isLoading: isLoadingReport } = useQuery({
-    queryKey: ['inventory-report', selectedStoreId, fromDate, toDate, selectedPriceId],
+  // Reset loss column when store, date range, or report type changes
+  useEffect(() => {
+    setShowLossColumn(false);
+    setLossRates({} as Record<ProductCategory, number>);
+  }, [selectedStoreId, fromDate, toDate, isAllStores]);
+
+  // 🔥 NEW: Fetch inventory report WITH PERIODS (tách theo kỳ chốt)
+  const { data: reportWithPeriods, isLoading: isLoadingReportWithPeriods } = useQuery({
+    queryKey: ['inventory-report-with-periods', selectedStoreId, fromDate, toDate],
     queryFn: () => {
-      if (!selectedStoreId) return Promise.resolve([]);
-      return inventoryApi.getInventoryReportByStore(selectedStoreId, fromDate, toDate, selectedPriceId);
+      if (!selectedStoreId) return Promise.resolve({ periods: [], tanks: [] });
+      return inventoryApi.getInventoryReportByTankWithPeriods(selectedStoreId, fromDate, toDate);
     },
     enabled: !!selectedStoreId && reportType === 'summary' && !isAllStores,
   });
 
-  // Fetch inventory reports for all stores
+  // Legacy: Fetch inventory report (Summary) - single store - 🔥 THEO BỂ (Tank-based)
+  const { data: report, isLoading: isLoadingReport } = useQuery({
+    queryKey: ['inventory-report-by-tank', selectedStoreId, fromDate, toDate],
+    queryFn: () => {
+      if (!selectedStoreId) return Promise.resolve([]);
+      return inventoryApi.getInventoryReportByTank(selectedStoreId, fromDate, toDate);
+    },
+    enabled: false, // Disabled - use reportWithPeriods instead
+  });
+
+  // Fetch inventory reports for all stores - 🔥 THEO BỂ (Tank-based)
   const { data: allStoresReport, isLoading: isLoadingAllStoresReport } = useQuery({
-    queryKey: ['inventory-report-all-stores', fromDate, toDate, selectedPriceId],
+    queryKey: ['inventory-report-all-stores-by-tank', fromDate, toDate],
     queryFn: async () => {
       if (!stores || stores.length === 0) return [];
 
       const reports = await Promise.all(
         stores.map(async (store: any) => {
           try {
-            const storeReport = await inventoryApi.getInventoryReportByStore(store.id, fromDate, toDate, selectedPriceId);
+            const storeReport = await inventoryApi.getInventoryReportByTank(store.id, fromDate, toDate);
             return {
               storeId: store.id,
               storeName: store.name,
@@ -115,8 +139,49 @@ const InventoryReportPage: React.FC = () => {
   });
 
   const isLoading = reportType === 'summary'
-    ? (isAllStores ? isLoadingAllStoresReport : isLoadingReport)
+    ? (isAllStores ? isLoadingAllStoresReport : isLoadingReportWithPeriods)
     : isLoadingDocs;
+
+  // Hàm tính hao hụt
+  const handleCalculateLoss = async () => {
+    if (!selectedStoreId || isAllStores) {
+      alert('Vui lòng chọn một cửa hàng cụ thể để tính hao hụt');
+      return;
+    }
+
+    setIsCalculatingLoss(true);
+    try {
+      // Lấy cấu hình hao hụt đang hiệu lực của store
+      const configs = await lossConfigApi.getCurrentByStore(selectedStoreId);
+
+      const rates: Record<ProductCategory, number> = {
+        GASOLINE: 0,
+        DIESEL: 0,
+      };
+
+      configs.forEach((config) => {
+        rates[config.productCategory] = Number(config.lossRate);
+      });
+
+      setLossRates(rates);
+      setShowLossColumn(true);
+    } catch (error) {
+      console.error('Error fetching loss configs:', error);
+      alert('Không thể lấy cấu hình hao hụt. Vui lòng kiểm tra lại.');
+    } finally {
+      setIsCalculatingLoss(false);
+    }
+  };
+
+  // Hàm tính hao hụt và tồn sau hao hụt cho một item
+  const calculateLossForItem = (item: any) => {
+    const category = item.productCategory as ProductCategory;
+    const lossRate = category && lossRates[category] ? lossRates[category] : 0;
+    const exportQty = Number(item.exportQuantity);
+    const lossAmount = exportQty * lossRate;
+    const closingAfterLoss = Number(item.openingBalance) + Number(item.importQuantity) - exportQty - lossAmount;
+    return { lossRate, lossAmount, closingAfterLoss };
+  };
 
   const handleExport = async () => {
     // @ts-ignore
@@ -129,7 +194,7 @@ const InventoryReportPage: React.FC = () => {
         alert('Không có dữ liệu để xuất');
         return;
       }
-      if (!isAllStores && (!report || report.length === 0)) {
+      if (!isAllStores && (!reportWithPeriods || reportWithPeriods.periods.length === 0)) {
         alert('Không có dữ liệu để xuất');
         return;
       }
@@ -143,12 +208,14 @@ const InventoryReportPage: React.FC = () => {
         toDate,
       });
 
-      // Columns setup
+      // Columns setup - 🔥 THEO BỂ
       worksheet.columns = [
         { key: 'stt', width: 6 },
-        { key: 'code', width: 12 },
-        { key: 'name', width: 30 },
+        { key: 'tankCode', width: 12 },
+        { key: 'tankName', width: 20 },
+        { key: 'productName', width: 25 },
         { key: 'unit', width: 10 },
+        { key: 'capacity', width: 12 },
         { key: 'opening', width: 15 },
         { key: 'import', width: 15 },
         { key: 'export', width: 15 },
@@ -159,9 +226,11 @@ const InventoryReportPage: React.FC = () => {
       const headerRow = worksheet.getRow(7);
       headerRow.values = [
         'STT',
-        'Mã hàng',
-        'Tên hàng',
+        'Mã bể',
+        'Tên bể',
+        'Mặt hàng',
         'ĐVT',
+        'Dung tích',
         'Tồn đầu kỳ',
         'Nhập',
         'Xuất',
@@ -180,12 +249,12 @@ const InventoryReportPage: React.FC = () => {
       let totalClosing = 0;
 
       if (isAllStores && allStoresReport) {
-        // All stores mode - group by store
+        // All stores mode - group by store (🔥 THEO BỂ)
         let stt = 1;
         allStoresReport.forEach((storeData: any) => {
           if (storeData.data && storeData.data.length > 0) {
             // Store header row
-            const storeHeaderRow = worksheet.addRow([storeData.storeName, '', '', '', '', '', '', '']);
+            const storeHeaderRow = worksheet.addRow([storeData.storeName, '', '', '', '', '', '', '', '', '']);
             storeHeaderRow.font = { ...STYLES.boldFont, size: 12 };
             storeHeaderRow.eachCell((cell) => {
               cell.fill = {
@@ -195,15 +264,17 @@ const InventoryReportPage: React.FC = () => {
               };
               cell.border = STYLES.borderStyle;
             });
-            worksheet.mergeCells(`A${storeHeaderRow.number}:H${storeHeaderRow.number}`);
+            worksheet.mergeCells(`A${storeHeaderRow.number}:J${storeHeaderRow.number}`);
 
-            // Store data rows
+            // Store data rows (🔥 THEO BỂ)
             storeData.data.forEach((item: any) => {
               const row = worksheet.addRow([
                 stt++,
-                item.productCode,
+                item.tankCode,
+                item.tankName,
                 item.productName,
                 item.unitName,
+                Number(item.capacity),
                 Number(item.openingBalance),
                 Number(item.importQuantity),
                 Number(item.exportQuantity),
@@ -218,9 +289,9 @@ const InventoryReportPage: React.FC = () => {
               row.font = STYLES.normalFont;
               row.eachCell((cell, colNumber) => {
                 cell.border = STYLES.borderStyle;
-                if (colNumber === 1 || colNumber === 4) {
+                if (colNumber === 1 || colNumber === 5) {
                   cell.alignment = STYLES.centerAlign;
-                } else if (colNumber === 2 || colNumber === 3) {
+                } else if (colNumber >= 2 && colNumber <= 4) {
                   cell.alignment = STYLES.leftAlign;
                 } else {
                   cell.alignment = STYLES.rightAlign;
@@ -231,43 +302,68 @@ const InventoryReportPage: React.FC = () => {
           }
         });
       } else {
-        // Single store mode
-        if (report) {
-          report.forEach((item, index) => {
-            const row = worksheet.addRow([
-              index + 1,
-              item.productCode,
-              item.productName,
-              item.unitName,
-              Number(item.openingBalance),
-              Number(item.importQuantity),
-              Number(item.exportQuantity),
-              Number(item.closingBalance),
-            ]);
+        // Single store mode - sử dụng reportWithPeriods
+        if (reportWithPeriods && reportWithPeriods.periods) {
+          let stt = 1;
+          reportWithPeriods.periods.forEach((period: any) => {
+            // Period header row
+            const periodLabel = period.periodType === 'CLOSED' ? '✓ Đã chốt' : '⏳ Chưa chốt';
+            const periodRange = `${dayjs(period.periodFrom).format('DD/MM/YYYY')} → ${dayjs(period.periodTo).format('DD/MM/YYYY')}`;
+            const closingInfo = period.closingDate ? ` (Chốt lúc: ${dayjs(period.closingDate).format('DD/MM/YYYY HH:mm')})` : '';
 
-            totalOpening += Number(item.openingBalance);
-            totalImport += Number(item.importQuantity);
-            totalExport += Number(item.exportQuantity);
-            totalClosing += Number(item.closingBalance);
-
-            row.font = STYLES.normalFont;
-            row.eachCell((cell, colNumber) => {
+            const periodHeaderRow = worksheet.addRow([`${periodLabel}: ${periodRange}${closingInfo}`, '', '', '', '', '', '', '', '', '']);
+            periodHeaderRow.font = { ...STYLES.boldFont, size: 11 };
+            periodHeaderRow.eachCell((cell) => {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: period.periodType === 'CLOSED' ? 'FFD4EDDA' : 'FFFFF3CD' },
+              };
               cell.border = STYLES.borderStyle;
-              if (colNumber === 1 || colNumber === 4) {
-                cell.alignment = STYLES.centerAlign;
-              } else if (colNumber === 2 || colNumber === 3) {
-                cell.alignment = STYLES.leftAlign;
-              } else {
-                cell.alignment = STYLES.rightAlign;
-                cell.numFmt = '#,##0.00';
-              }
+            });
+            worksheet.mergeCells(`A${periodHeaderRow.number}:J${periodHeaderRow.number}`);
+
+            // Period items
+            period.items.forEach((item: any) => {
+              const row = worksheet.addRow([
+                stt++,
+                item.tankCode,
+                item.tankName,
+                item.productName,
+                item.unitName,
+                Number(item.capacity),
+                Number(item.openingBalance),
+                Number(item.importQuantity),
+                Number(item.exportQuantity),
+                Number(item.closingBalance),
+              ]);
+
+              totalOpening += Number(item.openingBalance);
+              totalImport += Number(item.importQuantity);
+              totalExport += Number(item.exportQuantity);
+              totalClosing += Number(item.closingBalance);
+
+              row.font = STYLES.normalFont;
+              row.eachCell((cell, colNumber) => {
+                cell.border = STYLES.borderStyle;
+                if (colNumber === 1 || colNumber === 5) {
+                  cell.alignment = STYLES.centerAlign;
+                } else if (colNumber >= 2 && colNumber <= 4) {
+                  cell.alignment = STYLES.leftAlign;
+                } else {
+                  cell.alignment = STYLES.rightAlign;
+                  cell.numFmt = '#,##0.00';
+                }
+              });
             });
           });
         }
       }
 
-      // Total Row
+      // Total Row (🔥 THEO BỂ - 10 cột)
       const totalRow = worksheet.addRow([
+        '',
+        '',
         '',
         '',
         '',
@@ -280,14 +376,14 @@ const InventoryReportPage: React.FC = () => {
       totalRow.font = STYLES.boldFont;
       totalRow.eachCell((cell, colNumber) => {
         cell.border = STYLES.borderStyle;
-        if (colNumber === 4) {
+        if (colNumber === 6) {
           cell.alignment = STYLES.centerAlign;
-        } else if (colNumber >= 5) {
+        } else if (colNumber >= 7) {
           cell.alignment = STYLES.rightAlign;
           cell.numFmt = '#,##0.00';
         }
       });
-      worksheet.mergeCells(`A${totalRow.number}:C${totalRow.number}`);
+      worksheet.mergeCells(`A${totalRow.number}:E${totalRow.number}`);
 
       addReportFooter(worksheet);
       await downloadExcel(workbook, 'Bao_cao_nhap_xuat_ton');
@@ -345,7 +441,7 @@ const InventoryReportPage: React.FC = () => {
       documents.forEach((item, index) => {
         const row = worksheet.addRow([
           index + 1,
-          dayjs(item.docDate).format('DD/MM/YYYY'),
+          item.docAt ? dayjs(item.docAt).format('DD/MM/YYYY HH:mm') : dayjs(item.docDate).format('DD/MM/YYYY'),
           item.invoiceNumber || '-',
           item.supplierName || '-',
           item.productName,
@@ -412,7 +508,7 @@ const InventoryReportPage: React.FC = () => {
         alert('Không có dữ liệu để in');
         return;
       }
-      if (!isAllStores && (!report || report.length === 0)) {
+      if (!isAllStores && (!reportWithPeriods || reportWithPeriods.periods.length === 0)) {
         alert('Không có dữ liệu để in');
         return;
       }
@@ -429,14 +525,14 @@ const InventoryReportPage: React.FC = () => {
         let stt = 1;
         allStoresReport.forEach((storeData: any) => {
           if (storeData.data && storeData.data.length > 0) {
-            // Store header row
+            // Store header row (🔥 THEO BỂ - 10 cột)
             tableRows += `
               <tr class="store-header">
-                <td colspan="8" class="text-left font-bold" style="background-color: #e0e0e0; padding: 8px;">${storeData.storeName}</td>
+                <td colspan="10" class="text-left font-bold" style="background-color: #e0e0e0; padding: 8px;">${storeData.storeName}</td>
               </tr>
             `;
 
-            // Store data rows
+            // Store data rows (🔥 THEO BỂ)
             storeData.data.forEach((item: any) => {
               totalOpening += Number(item.openingBalance);
               totalImport += Number(item.importQuantity);
@@ -446,9 +542,11 @@ const InventoryReportPage: React.FC = () => {
               tableRows += `
                 <tr>
                   <td class="text-center">${stt++}</td>
-                  <td class="text-center">${item.productCode}</td>
+                  <td class="text-center">${item.tankCode}</td>
+                  <td class="text-left">${item.tankName}</td>
                   <td class="text-left">${item.productName}</td>
                   <td class="text-center">${item.unitName}</td>
+                  <td class="text-right">${formatNumber(item.capacity)}</td>
                   <td class="text-right">${formatNumber(item.openingBalance)}</td>
                   <td class="text-right">${formatNumber(item.importQuantity)}</td>
                   <td class="text-right">${formatNumber(item.exportQuantity)}</td>
@@ -459,27 +557,45 @@ const InventoryReportPage: React.FC = () => {
           }
         });
       } else {
-        // Single store mode
-        if (report) {
-          tableRows = report.map((item, index) => {
-            totalOpening += Number(item.openingBalance);
-            totalImport += Number(item.importQuantity);
-            totalExport += Number(item.exportQuantity);
-            totalClosing += Number(item.closingBalance);
+        // Single store mode - sử dụng reportWithPeriods
+        if (reportWithPeriods && reportWithPeriods.periods) {
+          let stt = 1;
+          reportWithPeriods.periods.forEach((period: any) => {
+            // Period header row
+            const periodLabel = period.periodType === 'CLOSED' ? '✓ Đã chốt' : '⏳ Chưa chốt';
+            const periodRange = `${dayjs(period.periodFrom).format('DD/MM/YYYY')} → ${dayjs(period.periodTo).format('DD/MM/YYYY')}`;
+            const closingInfo = period.closingDate ? ` (Chốt lúc: ${dayjs(period.closingDate).format('DD/MM/YYYY HH:mm')})` : '';
+            const bgColor = period.periodType === 'CLOSED' ? '#d4edda' : '#fff3cd';
 
-            return `
-              <tr>
-                <td class="text-center">${index + 1}</td>
-                <td class="text-center">${item.productCode}</td>
-                <td class="text-left">${item.productName}</td>
-                <td class="text-center">${item.unitName}</td>
-              <td class="text-right">${formatNumber(item.openingBalance)}</td>
-              <td class="text-right">${formatNumber(item.importQuantity)}</td>
-              <td class="text-right">${formatNumber(item.exportQuantity)}</td>
-              <td class="text-right">${formatNumber(item.closingBalance)}</td>
+            tableRows += `
+              <tr class="period-header">
+                <td colspan="10" class="text-left font-bold" style="background-color: ${bgColor}; padding: 8px;">${periodLabel}: ${periodRange}${closingInfo}</td>
               </tr>
             `;
-          }).join('');
+
+            // Period items
+            period.items.forEach((item: any) => {
+              totalOpening += Number(item.openingBalance);
+              totalImport += Number(item.importQuantity);
+              totalExport += Number(item.exportQuantity);
+              totalClosing += Number(item.closingBalance);
+
+              tableRows += `
+                <tr>
+                  <td class="text-center">${stt++}</td>
+                  <td class="text-center">${item.tankCode}</td>
+                  <td class="text-left">${item.tankName}</td>
+                  <td class="text-left">${item.productName}</td>
+                  <td class="text-center">${item.unitName}</td>
+                  <td class="text-right">${formatNumber(item.capacity)}</td>
+                  <td class="text-right">${formatNumber(item.openingBalance)}</td>
+                  <td class="text-right">${formatNumber(item.importQuantity)}</td>
+                  <td class="text-right">${formatNumber(item.exportQuantity)}</td>
+                  <td class="text-right">${formatNumber(item.closingBalance)}</td>
+                </tr>
+              `;
+            });
+          });
         }
       }
 
@@ -488,9 +604,11 @@ const InventoryReportPage: React.FC = () => {
           <thead>
             <tr>
               <th>STT</th>
-              <th>Mã hàng</th>
-              <th>Tên hàng</th>
+              <th>Mã bể</th>
+              <th>Tên bể</th>
+              <th>Mặt hàng</th>
               <th>ĐVT</th>
+              <th>Dung tích</th>
               <th>Tồn đầu kỳ</th>
               <th>Nhập</th>
               <th>Xuất</th>
@@ -500,7 +618,7 @@ const InventoryReportPage: React.FC = () => {
           <tbody>
             ${tableRows}
             <tr class="total-row">
-              <td colspan="4" class="text-center">Tổng cộng</td>
+              <td colspan="6" class="text-center">Tổng cộng</td>
               <td class="text-right">${formatNumber(totalOpening)}</td>
               <td class="text-right">${formatNumber(totalImport)}</td>
               <td class="text-right">${formatNumber(totalExport)}</td>
@@ -512,7 +630,7 @@ const InventoryReportPage: React.FC = () => {
 
       printReport(tableHTML, {
         storeName,
-        title: 'BÁO CÁO NHẬP - XUẤT - TỒN',
+        title: 'BÁO CÁO NHẬP - XUẤT - TỒN THEO BỂ',
         fromDate,
         toDate,
       });
@@ -533,7 +651,7 @@ const InventoryReportPage: React.FC = () => {
         return `
           <tr>
             <td class="text-center">${index + 1}</td>
-            <td class="text-center">${formatDate(item.docDate)}</td>
+            <td class="text-center">${item.docAt ? dayjs(item.docAt).format('DD/MM/YYYY HH:mm') : formatDate(item.docDate)}</td>
             <td class="text-left">${item.invoiceNumber || '-'}</td>
             <td class="text-left">${item.supplierName || '-'}</td>
             <td class="text-left">${item.productName}</td>
@@ -596,7 +714,7 @@ const InventoryReportPage: React.FC = () => {
             <button
               onClick={handleExport}
               disabled={reportType === 'summary'
-                ? (isAllStores ? !allStoresReport?.length : !report?.length)
+                ? (isAllStores ? !allStoresReport?.length : !reportWithPeriods?.periods?.length)
                 : !documents?.length}
               className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
             >
@@ -606,7 +724,7 @@ const InventoryReportPage: React.FC = () => {
             <button
               onClick={handlePrint}
               disabled={reportType === 'summary'
-                ? (isAllStores ? !allStoresReport?.length : !report?.length)
+                ? (isAllStores ? !allStoresReport?.length : !reportWithPeriods?.periods?.length)
                 : !documents?.length}
               className="inline-flex items-center px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm"
             >
@@ -624,33 +742,26 @@ const InventoryReportPage: React.FC = () => {
           {!user?.storeId && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Cửa hàng</label>
-              <div className="relative">
-                <select
-                  value={isAllStores ? 'all' : (selectedStoreId || '')}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'all') {
-                      setIsAllStores(true);
-                      setSelectedStoreId(undefined);
-                    } else {
-                      setIsAllStores(false);
-                      setSelectedStoreId(Number(value));
-                    }
-                  }}
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="">Chọn cửa hàng</option>
-                  <option value="all">Tất cả cửa hàng</option>
-                  {stores?.map((store) => (
-                    <option key={store.id} value={store.id}>
-                      {store.name}
-                    </option>
-                  ))}
-                </select>
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <BuildingStorefrontIcon className="h-5 w-5 text-gray-400" />
-                </div>
-              </div>
+              <SearchableSelect
+                options={[
+                  { value: 'all', label: '📊 Tất cả cửa hàng' },
+                  ...(stores?.map((store) => ({
+                    value: store.id,
+                    label: store.name,
+                  })) || []),
+                ]}
+                value={isAllStores ? 'all' : (selectedStoreId || null)}
+                onChange={(val) => {
+                  if (val === 'all') {
+                    setIsAllStores(true);
+                    setSelectedStoreId(undefined);
+                  } else {
+                    setIsAllStores(false);
+                    setSelectedStoreId(val ? Number(val) : undefined);
+                  }
+                }}
+                placeholder="Chọn cửa hàng"
+              />
             </div>
           )}
           {isStoreUser && (
@@ -684,23 +795,16 @@ const InventoryReportPage: React.FC = () => {
           {/* Price Period Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Kỳ giá</label>
-            <div className="relative">
-              <select
-                value={selectedPriceId || ""}
-                onChange={(e) => setSelectedPriceId(e.target.value ? Number(e.target.value) : undefined)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              >
-                <option value="">Tất cả kỳ giá</option>
-                {allPrices?.map((price) => (
-                  <option key={price.id} value={price.id}>
-                    {price.product?.name} - {price.region?.name} ({new Intl.NumberFormat('vi-VN').format(price.price)}đ) - {new Date(price.validFrom).toLocaleDateString('vi-VN')}
-                  </option>
-                ))}
-              </select>
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <FunnelIcon className="h-5 w-5 text-gray-400" />
-              </div>
-            </div>
+            <SearchableSelect
+              options={allPrices?.map((price) => ({
+                value: price.id,
+                label: `${price.product?.name} - ${price.region?.name} (${new Intl.NumberFormat('vi-VN').format(price.price)}đ) - ${new Date(price.validFrom).toLocaleDateString('vi-VN')}`,
+              })) || []}
+              value={selectedPriceId || null}
+              onChange={(val) => setSelectedPriceId(val ? Number(val) : undefined)}
+              placeholder="Tất cả kỳ giá"
+              isClearable
+            />
           </div>
         </div>
 
@@ -758,13 +862,19 @@ const InventoryReportPage: React.FC = () => {
                   {reportType === 'summary' ? (
                     <>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Mã hàng
+                        Mã bể
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tên hàng
+                        Tên bể
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Mặt hàng
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         ĐVT
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Dung tích
                       </th>
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tồn đầu kỳ
@@ -775,6 +885,12 @@ const InventoryReportPage: React.FC = () => {
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Xuất
                       </th>
+                      {/* Hao hụt - luôn hiển thị cho single store vì có thể có kỳ đã chốt */}
+                      {!isAllStores && (
+                        <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
+                          Hao hụt
+                        </th>
+                      )}
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tồn cuối kỳ
                       </th>
@@ -782,7 +898,7 @@ const InventoryReportPage: React.FC = () => {
                   ) : (
                     <>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Ngày
+                        Ngày giờ
                       </th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Số chứng từ
@@ -808,20 +924,23 @@ const InventoryReportPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {reportType === 'summary' && isAllStores && allStoresReport && allStoresReport.length > 0 ? (
-                  // All stores mode - grouped by store
+                  // All stores mode - grouped by store (🔥 THEO BỂ)
                   allStoresReport.map((storeData: any, storeIndex: number) => (
                     <React.Fragment key={storeIndex}>
                       {storeData.data && storeData.data.length > 0 && (
                         <>
                           <tr className="bg-gray-100">
-                            <td colSpan={7} className="px-6 py-3 text-left text-sm font-bold text-gray-900">
+                            <td colSpan={9} className="px-6 py-3 text-left text-sm font-bold text-gray-900">
                               {storeData.storeName}
                             </td>
                           </tr>
                           {storeData.data.map((item: any, itemIndex: number) => (
                             <tr key={`${storeIndex}-${itemIndex}`} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {item.productCode}
+                                {item.tankCode}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.tankName}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {item.productName}
@@ -829,17 +948,20 @@ const InventoryReportPage: React.FC = () => {
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {item.unitName}
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+                                {Number(item.capacity).toLocaleString('vi-VN')}
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                                {item.openingBalance.toLocaleString('vi-VN')}
+                                {Number(item.openingBalance).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                                {item.importQuantity.toLocaleString('vi-VN')}
+                                {Number(item.importQuantity).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                                {item.exportQuantity.toLocaleString('vi-VN')}
+                                {Number(item.exportQuantity).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                                {item.closingBalance.toLocaleString('vi-VN')}
+                                {Number(item.closingBalance).toLocaleString('vi-VN')}
                               </td>
                             </tr>
                           ))}
@@ -847,38 +969,106 @@ const InventoryReportPage: React.FC = () => {
                       )}
                     </React.Fragment>
                   ))
-                ) : reportType === 'summary' && !isAllStores && report && report.length > 0 ? (
-                  // Single store mode
-                  report.map((item) => (
-                    <tr key={item.productId} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.productCode}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.productName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.unitName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                        {item.openingBalance.toLocaleString('vi-VN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                        {item.importQuantity.toLocaleString('vi-VN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                        {item.exportQuantity.toLocaleString('vi-VN')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                        {item.closingBalance.toLocaleString('vi-VN')}
-                      </td>
-                    </tr>
+                ) : reportType === 'summary' && !isAllStores && reportWithPeriods && reportWithPeriods.periods.length > 0 ? (
+                  // 🔥 NEW: Single store mode - TÁCH THEO KỲ CHỐT
+                  reportWithPeriods.periods.map((period: any, periodIndex: number) => (
+                    <React.Fragment key={periodIndex}>
+                      {/* Period Header */}
+                      <tr className={period.periodType === 'CLOSED' ? 'bg-green-50' : 'bg-yellow-50'}>
+                        <td colSpan={10} className="px-6 py-3 text-left">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                period.periodType === 'CLOSED'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {period.periodType === 'CLOSED' ? '✓ Đã chốt' : '⏳ Chưa chốt'}
+                              </span>
+                              <span className="text-sm font-semibold text-gray-900">
+                                {dayjs(period.periodFrom).format('DD/MM/YYYY')} → {dayjs(period.periodTo).format('DD/MM/YYYY')}
+                              </span>
+                            </div>
+                            {period.closingDate && (
+                              <span className="text-xs text-gray-500">
+                                Chốt lúc: {dayjs(period.closingDate).format('DD/MM/YYYY HH:mm')}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      {/* Period Items */}
+                      {period.items.map((item: any, itemIndex: number) => {
+                        const lossData = showLossColumn && period.periodType === 'OPEN' ? calculateLossForItem(item) : null;
+                        return (
+                          <tr key={`${periodIndex}-${itemIndex}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                              {item.tankCode}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.tankName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.productName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {item.unitName}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+                              {Number(item.capacity).toLocaleString('vi-VN')}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                              {Number(item.openingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                              {Number(item.importQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                              {Number(item.exportQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                            </td>
+                            {/* Hao hụt - hiển thị nếu đã chốt hoặc đang tính */}
+                            {period.periodType === 'CLOSED' ? (
+                              <>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-orange-600">
+                                  {Number(item.lossAmount || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  {item.lossRate > 0 && (
+                                    <span className="text-xs text-gray-400 ml-1">
+                                      ({(Number(item.lossRate) * 100).toFixed(3)}%)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                                  {Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">
+                                  {lossData ? (
+                                    <>
+                                      {lossData.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                      <span className="text-xs ml-1">({(lossData.lossRate * 100).toFixed(3)}%)</span>
+                                    </>
+                                  ) : '-'}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                                  {lossData
+                                    ? lossData.closingAfterLoss.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+                                    : Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+                                  }
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </React.Fragment>
                   ))
                 ) : reportType !== 'summary' && documents && documents.length > 0 ? (
                   documents.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {dayjs(item.docDate).format('DD/MM/YYYY')}
+                        {item.docAt ? dayjs(item.docAt).format('DD/MM/YYYY HH:mm') : dayjs(item.docDate).format('DD/MM/YYYY')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.invoiceNumber || '-'}
@@ -902,7 +1092,7 @@ const InventoryReportPage: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={reportType === 'summary' ? (isAllStores ? 9 : 10) : 7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <ArchiveBoxIcon className="h-12 w-12 mb-3 text-gray-400" />
                         <p className="text-sm font-medium">

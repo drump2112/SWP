@@ -550,6 +550,20 @@ const CashReportPage: React.FC = () => {
                                     {ledger.details.totalAmount?.toLocaleString('vi-VN')}
                                   </span>
                                 </div>
+                                {ledger.details.receiptAt && (
+                                  <div className="col-span-2">
+                                    <span className="text-gray-600">Thời gian thu:</span>{' '}
+                                    <span className="font-medium">
+                                      {dayjs(ledger.details.receiptAt).format('DD/MM/YYYY HH:mm')}
+                                    </span>
+                                  </div>
+                                )}
+                                {ledger.details.notes && (
+                                  <div className="col-span-2">
+                                    <span className="text-gray-600">Ghi chú:</span>{' '}
+                                    <span className="font-medium">{ledger.details.notes}</span>
+                                  </div>
+                                )}
                               </div>
 
                               {ledger.details.customers && ledger.details.customers.length > 0 && (
@@ -584,14 +598,10 @@ const CashReportPage: React.FC = () => {
                             <div className="bg-white rounded-lg p-4 border border-red-200">
                               <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
-                                  <span className="text-gray-600">Ngày nộp:</span>{' '}
+                                  <span className="text-gray-600">Ngày giờ nộp:</span>{' '}
                                   <span className="font-medium">
-                                    {dayjs(ledger.details.depositDate).format('DD/MM/YYYY')}
+                                    {ledger.details.depositAt ? dayjs(ledger.details.depositAt).format('DD/MM/YYYY HH:mm') : '-'}
                                   </span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Giờ nộp:</span>{' '}
-                                  <span className="font-medium">{ledger.details.depositTime || '-'}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-600">Người nhận:</span>{' '}

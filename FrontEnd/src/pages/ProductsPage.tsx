@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { productsApi, type Product, type CreateProductDto } from '../api/products';
+import { productsApi, type Product, type CreateProductDto, type ProductCategory } from '../api/products';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
@@ -64,6 +64,7 @@ const ProductsPage: React.FC = () => {
       name: formData.get('name') as string,
       unit: formData.get('unit') as string || undefined,
       isFuel: formData.get('isFuel') === 'on',
+      category: formData.get('category') as ProductCategory || 'GASOLINE',
     };
 
     if (editingProduct) {
@@ -163,6 +164,17 @@ const ProductsPage: React.FC = () => {
                   </span>
                 )
               },
+              {
+                key: 'category',
+                header: 'Phân loại',
+                render: (p) => (
+                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    p.category === 'GASOLINE' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {p.category === 'GASOLINE' ? 'Xăng' : 'Dầu'}
+                  </span>
+                )
+              },
             ]}
             actions={(product) => (
               <div className="flex gap-2 justify-center">
@@ -256,6 +268,21 @@ const ProductsPage: React.FC = () => {
                   <label htmlFor="isFuel" className="ml-2 block text-sm text-gray-700">
                     Là nhiên liệu
                   </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phân loại <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    name="category"
+                    defaultValue={editingProduct?.category || 'GASOLINE'}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                  >
+                    <option value="GASOLINE">Xăng</option>
+                    <option value="DIESEL">Dầu</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Dùng để tính hệ số hao hụt</p>
                 </div>
               </div>
 

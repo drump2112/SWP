@@ -282,7 +282,7 @@ const InitialStock: React.FC = () => {
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">📦 Nhập Tồn Đầu Kỳ</h1>
+          <h1 className="text-3xl font-bold text-gray-800">📦 Nhập Tồn Đầu Kỳ (ÁP DỤNG CHO MÔ HÌNH QUẢN LÍ THEO MẶT HÀNG)</h1>
           <p className="text-gray-600 mt-2">
             Nhập số lượng tồn kho ban đầu cho từng mặt hàng tại cửa hàng
           </p>

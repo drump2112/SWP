@@ -57,6 +57,38 @@ export class InventoryController {
     return this.inventoryService.getInventoryReportByStore(effectiveStoreId, fromDate, toDate, priceId ? +priceId : undefined);
   }
 
+  /**
+   * 🔥 GET /inventory/report-by-tank/:storeId
+   * Báo cáo nhập xuất tồn THEO BỂ (Tank-based)
+   */
+  @Get('report-by-tank/:storeId')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  async getInventoryReportByTank(
+    @CurrentUser() user: any,
+    @Param('storeId') storeId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
+    return this.inventoryService.getInventoryReportByTank(effectiveStoreId, fromDate, toDate);
+  }
+
+  /**
+   * 🔥 GET /inventory/report-by-tank-with-periods/:storeId
+   * Báo cáo nhập xuất tồn TÁCH THEO KỲ CHỐT (Closed + Open periods)
+   */
+  @Get('report-by-tank-with-periods/:storeId')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  async getInventoryReportByTankWithPeriods(
+    @CurrentUser() user: any,
+    @Param('storeId') storeId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
+    return this.inventoryService.getInventoryReportByTankWithPeriods(effectiveStoreId, fromDate, toDate);
+  }
+
   @Get('documents')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getDocuments(

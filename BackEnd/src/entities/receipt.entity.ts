@@ -36,8 +36,14 @@ export class Receipt {
   @Column({ name: 'payment_method', length: 20, default: 'CASH' })
   paymentMethod: string; // CASH, BANK_TRANSFER
 
+  @Column({ type: 'text', nullable: true })
+  notes: string;
+
+  @Column({ name: 'receipt_at', type: 'timestamp', nullable: true })
+  receiptAt: Date; // Ngày giờ thu tiền do người dùng chọn
+
   @CreateDateColumn({ name: 'created_at' })
-  createdAt: Date;
+  createdAt: Date; // Ngày giờ bản ghi được tạo (log)
 
   @ManyToOne(() => Store)
   @JoinColumn({ name: 'store_id' })

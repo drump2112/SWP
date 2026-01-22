@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { productsApi } from '../api/products';
+import { tanksApi } from '../api/tanks';
 
 export interface CompartmentData {
   compartmentNumber: number;
@@ -16,7 +17,7 @@ export interface CompartmentData {
 }
 
 export interface InventoryImportFormData {
-  docDate: string;
+  docAt: string; // Ngày giờ nhập hàng (datetime-local format)
   supplierName: string;
   invoiceNumber: string;
   licensePlate: string;
@@ -26,15 +27,17 @@ export interface InventoryImportFormData {
   notes?: string;
   // Legacy fields (for backward compatibility)
   productId?: number;
+  tankId?: number; // ✅ Thêm tankId để nhập vào bể cụ thể
   quantity?: number;
 }
 
 interface Props {
   onSubmit: (data: InventoryImportFormData) => void;
   onCancel: () => void;
+  storeId?: number; // ✅ Thêm storeId để lọc bể theo cửa hàng
   initialData?: {
     id?: string;
-    docDate?: string;
+    docAt?: string;
     supplierName?: string;
     invoiceNumber?: string;
     licensePlate?: string;
@@ -43,17 +46,24 @@ interface Props {
     compartments?: CompartmentData[];
     notes?: string;
     productId?: number;
+    tankId?: number;
     quantity?: number;
   };
 }
 
-const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initialData }) => {
-  const [docDate, setDocDate] = useState(initialData?.docDate || new Date().toISOString().split('T')[0]);
+const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId, initialData }) => {
+  // Default datetime: current date and time in datetime-local format
+  const getDefaultDateTime = () => {
+    const now = new Date();
+    return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
+  };
+  const [docAt, setDocAt] = useState(initialData?.docAt || getDefaultDateTime());
   const [supplierName, setSupplierName] = useState(initialData?.supplierName || '');
   const [invoiceNumber, setInvoiceNumber] = useState(initialData?.invoiceNumber || '');
   const [licensePlate, setLicensePlate] = useState(initialData?.licensePlate || '');
   const [driverName, setDriverName] = useState(initialData?.driverName || '');
   const [productId, setProductId] = useState<number>(initialData?.productId || (initialData?.compartments?.[0]?.productId || 0));
+  const [tankId, setTankId] = useState<number>(initialData?.tankId || 0); // ✅ Thêm state tankId
   const [quantity, setQuantity] = useState(initialData?.quantity || (initialData?.compartments?.reduce((sum, c) => sum + (c.receivedVolume || 0), 0) || 0));
   const [notes, setNotes] = useState(initialData?.notes || '');
 
@@ -62,11 +72,35 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
     queryFn: () => productsApi.getAll(),
   });
 
+  // ✅ Query tanks theo storeId
+  const { data: tanks } = useQuery({
+    queryKey: ['tanks', storeId],
+    queryFn: () => tanksApi.getByStore(storeId!),
+    enabled: !!storeId,
+  });
+
+  // ✅ Lọc bể theo productId đã chọn
+  const filteredTanks = useMemo(() => {
+    if (!tanks || !productId) return [];
+    return tanks.filter((tank: { productId: number }) => tank.productId === productId);
+  }, [tanks, productId]);
+
+  // ✅ Reset tankId khi đổi productId
+  const handleProductChange = (newProductId: number) => {
+    setProductId(newProductId);
+    setTankId(0); // Reset bể khi đổi sản phẩm
+  };
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
     // Validation
+    if (!docAt) {
+      alert('Vui lòng chọn ngày giờ nhập hàng');
+      return;
+    }
+
     if (!licensePlate.trim()) {
       alert('Vui lòng nhập biển số xe');
       return;
@@ -77,18 +111,25 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
       return;
     }
 
+    // ✅ Validation bể
+    if (!tankId || tankId <= 0) {
+      alert('Vui lòng chọn bể để nhập hàng');
+      return;
+    }
+
     if (quantity <= 0) {
       alert('Vui lòng nhập số lượng hợp lệ');
       return;
     }
 
     onSubmit({
-      docDate,
+      docAt,
       supplierName,
       invoiceNumber,
       licensePlate,
       driverName,
       productId,
+      tankId, // ✅ Thêm tankId vào submit
       quantity,
       notes,
       compartments: [{
@@ -112,12 +153,12 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nhập *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nhập *</label>
             <input
-              type="date"
+              type="datetime-local"
               required
-              value={docDate}
-              onChange={(e) => setDocDate(e.target.value)}
+              value={docAt}
+              onChange={(e) => setDocAt(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -176,7 +217,7 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
             <select
               required
               value={productId}
-              onChange={(e) => setProductId(Number(e.target.value))}
+              onChange={(e) => handleProductChange(Number(e.target.value))}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
             >
               <option value="0">-- Chọn sản phẩm --</option>
@@ -184,6 +225,28 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
                 <option key={p.id} value={p.id}>{p.code} - {p.name}</option>
               ))}
             </select>
+          </div>
+
+          {/* ✅ Thêm dropdown chọn bể */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Bể chứa *</label>
+            <select
+              required
+              value={tankId}
+              onChange={(e) => setTankId(Number(e.target.value))}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={!productId}
+            >
+              <option value="0">-- Chọn bể --</option>
+              {filteredTanks?.map((tank: { id: number; tankCode: string; tankName: string; capacity: number }) => (
+                <option key={tank.id} value={tank.id}>
+                  {tank.tankCode} - {tank.tankName} (Dung tích: {tank.capacity?.toLocaleString()}L)
+                </option>
+              ))}
+            </select>
+            {productId > 0 && filteredTanks?.length === 0 && (
+              <p className="text-xs text-red-500 mt-1">Không có bể nào chứa sản phẩm này</p>
+            )}
           </div>
 
           <div>

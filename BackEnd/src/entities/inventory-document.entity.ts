@@ -24,6 +24,9 @@ export class InventoryDocument {
   @Column({ name: 'doc_date', type: 'date', nullable: true })
   docDate: Date;
 
+  @Column({ name: 'doc_at', type: 'timestamp', nullable: true })
+  docAt: Date;
+
   @Column({ name: 'ref_shift_id', nullable: true })
   refShiftId: number;
 

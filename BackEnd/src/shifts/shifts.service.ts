@@ -297,24 +297,44 @@ export class ShiftsService {
     // Lưu trạng thái cũ để ghi audit log
     const oldData = { ...shift };
 
+    // ⏰ Xác định closedAt TRƯỚC để dùng cho các phiếu xuất/nhập/chi phí
+    const closedAt = closeShiftDto.closedAt
+      ? new Date(closeShiftDto.closedAt)
+      : new Date();
+
+    // Validate closedAt > openedAt ngay từ đầu
+    if (shift.openedAt && closedAt < shift.openedAt) {
+      throw new BadRequestException(
+        'Thời gian đóng ca không thể trước thời gian mở ca',
+      );
+    }
+
     // 1. Lưu số liệu cột bơm (bulk insert với unitPrice để lưu vết giá)
     // Lấy giá trước để dùng cho cả pump_readings và sales
     const productIds = [
       ...new Set(closeShiftDto.pumpReadings.map((r) => r.productId)),
     ];
-    const prices = await manager.find(ProductPrice, {
-      where: productIds.map((productId) => ({
-        productId,
-        regionId: shift.store.regionId,
-      })),
-    });
 
+    // ✅ QUAN TRỌNG: Lấy giá tại thời điểm MỞ CA (openedAt), không phải thời điểm hiện tại
+    // Điều này đảm bảo rằng nếu giá thay đổi giữa chừng (ví dụ: đổi giá lúc 15h),
+    // ca đã mở trước đó vẫn sử dụng giá đúng tại thời điểm mở ca
+    const priceReferenceTime = shift.openedAt || new Date();
+    console.log(`📊 Lấy giá tại thời điểm mở ca: ${priceReferenceTime.toISOString()}`);
+
+    const prices = await manager
+      .createQueryBuilder(ProductPrice, 'pp')
+      .where('pp.product_id IN (:...productIds)', { productIds })
+      .andWhere('pp.region_id = :regionId', { regionId: shift.store.regionId })
+      .andWhere('pp.valid_from <= :priceReferenceTime', { priceReferenceTime })
+      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)', { priceReferenceTime })
+      .orderBy('pp.valid_from', 'DESC') // Lấy giá mới nhất trước
+      .getMany();
+
+    // Map giá theo productId - chỉ lấy giá đầu tiên (mới nhất) cho mỗi sản phẩm
     const priceMap = new Map<number, number>();
     for (const price of prices) {
-      if (
-        price.validFrom <= new Date() &&
-        (!price.validTo || price.validTo > new Date())
-      ) {
+      // Chỉ set nếu chưa có (vì đã sort DESC theo validFrom, nên record đầu là mới nhất)
+      if (!priceMap.has(price.productId)) {
         priceMap.set(price.productId, Number(price.price));
       }
     }
@@ -339,6 +359,7 @@ export class ShiftsService {
       const unitPrice = priceMap.get(reading.productId)!;
       return {
         shiftId: shift.id,
+        pumpId: reading.pumpId, // ✅ Lưu pumpId để query tankId sau
         pumpCode: reading.pumpCode,
         productId: reading.productId,
         startValue: reading.startValue,
@@ -366,7 +387,7 @@ export class ShiftsService {
         productId: reading.productId,
         quantity: reading.quantity,
         unitPrice,
-        amount: reading.quantity * unitPrice,
+        amount: Math.round(reading.quantity * unitPrice), // Làm tròn để tránh phần thập phân
         customerId: undefined, // ✅ NULL = Bán lẻ (không phải công nợ)
       };
     });
@@ -405,7 +426,7 @@ export class ShiftsService {
     // ✅ FIX: Tính tổng tiền bán công nợ để TRỪ RA khỏi tổng từ vòi bơm
     // Vì tiền công nợ CHƯA THU, không được ghi vào sổ quỹ
     const totalDebtSalesAmount = (closeShiftDto.debtSales || []).reduce(
-      (sum, ds) => sum + ds.quantity * ds.unitPrice,
+      (sum, ds) => sum + Math.round(ds.quantity * ds.unitPrice), // Làm tròn để tránh phần thập phân
       0,
     );
 
@@ -426,6 +447,7 @@ export class ShiftsService {
         refId: shift.id,
         cashIn: totalRetailAmount, // ✅ Thu tiền vào quỹ (CHỈ TIỀN MẶT, KHÔNG BAO GỒM NỢ)
         cashOut: 0,
+        ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
         notes: `Thu tiền bán lẻ: ${totalFromPumps.toLocaleString()} - công nợ ${totalDebtSalesAmount.toLocaleString()} = ${totalRetailAmount.toLocaleString()}`,
       });
     }
@@ -442,7 +464,7 @@ export class ShiftsService {
       // Group debt sales by customer để tính tổng nợ mới cho mỗi khách
       const debtByCustomer = new Map<number, number>();
       for (const debtSale of closeShiftDto.debtSales) {
-        const totalAmount = debtSale.quantity * debtSale.unitPrice;
+        const totalAmount = Math.round(debtSale.quantity * debtSale.unitPrice); // Làm tròn để tránh phần thập phân
         const currentTotal = debtByCustomer.get(debtSale.customerId) || 0;
         debtByCustomer.set(debtSale.customerId, currentTotal + totalAmount);
       }
@@ -498,7 +520,7 @@ export class ShiftsService {
 
     if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
       for (const debtSale of closeShiftDto.debtSales) {
-        const totalAmount = debtSale.quantity * debtSale.unitPrice;
+        const totalAmount = Math.round(debtSale.quantity * debtSale.unitPrice); // Làm tròn để tránh phần thập phân
 
         // Lưu vào shift_debt_sales
         const debtSaleRecord = await manager.save(ShiftDebtSale, {
@@ -522,6 +544,7 @@ export class ShiftsService {
           credit: 0,
           notes: debtSale.notes || 'Bán công nợ',
           shiftId: shift.id,
+          ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
         });
 
         // NOTE: Bán công nợ KHÔNG giảm tồn kho bể, KHÔNG ghi cash_ledger
@@ -552,7 +575,7 @@ export class ShiftsService {
     // - CREDIT sẽ được ghi khi có phiếu nộp tiền về công ty (deposit)
     if (closeShiftDto.retailSales && closeShiftDto.retailSales.length > 0) {
       for (const retailSale of closeShiftDto.retailSales) {
-        const totalAmount = retailSale.quantity * retailSale.unitPrice;
+        const totalAmount = Math.round(retailSale.quantity * retailSale.unitPrice); // Làm tròn để tránh phần thập phân
 
         // Lấy tên sản phẩm để ghi vào notes
         const product = await manager.findOne(Product, {
@@ -571,6 +594,7 @@ export class ShiftsService {
           credit: 0,
           notes: `Bán lẻ ${retailSale.quantity.toFixed(3)} lít ${productName}`,
           shiftId: shift.id,
+          ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
         });
 
         // ❌ KHÔNG ghi CREDIT ở đây
@@ -582,7 +606,7 @@ export class ShiftsService {
     // 6.3. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
     if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
       for (const receipt of closeShiftDto.receipts) {
-        // Lưu receipt
+        // Lưu receipt với thời gian thu tiền do người dùng chọn
         const receiptRecord = await manager.save(Receipt, {
           storeId: receipt.storeId,
           shiftId: shift.id,
@@ -590,7 +614,8 @@ export class ShiftsService {
           amount: receipt.amount,
           paymentMethod: receipt.paymentMethod || 'CASH',
           notes: receipt.notes,
-        });
+          receiptAt: receipt.receiptAt ? new Date(receipt.receiptAt) : new Date(),
+        }) as Receipt;
 
         // Lưu chi tiết
         for (const detail of receipt.details) {
@@ -611,6 +636,7 @@ export class ShiftsService {
             debit: 0,
             credit: detail.amount,
             notes: receipt.notes || 'Thanh toán nợ',
+            ledgerAt: receiptRecord.receiptAt || closedAt, // ⏰ Dùng thời gian phiếu thu hoặc chốt ca
           });
         }
 
@@ -623,6 +649,7 @@ export class ShiftsService {
             refId: receiptRecord.id,
             cashIn: receipt.amount,
             cashOut: 0,
+            ledgerAt: receiptRecord.receiptAt || closedAt, // ⏰ Dùng thời gian phiếu thu hoặc thời gian chốt ca
             notes: receipt.notes || 'Thu tiền thanh toán nợ',
           });
         }
@@ -658,8 +685,7 @@ export class ShiftsService {
           storeId: deposit.storeId,
           shiftId: shift.id,
           amount: deposit.amount,
-          depositDate: new Date(deposit.depositDate),
-          depositTime: deposit.depositTime,
+          depositAt: deposit.depositAt ? new Date(deposit.depositAt) : new Date(),
           receiverName: deposit.receiverName,
           paymentMethod: deposit.paymentMethod || 'CASH',
           notes: deposit.notes,
@@ -667,7 +693,7 @@ export class ShiftsService {
 
         // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
         // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
-        // Chỉ ghi nếu nộp tiền m ặt (không ghi nếu chuyển khoản đã nộp trước)
+        // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
         if (depositRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             storeId: deposit.storeId,
@@ -675,6 +701,7 @@ export class ShiftsService {
             refId: depositRecord.id,
             cashIn: 0,
             cashOut: deposit.amount,
+            ledgerAt: depositRecord.depositAt || closedAt, // ⏰ Dùng thời gian nộp tiền hoặc thời gian chốt ca
             notes: deposit.notes || 'Nộp tiền về công ty',
             shiftId: shift.id,
           });
@@ -692,6 +719,7 @@ export class ShiftsService {
               credit: deposit.amount,
               notes: deposit.notes || 'Nộp tiền về công ty - Giảm nợ',
               shiftId: shift.id,
+              ledgerAt: depositRecord.depositAt || closedAt, // ⏰ Dùng thời gian nộp tiền hoặc chốt ca
             });
           }
         }
@@ -700,8 +728,6 @@ export class ShiftsService {
 
     // 6.4. Xử lý Expenses (chi phí)
     if (closeShiftDto.expenses && closeShiftDto.expenses.length > 0) {
-      const today = new Date();
-
       for (const expense of closeShiftDto.expenses) {
         // Lưu expense record
         const expenseRecord = await manager.save(Expense, {
@@ -710,7 +736,7 @@ export class ShiftsService {
           expenseCategoryId: expense.expenseCategoryId,
           amount: expense.amount,
           description: expense.description,
-          expenseDate: today,
+          expenseDate: closedAt, // ⏰ Dùng thời gian chốt ca
           paymentMethod: expense.paymentMethod || 'CASH',
           createdBy: user?.id,
         });
@@ -725,6 +751,7 @@ export class ShiftsService {
             refId: expenseRecord.id,
             cashIn: 0,
             cashOut: expense.amount,
+            ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
             notes: expense.description,
           });
         }
@@ -737,44 +764,80 @@ export class ShiftsService {
     // → KHÔNG tạo phiếu xuất cho testExport vì KHÔNG làm giảm tồn kho
     // → CHỈ tạo phiếu xuất cho lượng BÁN thực tế (đã trừ testExport)
 
-    // Tổng hợp lượng BÁN theo từng productId (đã trừ testExport)
-    const productSalesMap = new Map<number, number>();
-    for (const reading of pumpReadingsData) {
-      const current = productSalesMap.get(reading.productId) || 0;
-      productSalesMap.set(reading.productId, current + reading.quantity); // quantity đã trừ testExport
+    // 🔥 Query pumps để lấy tankId từ pumpId (1 bồn có thể có nhiều vòi)
+    const pumpIds = closeShiftDto.pumpReadings
+      .filter((r) => r.pumpId)
+      .map((r) => r.pumpId);
+
+    let pumpToTankMap = new Map<number, number>();
+
+    if (pumpIds.length > 0) {
+      const pumps = await manager
+        .createQueryBuilder()
+        .select(['p.id as "pumpId"', 'p.tank_id as "tankId"'])
+        .from('pumps', 'p')
+        .where('p.id IN (:...pumpIds)', { pumpIds })
+        .getRawMany();
+
+      // Tạo map pumpId -> tankId
+      for (const pump of pumps) {
+        pumpToTankMap.set(Number(pump.pumpId), pump.tankId);
+      }
     }
 
-    if (productSalesMap.size > 0) {
+    // Tổng hợp lượng BÁN theo từng TANK + PRODUCT (thay vì chỉ productId)
+    // Key: "tankId-productId", Value: { tankId, productId, quantity, unitPrice }
+    const tankSalesMap = new Map<string, { tankId: number; productId: number; quantity: number; unitPrice: number }>();
+    for (const reading of pumpReadingsData) {
+      const tankId = reading.pumpId ? pumpToTankMap.get(reading.pumpId) : null;
+      if (!tankId) {
+        console.warn(`⚠️ Không tìm thấy tankId cho pump ${reading.pumpCode} (pumpId: ${reading.pumpId})`);
+        continue;
+      }
+      const key = `${tankId}-${reading.productId}`;
+      const existing = tankSalesMap.get(key);
+      if (existing) {
+        existing.quantity += reading.quantity;
+      } else {
+        tankSalesMap.set(key, {
+          tankId,
+          productId: reading.productId,
+          quantity: reading.quantity,
+          unitPrice: reading.unitPrice,
+        });
+      }
+    }
+
+    if (tankSalesMap.size > 0) {
       // Tạo 1 phiếu xuất duy nhất cho tất cả sản phẩm bán trong ca
       const exportDoc = await manager.save(InventoryDocument, {
         warehouseId: warehouse.id,
         docType: 'EXPORT',
-        docDate: new Date(),
+        docDate: closedAt,
+        docAt: closedAt, // ⏰ Dùng thời gian chốt ca thay vì thời gian hiện tại
         refShiftId: shift.id,
         supplierName: `Xuất bán ca #${shift.shiftNo}`,
         notes: `Tự động tạo từ lượng bơm qua vòi - Ca ${shift.shiftNo} ngày ${shift.shiftDate}`,
       });
 
-      for (const [productId, totalQuantity] of productSalesMap.entries()) {
-        // Lấy đơn giá từ pump readings (giả sử tất cả pump cùng sản phẩm có cùng giá)
-        const sampleReading = pumpReadingsData.find(
-          (r) => r.productId === productId,
-        );
-        const unitPrice = sampleReading?.unitPrice || 0;
+      for (const [, sale] of tankSalesMap.entries()) {
+        const { tankId, productId, quantity: totalQuantity, unitPrice } = sale;
 
         await manager.save(InventoryDocumentItem, {
           documentId: exportDoc.id,
           productId,
+          tankId, // ✅ Ghi tankId vào document item
           quantity: totalQuantity,
           unitPrice,
         });
 
-        // Ghi inventory ledger cho phiếu xuất
+        // 🔥 Ghi inventory ledger THEO TANK (không trừ trực tiếp vào tanks.current_stock)
+        // Tồn kho tính bằng: SUM(quantity_in - quantity_out) WHERE tank_id = X
         await manager.save(InventoryLedger, {
           warehouseId: warehouse.id,
           productId,
           shiftId: shift.id,
-          tankId: null, // Không chỉ định tank cụ thể vì tổng hợp từ nhiều pump
+          tankId, // ✅ Ghi tankId để trừ tồn theo bể
           refType: 'EXPORT',
           refId: exportDoc.id,
           quantityIn: 0,
@@ -782,7 +845,7 @@ export class ShiftsService {
         });
 
         console.log(
-          `🛒 Xuất bán: ${totalQuantity} lít sản phẩm ${productId} (đơn giá ${unitPrice})`,
+          `🛒 Xuất bán: ${totalQuantity} lít sản phẩm ${productId} từ bể ${tankId} (đơn giá ${unitPrice})`,
         );
       }
 
@@ -798,27 +861,29 @@ export class ShiftsService {
         const importDoc = await manager.save(InventoryDocument, {
           warehouseId: warehouse.id,
           docType: 'IMPORT',
-          docDate: new Date(importItem.docDate),
+          docDate: importItem.docAt ? new Date(importItem.docAt) : new Date(),
+          docAt: importItem.docAt ? new Date(importItem.docAt) : new Date(),
           refShiftId: shift.id,
           supplierName: importItem.supplierName,
           licensePlate: importItem.licensePlate,
           notes: importItem.notes,
         });
 
-        // Tạo item
+        // Tạo item (với tankId nếu có)
         await manager.save(InventoryDocumentItem, {
           documentId: importDoc.id,
           productId: importItem.productId,
+          tankId: importItem.tankId || undefined, // ✅ Thêm tankId
           quantity: importItem.quantity,
           unitPrice: 0,
         });
 
-        // Ghi inventory ledger (tăng tồn kho)
+        // Ghi inventory ledger (tăng tồn kho) - THEO BỂ nếu có tankId
         await manager.save(InventoryLedger, {
           warehouseId: warehouse.id,
           productId: importItem.productId,
           shiftId: shift.id,
-          tankId: null,
+          tankId: importItem.tankId || undefined, // ✅ Ghi vào bể nếu có
           refType: 'IMPORT',
           refId: importDoc.id,
           quantityIn: importItem.quantity,
@@ -826,23 +891,13 @@ export class ShiftsService {
         });
 
         console.log(
-          `📥 Nhập kho: ${importItem.quantity} lít sản phẩm ${importItem.productId} (Nhà cung cấp: ${importItem.supplierName || 'N/A'})`,
+          `📥 Nhập kho: ${importItem.quantity} lít sản phẩm ${importItem.productId} vào bể ${importItem.tankId || 'N/A'} (Nhà cung cấp: ${importItem.supplierName || 'N/A'})`,
         );
       }
     }
 
-    // 7. Đóng ca
-    if (closeShiftDto.closedAt) {
-      shift.closedAt = new Date(closeShiftDto.closedAt);
-      // Validate closedAt > openedAt
-      if (shift.openedAt && shift.closedAt < shift.openedAt) {
-        throw new BadRequestException(
-          'Thời gian đóng ca không thể trước thời gian mở ca',
-        );
-      }
-    } else {
-      shift.closedAt = new Date();
-    }
+    // 7. Đóng ca - Sử dụng closedAt đã xác định ở đầu hàm
+    shift.closedAt = closedAt;
 
     // Lưu thông tin người giao và người nhận
     if (closeShiftDto.handoverName) {
@@ -1188,22 +1243,25 @@ export class ShiftsService {
       throw new NotFoundException('Shift not found');
     }
 
+    // ✅ Sử dụng thời điểm mở ca để lấy giá đúng kỳ giá
+    const priceReferenceTime = shift.openedAt || new Date();
+
     // Tính tổng doanh thu từ vòi bơm (hoặc sales nếu đã chốt ca)
     let totalFromPumps = 0;
 
     if (shift.pumpReadings && shift.pumpReadings.length > 0) {
       // Nếu có pump readings, tính từ đó
       for (const reading of shift.pumpReadings) {
-        // Lấy giá bán hiện tại
+        // ✅ Lấy giá tại thời điểm MỞ CA thay vì thời điểm hiện tại
         const price = await this.productPriceRepository
           .createQueryBuilder('pp')
           .where('pp.product_id = :productId', { productId: reading.productId })
           .andWhere('pp.region_id = :regionId', {
             regionId: shift.store.regionId,
           })
-          .andWhere('pp.valid_from <= :now', { now: new Date() })
-          .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :now)', {
-            now: new Date(),
+          .andWhere('pp.valid_from <= :priceReferenceTime', { priceReferenceTime })
+          .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)', {
+            priceReferenceTime,
           })
           .getOne();
 
@@ -1311,7 +1369,7 @@ export class ShiftsService {
       }
 
       // 1. Tạo shift debt sale
-      const amount = createDto.quantity * createDto.unitPrice;
+      const amount = Math.round(createDto.quantity * createDto.unitPrice); // Làm tròn để tránh phần thập phân
       const debtSale = manager.create(ShiftDebtSale, {
         ...createDto,
         amount,

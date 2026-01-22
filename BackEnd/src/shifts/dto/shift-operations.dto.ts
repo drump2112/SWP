@@ -78,6 +78,10 @@ export class CreateReceiptDto {
   @IsOptional()
   @IsString()
   paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
+
+  @IsOptional()
+  @IsString()
+  receiptAt?: string; // ISO datetime string
 }
 
 export class ReceiptDetailDto {
@@ -109,12 +113,9 @@ export class CreateCashDepositDto {
   @Min(0)
   amount: number;
 
-  @IsNotEmpty()
-  depositDate: string;
-
   @IsOptional()
   @IsString()
-  depositTime?: string;
+  depositAt?: string; // Thời gian nộp tiền do người dùng chọn (ISO datetime string)
 
   @IsOptional()
   @IsString()

@@ -1,11 +1,14 @@
 import api from './client';
 
+export type ProductCategory = 'GASOLINE' | 'DIESEL';
+
 export interface Product {
   id: number;
   code: string;
   name: string;
   unit: string;
   isFuel: boolean;
+  category: ProductCategory;
 }
 
 export interface CreateProductDto {
@@ -13,6 +16,7 @@ export interface CreateProductDto {
   name: string;
   unit?: string;
   isFuel?: boolean;
+  category?: ProductCategory;
 }
 
 export interface UpdateProductDto {
@@ -20,6 +24,7 @@ export interface UpdateProductDto {
   name?: string;
   unit?: string;
   isFuel?: boolean;
+  category?: ProductCategory;
 }
 
 export interface ProductPrice {
@@ -94,8 +99,19 @@ export const productsApi = {
     return response.data;
   },
 
-  getCurrentPrice: async (productId: number, regionId: number): Promise<ProductPrice> => {
-    const response = await api.get(`/products/${productId}/price/${regionId}`);
+  /**
+   * Lấy giá hiện tại hoặc giá tại thời điểm cụ thể
+   * @param productId - ID sản phẩm
+   * @param regionId - ID khu vực
+   * @param atTime - Thời điểm cần lấy giá (ISO string hoặc Date object, mặc định là now)
+   */
+  getCurrentPrice: async (productId: number, regionId: number, atTime?: Date | string): Promise<ProductPrice> => {
+    let url = `/products/${productId}/price/${regionId}`;
+    if (atTime) {
+      const isoTime = typeof atTime === 'string' ? atTime : atTime.toISOString();
+      url += `?atTime=${encodeURIComponent(isoTime)}`;
+    }
+    const response = await api.get(url);
     return response.data;
   },
 

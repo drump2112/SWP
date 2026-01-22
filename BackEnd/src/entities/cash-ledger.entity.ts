@@ -49,6 +49,9 @@ export class CashLedger {
   @Column({ name: 'superseded_by_shift_id', type: 'int', nullable: true })
   supersededByShiftId: number | null; // Nếu != NULL: dữ liệu này đã bị thay thế bởi ca khác
 
+  @Column({ name: 'ledger_at', type: 'timestamp', nullable: true })
+  ledgerAt: Date; // Thời gian giao dịch do người dùng chọn (theo closedAt của ca)
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

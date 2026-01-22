@@ -1,5 +1,10 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToMany } from 'typeorm';
 
+export enum ProductCategory {
+  GASOLINE = 'GASOLINE', // Xăng
+  DIESEL = 'DIESEL', // Dầu
+}
+
 @Entity('products')
 export class Product {
   @PrimaryGeneratedColumn()
@@ -16,6 +21,13 @@ export class Product {
 
   @Column({ name: 'is_fuel', type: 'boolean', default: false })
   isFuel: boolean;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    default: 'GASOLINE',
+  })
+  category: ProductCategory;
 
   @OneToMany('ProductPrice', 'product')
   productPrices: any[];

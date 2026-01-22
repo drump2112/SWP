@@ -16,6 +16,10 @@ import {
 } from './shift-operations.dto';
 
 class PumpReadingDto {
+  @IsOptional()
+  @IsInt()
+  pumpId?: number; // ✅ Dùng pumpId để query tankId
+
   @IsNotEmpty()
   pumpCode: string;
 
@@ -58,9 +62,9 @@ class InventoryImportDto {
   @IsNumber()
   id?: number; // ID của document nếu đang edit
 
-  @IsNotEmpty()
-  @IsDateString()
-  docDate: string;
+  @IsOptional()
+  @IsString()
+  docAt?: string; // Ngày giờ nhập hàng do người dùng chọn
 
   @IsOptional()
   @IsString()
@@ -77,6 +81,10 @@ class InventoryImportDto {
   @IsNotEmpty()
   @IsInt()
   productId: number;
+
+  @IsOptional()
+  @IsInt()
+  tankId?: number; // ✅ Thêm tankId để nhập vào bể cụ thể
 
   @IsNotEmpty()
   @IsNumber()

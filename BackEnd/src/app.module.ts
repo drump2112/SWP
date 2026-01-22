@@ -39,6 +39,9 @@ import { ExpensesModule } from './expenses/expenses.module';
 import { ReportsModule } from './reports/reports.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 
+// Loss Config
+import { LossConfigModule } from './loss-config/loss-config.module';
+
 @Module({
   imports: [
     // Configuration
@@ -92,6 +95,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
     // Reports
     ReportsModule,
     AnalyticsModule,
+
+    // Loss Config
+    LossConfigModule,
   ],
   controllers: [AppController],
   providers: [AppService],

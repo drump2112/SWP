@@ -58,6 +58,51 @@ export interface InventoryReportItem {
   closingBalance: number;
 }
 
+/**
+ * 🔥 Báo cáo nhập xuất tồn THEO BỂ
+ */
+export interface TankInventoryReportItem {
+  tankId: number;
+  tankCode: string;
+  tankName: string;
+  productId: number;
+  productCode: string;
+  productName: string;
+  productCategory?: string | null;
+  unitName: string;
+  capacity: number;
+  openingBalance: number;
+  importQuantity: number;
+  exportQuantity: number;
+  lossRate?: number | null;
+  lossAmount?: number | null;
+  closingBalance: number;
+}
+
+/**
+ * 🔥 Báo cáo NXT tách theo kỳ chốt
+ */
+export interface InventoryPeriodDto {
+  periodType: 'CLOSED' | 'OPEN';
+  periodFrom: string;
+  periodTo: string;
+  closingDate?: string;
+  items: TankInventoryReportItem[];
+}
+
+export interface InventoryReportWithPeriodsDto {
+  periods: InventoryPeriodDto[];
+  tanks: {
+    tankId: number;
+    tankCode: string;
+    tankName: string;
+    productId: number;
+    productName: string;
+    productCategory: string | null;
+    capacity: number;
+  }[];
+}
+
 export interface StockProductDto {
   productId: number;
   productCode: string;
@@ -101,6 +146,24 @@ export const inventoryApi = {
   getInventoryReportByStore: async (storeId: number, fromDate?: string, toDate?: string, priceId?: number) => {
     const response = await client.get<InventoryReportItem[]>(`/inventory/report-by-store/${storeId}`, {
       params: { fromDate, toDate, priceId },
+    });
+    return response.data;
+  },
+  /**
+   * 🔥 Báo cáo nhập xuất tồn THEO BỂ (Tank-based)
+   */
+  getInventoryReportByTank: async (storeId: number, fromDate?: string, toDate?: string) => {
+    const response = await client.get<TankInventoryReportItem[]>(`/inventory/report-by-tank/${storeId}`, {
+      params: { fromDate, toDate },
+    });
+    return response.data;
+  },
+  /**
+   * 🔥 Báo cáo nhập xuất tồn TÁCH THEO KỲ CHỐT
+   */
+  getInventoryReportByTankWithPeriods: async (storeId: number, fromDate?: string, toDate?: string) => {
+    const response = await client.get<InventoryReportWithPeriodsDto>(`/inventory/report-by-tank-with-periods/${storeId}`, {
+      params: { fromDate, toDate },
     });
     return response.data;
   },

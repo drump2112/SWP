@@ -6,6 +6,7 @@ import {
   JoinColumn,
   OneToMany,
   Index,
+  CreateDateColumn,
 } from 'typeorm';
 import { Store } from './store.entity';
 
@@ -49,6 +50,9 @@ export class Shift {
 
   @Column({ name: 'receiver_name', type: 'varchar', length: 255, nullable: true })
   receiverName: string | null; // Tên người nhận ca
+
+  @CreateDateColumn({ name: 'created_at' })
+  createdAt: Date;
 
   @ManyToOne(() => Store, (store) => store.shifts)
   @JoinColumn({ name: 'store_id' })

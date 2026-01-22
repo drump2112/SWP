@@ -12,7 +12,7 @@ import { Shift } from './shift.entity';
 import { User } from './user.entity';
 
 @Entity('cash_deposits')
-@Index('idx_cash_deposits_store', ['storeId', 'depositDate'])
+@Index('idx_cash_deposits_store', ['storeId', 'depositAt'])
 @Index('idx_cash_deposits_shift', ['shiftId'])
 export class CashDeposit {
   @PrimaryGeneratedColumn()
@@ -27,11 +27,8 @@ export class CashDeposit {
   @Column({ type: 'decimal', precision: 18, scale: 2 })
   amount: number;
 
-  @Column({ name: 'deposit_date', type: 'date' })
-  depositDate: Date;
-
-  @Column({ name: 'deposit_time', type: 'time', nullable: true })
-  depositTime: string;
+  @Column({ name: 'deposit_at', type: 'timestamp', nullable: true })
+  depositAt: Date; // Thời gian nộp tiền do người dùng chọn
 
   @Column({ name: 'receiver_name', length: 100, nullable: true })
   receiverName: string;

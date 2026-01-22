@@ -139,14 +139,15 @@ export class ReportsService {
         }
 
         if (fromDate && toDate) {
-          ledgerQuery.andWhere('dl.created_at BETWEEN :fromDate AND :toDate', {
+          // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
+          ledgerQuery.andWhere('dl.ledger_at BETWEEN :fromDate AND :toDate', {
             fromDate,
             toDate,
           });
         }
 
         const ledgers = await ledgerQuery
-          .orderBy('dl.created_at', 'ASC')
+          .orderBy('dl.ledger_at', 'ASC')
           .getMany();
 
         const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
@@ -184,7 +185,7 @@ export class ReportsService {
 
             return {
               id: l.id,
-              date: l.createdAt,
+              date: l.ledgerAt || l.createdAt, // ⏰ Ưu tiên ledgerAt
               refType: l.refType,
               refId: l.refId,
               debit: Number(l.debit),
@@ -341,7 +342,7 @@ export class ReportsService {
         testExport: Number(reading.testExport || 0), // Xuất kiểm thử/Quay kho
         quantity: Number(reading.quantity), // Số lượng BÁN (đã trừ testExport)
         unitPrice: Number(reading.unitPrice),
-        amount: Number(reading.quantity) * Number(reading.unitPrice),
+        amount: Math.round(Number(reading.quantity) * Number(reading.unitPrice)), // Làm tròn để tránh phần thập phân
       })),
       debtSales: debtSalesData.map((sale) => ({
         customerCode: sale.customer?.code,
@@ -382,8 +383,11 @@ export class ReportsService {
       .addSelect('product.name', 'productName')
       .addSelect('SUM(s.quantity)', 'totalQuantity')
       .addSelect('SUM(s.amount)', 'totalAmount')
-      .where('shift.shift_date >= :fromDate', { fromDate })
-      .andWhere('shift.shift_date <= :toDate', { toDate })
+      // ⏰ Dùng closed_at (thời điểm chốt ca) để lọc chính xác theo kỳ giá
+      // Tránh trường hợp 1 ngày có 2 ca do thay đổi giá
+      .where('shift.closed_at >= :fromDate', { fromDate })
+      .andWhere('shift.closed_at <= :toDate', { toDate })
+      .andWhere('shift.status = :status', { status: 'CLOSED' })
       .groupBy('store.id')
       .addGroupBy('store.name')
       .addGroupBy('product.id')
@@ -423,7 +427,8 @@ export class ReportsService {
     }
 
     if (fromDate) {
-      openingBalanceQuery.andWhere('cl.created_at < :fromDate', { fromDate });
+      // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
+      openingBalanceQuery.andWhere('cl.ledger_at < :fromDate', { fromDate });
     }
 
     const openingBalanceResult = await openingBalanceQuery.getRawOne();
@@ -449,13 +454,14 @@ export class ReportsService {
     }
 
     if (fromDate && toDate) {
+      // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
       if (storeId) {
-        ledgerQuery.andWhere('cl.created_at BETWEEN :fromDate AND :toDate', {
+        ledgerQuery.andWhere('cl.ledger_at BETWEEN :fromDate AND :toDate', {
           fromDate,
           toDate,
         });
       } else {
-        ledgerQuery.where('cl.created_at BETWEEN :fromDate AND :toDate', {
+        ledgerQuery.where('cl.ledger_at BETWEEN :fromDate AND :toDate', {
           fromDate,
           toDate,
         });
@@ -480,12 +486,14 @@ export class ReportsService {
             details = {
               type: 'RECEIPT',
               receiptType: receipt.receiptType,
+              receiptAt: receipt.receiptAt, // Thời gian thu tiền do người dùng chọn
               customers:
                 receipt.receiptDetails?.map((rd) => ({
                   customerName: rd.customer?.name || 'N/A',
                   amount: Number(rd.amount),
                 })) || [],
               totalAmount: Number(receipt.amount),
+              notes: receipt.notes,
             };
           }
         }
@@ -499,8 +507,7 @@ export class ReportsService {
           if (deposit) {
             details = {
               type: 'DEPOSIT',
-              depositDate: deposit.depositDate,
-              depositTime: deposit.depositTime,
+              depositAt: deposit.depositAt,
               receiverName: deposit.receiverName,
               amount: Number(deposit.amount),
               notes: deposit.notes,
@@ -508,9 +515,20 @@ export class ReportsService {
           }
         }
 
+        // Xác định ngày hiển thị: ưu tiên ledgerAt, sau đó receipt/deposit, cuối cùng createdAt
+        let displayDate = l.ledgerAt || l.createdAt;
+        if (!l.ledgerAt) {
+          // Fallback cho dữ liệu cũ chưa có ledgerAt
+          if (details?.type === 'RECEIPT' && details.receiptAt) {
+            displayDate = details.receiptAt;
+          } else if (details?.type === 'DEPOSIT' && details.depositAt) {
+            displayDate = details.depositAt;
+          }
+        }
+
         return {
           id: l.id,
-          date: l.createdAt,
+          date: displayDate,
           refType: l.refType,
           refId: l.refId,
           cashIn: Number(l.cashIn),
@@ -576,13 +594,14 @@ export class ReportsService {
   async getDashboard(fromDate: Date, toDate: Date) {
     const [totalSales, debtSummary, cashSummary, inventorySummary] =
       await Promise.all([
-        // Tổng doanh thu
+        // Tổng doanh thu - ⏰ Dùng closed_at thay vì shift_date
         this.saleRepository
           .createQueryBuilder('s')
           .leftJoin('s.shift', 'shift')
           .select('SUM(s.amount)', 'total')
-          .where('shift.shift_date >= :fromDate', { fromDate })
-          .andWhere('shift.shift_date <= :toDate', { toDate })
+          .where('shift.closed_at >= :fromDate', { fromDate })
+          .andWhere('shift.closed_at <= :toDate', { toDate })
+          .andWhere('shift.status = :status', { status: 'CLOSED' })
           .getRawOne(),
 
         // Tổng công nợ
@@ -688,6 +707,7 @@ export class ReportsService {
       return {
         id: doc.id,
         docDate: doc.docDate,
+        docAt: doc.docAt,
         docType: doc.docType,
         status: doc.status,
         supplierName: doc.supplierName,
@@ -706,7 +726,7 @@ export class ReportsService {
           productName: item.product.name,
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice || 0),
-          amount: Number(item.quantity) * Number(item.unitPrice || 0),
+          amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)), // Làm tròn để tránh phần thập phân
           tankCode: item.tank?.tankCode || null,
           tankName: item.tank?.name || null,
         })),
@@ -767,7 +787,7 @@ export class ReportsService {
         productName: item.product.name,
         quantity: Number(item.quantity),
         unitPrice: Number(item.unitPrice || 0),
-        amount: Number(item.quantity) * Number(item.unitPrice || 0),
+        amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)), // Làm tròn để tránh phần thập phân
         tankId: item.tank?.id || null,
         tankCode: item.tank?.tankCode || null,
         tankName: item.tank?.name || null,
@@ -918,13 +938,14 @@ export class ReportsService {
    * @returns Danh sách kỳ giá với label đã format
    */
   async getPricePeriods(): Promise<PricePeriod[]> {
-    // Lấy các khoảng thời gian duy nhất (DISTINCT validFrom, validTo)
+    // Lấy các khoảng thời gian duy nhất bằng GROUP BY
+    // Sử dụng GROUP BY thay vì DISTINCT để xử lý đúng với NULL values trong PostgreSQL
     const prices = await this.productPriceRepository
       .createQueryBuilder('price')
-      .select([
-        'DISTINCT price.validFrom AS "validFrom"',
-        'price.validTo AS "validTo"',
-      ])
+      .select('price.validFrom', 'validFrom')
+      .addSelect('price.validTo', 'validTo')
+      .groupBy('price.validFrom')
+      .addGroupBy('price.validTo')
       .orderBy('price.validFrom', 'DESC')
       .getRawMany();
 
@@ -1296,12 +1317,12 @@ export class ReportsService {
       .createQueryBuilder('pr')
       .leftJoin('pr.shift', 'shift')
       .leftJoin('pr.product', 'product')
-      .leftJoin('pumps', 'pump', 'pr.pump_code = pump.pump_code AND pump.store_id = shift.store_id')
+      .leftJoin('pr.pump', 'pump') // Sử dụng relation pump_id thay vì pump_code để join chính xác hơn
       .select('shift.id', 'shiftId')
       .addSelect('shift.shift_no', 'shiftNo')
       .addSelect('shift.shift_date', 'shiftDate')
       .addSelect('pump.id', 'pumpId')
-      .addSelect('pump.pump_code', 'pumpCode')
+      .addSelect('COALESCE(pump.pump_code, pr.pump_code)', 'pumpCode') // Fallback về pr.pump_code nếu pump_id chưa được set
       .addSelect('pump.name', 'pumpName')
       .addSelect('product.id', 'productId')
       .addSelect('product.code', 'productCode')
@@ -1313,7 +1334,7 @@ export class ReportsService {
       .addSelect('COALESCE(pr.unit_price, 0)', 'unitPrice')
       .addSelect('COALESCE(pr.quantity * pr.unit_price, 0)', 'amount')
       .where('shift.store_id = :storeId', { storeId })
-      .andWhere('shift.status = :status', { status: 'CLOSED' });
+      .andWhere('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] }); // Bao gồm cả ca điều chỉnh
 
     if (fromDate) {
       query.andWhere('shift.shift_date >= :fromDate', { fromDate });

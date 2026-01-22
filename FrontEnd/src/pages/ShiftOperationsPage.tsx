@@ -16,6 +16,7 @@ import { productsApi } from "../api/products";
 import { pumpsApi } from "../api/pumps";
 import { storesApi } from "../api/stores";
 import { inventoryApi } from "../api/inventory";
+import { tanksApi } from "../api/tanks"; // ✅ Import tanksApi
 import { useAuth } from "../contexts/AuthContext";
 import { showConfirm } from "../utils/sweetalert";
 import Swal from "sweetalert2";
@@ -155,6 +156,16 @@ const ShiftOperationsPage: React.FC = () => {
     queryFn: async () => {
       if (!report?.shift.storeId) return null;
       return storesApi.getById(report.shift.storeId);
+    },
+    enabled: !!report?.shift.storeId,
+  });
+
+  // ✅ Fetch tanks để hiển thị tên bể trong bảng nhập hàng
+  const { data: tanks } = useQuery({
+    queryKey: ["tanks", report?.shift.storeId],
+    queryFn: async () => {
+      if (!report?.shift.storeId) return [];
+      return tanksApi.getByStore(report.shift.storeId);
     },
     enabled: !!report?.shift.storeId,
   });
@@ -378,6 +389,7 @@ const ShiftOperationsPage: React.FC = () => {
           const previousEndValue = previousData.hasPreviousShift ? previousData.readings[pump.pumpCode] || 0 : 0;
 
           initialReadings[pump.id] = {
+            pumpId: pump.id, // ✅ Thêm pumpId để query tankId
             pumpCode: pump.pumpCode,
             productId: pump.productId,
             startValue: previousEndValue,
@@ -400,6 +412,7 @@ const ShiftOperationsPage: React.FC = () => {
         const initialReadings: Record<number, PumpReadingDto> = {};
         pumps.forEach((pump: any) => {
           initialReadings[pump.id] = {
+            pumpId: pump.id, // ✅ Thêm pumpId để query tankId
             pumpCode: pump.pumpCode,
             productId: pump.productId,
             startValue: 0,
@@ -462,6 +475,7 @@ const ShiftOperationsPage: React.FC = () => {
     pumps.forEach((pump: any) => {
       const reportReading = report.pumpReadings.find((r: any) => r.pumpCode === pump.pumpCode);
       initialReadings[pump.id] = {
+        pumpId: pump.id, // ✅ Thêm pumpId để query tankId
         pumpCode: pump.pumpCode,
         productId: pump.productId,
         startValue: reportReading ? Number(reportReading.startValue) : 0,
@@ -517,8 +531,7 @@ const ShiftOperationsPage: React.FC = () => {
           storeId: d.storeId,
           shiftId: d.shiftId,
           amount: Number(d.amount),
-          depositDate: d.depositDate,
-          depositTime: d.depositTime,
+          depositAt: d.depositAt || d.depositDate, // Support both new and old format
           receiverName: d.receiverName,
           notes: d.notes,
           paymentMethod: d.paymentMethod || "CASH",
@@ -565,7 +578,7 @@ const ShiftOperationsPage: React.FC = () => {
     }
   }, [isEditMode, report, pumps, shiftId, hasLoadedReportData]);
 
-  // Fetch prices
+  // Fetch prices - Sử dụng thời điểm mở ca để lấy đúng kỳ giá
   useEffect(() => {
     if (!store?.regionId || !pumps || pumps.length === 0) return;
 
@@ -573,9 +586,17 @@ const ShiftOperationsPage: React.FC = () => {
       const prices: Record<number, number> = {};
       const uniqueProductIds = [...new Set(pumps.map((p: any) => p.productId))];
 
+      // ✅ QUAN TRỌNG: Sử dụng thời điểm mở ca (openedAt) để lấy giá đúng kỳ giá
+      // Nếu ca mở lúc 10h và giá đổi lúc 15h, vẫn lấy giá của kỳ 10h
+      const priceReferenceTime = report?.shift?.openedAt
+        ? new Date(report.shift.openedAt)
+        : undefined;
+
+      console.log(`📊 Lấy giá tại thời điểm: ${priceReferenceTime?.toISOString() || 'hiện tại'}`);
+
       for (const productId of uniqueProductIds) {
         try {
-          const priceData = await productsApi.getCurrentPrice(productId, store.regionId);
+          const priceData = await productsApi.getCurrentPrice(productId, store.regionId, priceReferenceTime);
           prices[productId] = Number(priceData.price);
         } catch (error) {
           console.error(`❌ Failed to fetch price for product ${productId}:`, error);
@@ -587,7 +608,7 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     fetchPrices();
-  }, [store, pumps]);
+  }, [store, pumps, report?.shift?.openedAt]);
 
   // Load phiếu nhập kho của ca (nếu có) - load khi xem chi tiết, edit mode
   // Chỉ KHÔNG load khi ca thực sự đang OPEN (chưa từng chốt)
@@ -614,7 +635,7 @@ const ShiftOperationsPage: React.FC = () => {
             const firstCompartment = doc.compartments?.[0];
             return {
               id: doc.id,
-              docDate: doc.docDate,
+              docAt: doc.docAt || doc.docDate,
               supplierName: doc.supplierName,
               licensePlate: doc.licensePlate,
               driverName: doc.driverName,
@@ -995,8 +1016,7 @@ const ShiftOperationsPage: React.FC = () => {
         storeId: d.storeId || report?.shift.storeId || user?.storeId || 0,
         shiftId: Number(shiftId),
         amount: d.amount,
-        depositDate: d.depositDate,
-        depositTime: d.depositTime,
+        depositAt: d.depositAt,
         receiverName: d.receiverName,
         notes: d.notes,
         paymentMethod: d.paymentMethod || "CASH",
@@ -1015,11 +1035,12 @@ const ShiftOperationsPage: React.FC = () => {
         }
         return {
           id: importId,
-          docDate: imp.docDate,
+          docAt: imp.docAt,
           supplierName: imp.supplierName,
           licensePlate: imp.licensePlate,
           driverName: imp.driverName,
           productId: imp.productId,
+          tankId: imp.tankId, // ✅ Thêm tankId
           quantity: imp.quantity,
           notes: imp.notes,
         };
@@ -1079,6 +1100,13 @@ const ShiftOperationsPage: React.FC = () => {
     const amount = Number(formData.get("amount"));
     const notes = (formData.get("notes") as string) || undefined;
     const paymentMethod = (formData.get("paymentMethod") as string) || "CASH";
+    const receiptAt = formData.get("receiptAt") as string;
+
+    // Validate thời gian
+    if (!receiptAt) {
+      toast.error("Vui lòng nhập thời gian thu tiền!", { position: "top-right", autoClose: 3000 });
+      return;
+    }
 
     if (editingReceiptId) {
       setDraftReceipts((prev) =>
@@ -1090,6 +1118,7 @@ const ShiftOperationsPage: React.FC = () => {
               details: [{ customerId, amount }],
               notes,
               paymentMethod,
+              receiptAt,
             };
           }
           return item;
@@ -1135,9 +1164,12 @@ const ShiftOperationsPage: React.FC = () => {
           if (exists) {
             return prev.map((d) => {
               if (d.id === targetId) {
+                // Sử dụng receiptAt cho depositAt
+                const depositAt = receiptAt || dayjs().format("YYYY-MM-DDTHH:mm");
                 return {
                   ...d,
                   amount,
+                  depositAt,
                   // Cập nhật note để lần sau dễ tìm kiếm hơn
                   notes: d.notes?.includes(`#${editingReceiptId}`)
                     ? d.notes
@@ -1148,6 +1180,7 @@ const ShiftOperationsPage: React.FC = () => {
             });
           }
           // Nếu chưa có (vd sửa từ Transfer sang CASH) -> Tạo mới
+          const depositAt = receiptAt || dayjs().format("YYYY-MM-DDTHH:mm");
           return [
             ...prev,
             {
@@ -1155,8 +1188,7 @@ const ShiftOperationsPage: React.FC = () => {
               storeId: user?.storeId || report?.shift.storeId || 0,
               shiftId: Number(shiftId),
               amount,
-              depositDate: dayjs().format("YYYY-MM-DD"),
-              depositTime: dayjs().format("HH:mm"),
+              depositAt,
               receiverName: "Công ty SWP",
               notes: `Nộp tiền thu từ khách hàng (Phiếu thu #${editingReceiptId})`,
               paymentMethod: "CASH",
@@ -1179,19 +1211,20 @@ const ShiftOperationsPage: React.FC = () => {
         details: [{ customerId, amount }],
         notes,
         paymentMethod,
+        receiptAt,
       };
       // Lưu vào draft state thay vì API
       setDraftReceipts((prev) => [...prev, data]);
 
       // Tự động tạo phiếu nộp (Deposit) tương ứng nếu là tiền mặt
       if (paymentMethod === "CASH") {
+        const depositAt = receiptAt || dayjs().format("YYYY-MM-DDTHH:mm");
         const depositData: CashDepositDto & { id: string } = {
           id: `receipt-${receiptId}`, // ID liên kết đặc biệt
           storeId: user?.storeId || report?.shift.storeId || 0,
           shiftId: Number(shiftId),
           amount,
-          depositDate: dayjs().format("YYYY-MM-DD"),
-          depositTime: dayjs().format("HH:mm"),
+          depositAt,
           receiverName: "Công ty SWP",
           notes: `Nộp tiền thu từ khách hàng (Phiếu thu mới)`,
           paymentMethod: "CASH",
@@ -1214,13 +1247,18 @@ const ShiftOperationsPage: React.FC = () => {
     console.log("📝 handleDepositSubmit called");
     const formData = new FormData(e.currentTarget);
     const amount = Number(formData.get("amount"));
-    const depositDate = formData.get("depositDate") as string;
-    const depositTime = (formData.get("depositTime") as string) || undefined;
+    const depositAt = formData.get("depositAt") as string;
     const receiverName = (formData.get("receiverName") as string) || undefined;
     const notes = (formData.get("notes") as string) || undefined;
     const paymentMethod = (formData.get("paymentMethod") as string) || "CASH";
 
-    console.log("📝 Deposit data:", { amount, depositDate, depositTime, receiverName, notes, paymentMethod, editingDepositId });
+    console.log("📝 Deposit data:", { amount, depositAt, receiverName, notes, paymentMethod, editingDepositId });
+
+    // Validate ngày giờ
+    if (!depositAt) {
+      toast.error("Vui lòng nhập ngày giờ nộp tiền!", { position: "top-right", autoClose: 3000 });
+      return;
+    }
 
     if (editingDepositId) {
       setDraftDeposits((prev) =>
@@ -1229,8 +1267,7 @@ const ShiftOperationsPage: React.FC = () => {
             return {
               ...item,
               amount,
-              depositDate,
-              depositTime,
+              depositAt,
               receiverName,
               notes,
               paymentMethod,
@@ -1247,8 +1284,7 @@ const ShiftOperationsPage: React.FC = () => {
         storeId: user?.storeId || report?.shift.storeId || 0,
         shiftId: Number(shiftId),
         amount,
-        depositDate,
-        depositTime,
+        depositAt,
         receiverName,
         notes,
         paymentMethod,
@@ -1319,6 +1355,12 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
+    // ✅ Validate tankId
+    if (!formData.tankId || formData.tankId <= 0) {
+      toast.error("Vui lòng chọn bể để nhập hàng");
+      return;
+    }
+
     if (!formData.quantity || formData.quantity <= 0) {
       toast.error("Vui lòng nhập số lượng hợp lệ");
       return;
@@ -1331,11 +1373,12 @@ const ShiftOperationsPage: React.FC = () => {
           if (item.id === editingImportId) {
             return {
               ...item,
-              docDate: formData.docDate,
+              docAt: formData.docAt,
               supplierName: formData.supplierName,
               licensePlate: formData.licensePlate,
               driverName: formData.driverName,
               productId: formData.productId,
+              tankId: formData.tankId, // ✅ Thêm tankId
               quantity: formData.quantity,
               notes: formData.notes,
             };
@@ -1348,11 +1391,12 @@ const ShiftOperationsPage: React.FC = () => {
       // Thêm mới vào draft
       const newItem = {
         id: `draft_${Date.now()}`,
-        docDate: formData.docDate,
+        docAt: formData.docAt,
         supplierName: formData.supplierName,
         licensePlate: formData.licensePlate,
         driverName: formData.driverName,
         productId: formData.productId,
+        tankId: formData.tankId, // ✅ Thêm tankId
         quantity: formData.quantity,
         notes: formData.notes,
       };
@@ -2846,6 +2890,21 @@ const ShiftOperationsPage: React.FC = () => {
                       </select>
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian thu *</label>
+                      <input
+                        type="datetime-local"
+                        name="receiptAt"
+                        required
+                        defaultValue={
+                          editingReceiptId
+                            ? draftReceipts.find((r) => r.id === editingReceiptId)?.receiptAt?.slice(0, 16)
+                            : dayjs().format("YYYY-MM-DDTHH:mm")
+                        }
+                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+
                     <div className="md:col-span-2">
                       <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
                       <input
@@ -2903,7 +2962,11 @@ const ShiftOperationsPage: React.FC = () => {
                             .join(", ");
                           return (
                             <tr key={receipt.id}>
-                              <td className="px-6 py-4 text-sm text-gray-900">Chưa lưu</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {receipt.receiptAt
+                                  ? dayjs(receipt.receiptAt).format("DD/MM/YYYY HH:mm")
+                                  : "Chưa lưu"}
+                              </td>
                               <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
@@ -2955,7 +3018,9 @@ const ShiftOperationsPage: React.FC = () => {
                           return (
                             <tr key={receipt.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">
-                                {dayjs(receipt.createdAt).format("DD/MM/YYYY HH:mm")}
+                                {receipt.receiptAt
+                                  ? dayjs(receipt.receiptAt).format("DD/MM/YYYY HH:mm")
+                                  : dayjs(receipt.createdAt).format("DD/MM/YYYY HH:mm")}
                               </td>
                               <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
                               <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
@@ -3028,27 +3093,15 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày nộp *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nộp *</label>
                       <input
-                        type="date"
-                        name="depositDate"
+                        type="datetime-local"
+                        name="depositAt"
                         required
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.depositDate
-                            : dayjs().format("YYYY-MM-DD")
-                        }
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Giờ nộp</label>
-                      <input
-                        type="time"
-                        name="depositTime"
-                        defaultValue={
-                          editingDepositId ? draftDeposits.find((d) => d.id === editingDepositId)?.depositTime : ""
+                            ? draftDeposits.find((d) => d.id === editingDepositId)?.depositAt
+                            : dayjs().format("YYYY-MM-DDTHH:mm")
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                       />
@@ -3121,8 +3174,7 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày nộp</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Giờ</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày giờ nộp</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
@@ -3136,9 +3188,8 @@ const ShiftOperationsPage: React.FC = () => {
                         draftDeposits.map((deposit) => (
                           <tr key={deposit.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              {dayjs(deposit.depositDate).format("DD/MM/YYYY")}
+                              {dayjs(deposit.depositAt).format("DD/MM/YYYY HH:mm")}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
@@ -3164,7 +3215,7 @@ const ShiftOperationsPage: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
                             Chưa có phiếu nộp tiền{" "}
                           </td>
                         </tr>
@@ -3174,9 +3225,8 @@ const ShiftOperationsPage: React.FC = () => {
                         report.cashDeposits.map((deposit: any) => (
                           <tr key={deposit.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              {dayjs(deposit.depositDate).format("DD/MM/YYYY")}
+                              {deposit.depositAt ? dayjs(deposit.depositAt).format("DD/MM/YYYY HH:mm") : dayjs(deposit.depositDate).format("DD/MM/YYYY")}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.depositTime || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
@@ -3187,7 +3237,7 @@ const ShiftOperationsPage: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
                             Không có phiếu nộp tiền
                           </td>
                         </tr>
@@ -3226,6 +3276,7 @@ const ShiftOperationsPage: React.FC = () => {
                       setShowImportForm(false);
                       setEditingImportId(null);
                     }}
+                    storeId={report?.shift.storeId}
                     initialData={editingImportId ? draftImports.find((i) => i.id === editingImportId) : undefined}
                   />
                 )}
@@ -3233,10 +3284,11 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày giờ</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bể</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
@@ -3247,15 +3299,19 @@ const ShiftOperationsPage: React.FC = () => {
                         // Lấy tên mặt hàng từ productId
                         const product = products?.find((p) => p.id === item.productId);
                         const productName = product?.name || `SP#${item.productId}`;
+                        // ✅ Lấy tên bể từ tankId
+                        const tank = tanks?.find((t) => t.id === item.tankId);
+                        const tankName = tank ? `${tank.tankCode} - ${tank.name}` : (item.tankId ? `Bể#${item.tankId}` : "-");
 
                         return (
                           <tr key={item.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              {dayjs(item.docDate).format("DD/MM/YYYY")}
+                              {dayjs(item.docAt).format("DD/MM/YYYY HH:mm")}
                             </td>
                             <td className="px-6 py-4 text-sm font-medium text-blue-600">{item.licensePlate || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
                             <td className="px-6 py-4 text-sm text-gray-700">{productName}</td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{tankName}</td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
                               {Number(item.quantity || 0).toLocaleString("vi-VN")} lít
                             </td>
@@ -3288,7 +3344,7 @@ const ShiftOperationsPage: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                        <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
                           Chưa có phiếu nhập hàng
                         </td>
                       </tr>
