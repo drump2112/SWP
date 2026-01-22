@@ -91,6 +91,16 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
       productId,
       quantity,
       notes,
+      compartments: [{
+        compartmentNumber: 1,
+        productId,
+        compartmentHeight: 0,
+        truckTemperature: 0,
+        truckVolume: quantity,
+        warehouseHeight: 0,
+        actualTemperature: 0,
+        receivedVolume: quantity,
+      }],
     });
   };
 
@@ -145,7 +155,7 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
               onChange={(e) => setLicensePlate(e.target.value)}
               onFocus={(e) => e.target.select()}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="VD: 29A-12345"
+              placeholder="VD: 29K-02756"
             />
           </div>
 
@@ -195,7 +205,7 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, initial
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giả<i></i></label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}

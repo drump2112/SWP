@@ -113,6 +113,21 @@ class InventoryExportDto {
   notes?: string;
 }
 
+// DTO cho bán lẻ - ghi nhận cho khách hàng nội bộ (không tạo công nợ)
+class RetailSaleDto {
+  @IsInt()
+  customerId: number; // Khách hàng nội bộ
+
+  @IsInt()
+  productId: number;
+
+  @IsNumber()
+  quantity: number;
+
+  @IsNumber()
+  unitPrice: number;
+}
+
 export class CloseShiftDto {
   @IsInt()
   @IsNotEmpty()
@@ -128,6 +143,12 @@ export class CloseShiftDto {
   @ValidateNested({ each: true })
   @Type(() => CreateShiftDebtSaleDto)
   debtSales?: CreateShiftDebtSaleDto[];
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => RetailSaleDto)
+  retailSales?: RetailSaleDto[]; // Bán lẻ cho khách hàng nội bộ
 
   @IsOptional()
   @IsArray()

@@ -128,6 +128,11 @@ const ShiftOperationsPage: React.FC = () => {
     return [...externalCustomers, ...internalCustomers];
   }, [customers, storeCustomers]);
 
+  // Tìm khách hàng INTERNAL (cửa hàng trưởng) để gán bán lẻ thực tế
+  const retailCustomer = React.useMemo(() => {
+    return storeCustomers?.find((c: any) => c.type === 'INTERNAL') || null;
+  }, [storeCustomers]);
+
   // Fetch products
   const { data: products } = useQuery({
     queryKey: ["products"],
@@ -949,6 +954,18 @@ const ShiftOperationsPage: React.FC = () => {
 
     const closedAt = result.value;
 
+    // Tạo retailSales từ declaredRetailQuantities cho khách hàng nội bộ
+    const retailSalesData = retailCustomer
+      ? Object.entries(declaredRetailQuantities)
+          .filter(([_, qty]) => qty > 0)
+          .map(([productIdStr, quantity]) => ({
+            customerId: retailCustomer.id,
+            productId: Number(productIdStr),
+            quantity: quantity,
+            unitPrice: productPrices[Number(productIdStr)] || 0,
+          }))
+      : [];
+
     const dto: CloseShiftDto = {
       shiftId: Number(shiftId),
       closedAt: closedAt ? new Date(closedAt).toISOString() : undefined,
@@ -962,6 +979,7 @@ const ShiftOperationsPage: React.FC = () => {
         unitPrice: ds.unitPrice,
         notes: ds.notes,
       })),
+      retailSales: retailSalesData, // Bán lẻ cho khách hàng nội bộ
       receipts: draftReceipts.map((r) => ({
         id: String(r.id).startsWith("draft_") ? undefined : r.id,
         storeId: r.storeId || report?.shift.storeId || user?.storeId || 0,
@@ -982,6 +1000,7 @@ const ShiftOperationsPage: React.FC = () => {
         receiverName: d.receiverName,
         notes: d.notes,
         paymentMethod: d.paymentMethod || "CASH",
+        sourceType: d.sourceType, // RETAIL hoặc RECEIPT để phân biệt nguồn gốc
       })),
       inventoryImports: draftImports.map((imp) => {
         // Xử lý id: draft_ = undefined, doc_123 = 123, number = number
@@ -1141,6 +1160,7 @@ const ShiftOperationsPage: React.FC = () => {
               receiverName: "Công ty SWP",
               notes: `Nộp tiền thu từ khách hàng (Phiếu thu #${editingReceiptId})`,
               paymentMethod: "CASH",
+              sourceType: 'RECEIPT', // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
             },
           ];
         });
@@ -1175,6 +1195,7 @@ const ShiftOperationsPage: React.FC = () => {
           receiverName: "Công ty SWP",
           notes: `Nộp tiền thu từ khách hàng (Phiếu thu mới)`,
           paymentMethod: "CASH",
+          sourceType: 'RECEIPT', // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
         };
         setDraftDeposits((prev) => [...prev, depositData]);
         toast.success("Đã tạo phiếu thu và phiếu nộp tương ứng", { position: "top-right", autoClose: 3000 });
@@ -1231,6 +1252,7 @@ const ShiftOperationsPage: React.FC = () => {
         receiverName,
         notes,
         paymentMethod,
+        sourceType: 'RETAIL', // Phiếu nộp thủ công = từ tiền bán lẻ → ghi CREDIT cho khách nội bộ
       };
       // Lưu vào draft state thay vì API
       setDraftDeposits((prev) => [...prev, data]);
@@ -2382,7 +2404,19 @@ const ShiftOperationsPage: React.FC = () => {
               {/* Retail Quantity Verification Section */}
               {canEdit ? (
                 <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">⛽ Đối chiếu lượng hàng bán</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">⛽ Đối chiếu lượng hàng bán</h3>
+                    {retailCustomer ? (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
+                        <span className="text-sm text-gray-600">Khách nội bộ:</span>
+                        <span className="text-sm font-medium text-green-700">{retailCustomer.code} - {retailCustomer.name}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <span className="text-sm text-yellow-700">⚠️ Chưa có khách hàng nội bộ cho cửa hàng này</span>
+                      </div>
+                    )}
+                  </div>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead>
@@ -2464,7 +2498,7 @@ const ShiftOperationsPage: React.FC = () => {
                     </table>
                   </div>
                   <p className="text-xs text-gray-500 mt-2 italic">
-                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu với tổng lượng bơm. <strong>Chỉ để kiểm tra số liệu, KHÔNG tạo công nợ.</strong>
+                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu. Khi chốt ca, lượng này sẽ được ghi nhận cho khách hàng nội bộ để kiểm soát tiền.
                   </p>
                 </div>
               ) : null}

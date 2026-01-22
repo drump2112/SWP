@@ -12,6 +12,7 @@ import { InventoryLedger } from '../entities/inventory-ledger.entity';
 import { InventoryDocument } from '../entities/inventory-document.entity';
 import { InventoryDocumentItem } from '../entities/inventory-document-item.entity';
 import { ProductPrice } from '../entities/product-price.entity';
+import { Product } from '../entities/product.entity';
 import { AuditLog } from '../entities/audit-log.entity';
 import { ShiftDebtSale } from '../entities/shift-debt-sale.entity';
 import { CashDeposit } from '../entities/cash-deposit.entity';
@@ -542,7 +543,43 @@ export class ShiftsService {
       }
     }
 
-    // 6.2. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
+    // 6.2. ✅ Xử lý Retail Sales (ghi nhận cho khách hàng nội bộ để kiểm soát tiền)
+    // LƯU Ý QUAN TRỌNG:
+    // - Lượng bán lẻ ĐÃ ĐƯỢC ghi vào bảng sales ở Bước 2 (từ pump readings, customerId=null)
+    // - KHÔNG ghi vào shift_debt_sales vì sẽ làm sai báo cáo doanh thu/xuất hàng
+    //   (báo cáo tính: Bán lẻ = Tổng pump - shift_debt_sales)
+    // - Chỉ ghi DEBIT vào debt_ledger → khách nội bộ NỢ tiền bán lẻ
+    // - CREDIT sẽ được ghi khi có phiếu nộp tiền về công ty (deposit)
+    if (closeShiftDto.retailSales && closeShiftDto.retailSales.length > 0) {
+      for (const retailSale of closeShiftDto.retailSales) {
+        const totalAmount = retailSale.quantity * retailSale.unitPrice;
+
+        // Lấy tên sản phẩm để ghi vào notes
+        const product = await manager.findOne(Product, {
+          where: { id: retailSale.productId },
+          select: ['id', 'name'],
+        });
+        const productName = product?.name || `SP${retailSale.productId}`;
+
+        // ✅ Ghi công nợ DEBIT (phát sinh nợ) - khách nội bộ NỢ tiền bán lẻ
+        await manager.save(DebtLedger, {
+          customerId: retailSale.customerId,
+          storeId: shift.storeId,
+          refType: 'RETAIL_SALE',
+          refId: shift.id, // Ref đến shift
+          debit: totalAmount,
+          credit: 0,
+          notes: `Bán lẻ ${retailSale.quantity.toFixed(3)} lít ${productName}`,
+          shiftId: shift.id,
+        });
+
+        // ❌ KHÔNG ghi CREDIT ở đây
+        // CREDIT sẽ được ghi khi có phiếu nộp tiền về công ty (deposit)
+        // → Công nợ khách nội bộ = Tổng DEBIT (bán lẻ) - Tổng CREDIT (đã nộp)
+      }
+    }
+
+    // 6.3. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
     if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
       for (const receipt of closeShiftDto.receipts) {
         // Lưu receipt
@@ -594,8 +631,27 @@ export class ShiftsService {
 
     // 6.3. ✅ Xử lý Deposits (nộp tiền về công ty)
     // Tiền rời khỏi quỹ cửa hàng → cashOut
-    // KHÔNG liên quan đến công nợ khách hàng
+    // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
     if (closeShiftDto.deposits && closeShiftDto.deposits.length > 0) {
+      // Tìm khách hàng nội bộ của cửa hàng để ghi CREDIT
+      const internalCustomer = await manager.findOne(Customer, {
+        where: {
+          type: 'INTERNAL',
+        },
+        relations: ['customerStores'],
+      }).then(async () => {
+        // Tìm khách hàng nội bộ qua customer_stores
+        const customerStore = await manager
+          .createQueryBuilder()
+          .select('cs.customerId', 'customerId')
+          .from('customer_stores', 'cs')
+          .innerJoin('customers', 'c', 'c.id = cs.customerId')
+          .where('cs.storeId = :storeId', { storeId: shift.storeId })
+          .andWhere('c.type = :type', { type: 'INTERNAL' })
+          .getRawOne();
+        return customerStore?.customerId || null;
+      });
+
       for (const deposit of closeShiftDto.deposits) {
         // Lưu deposit record
         const depositRecord = await manager.save(CashDeposit, {
@@ -611,7 +667,7 @@ export class ShiftsService {
 
         // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
         // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
-        // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
+        // Chỉ ghi nếu nộp tiền m ặt (không ghi nếu chuyển khoản đã nộp trước)
         if (depositRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             storeId: deposit.storeId,
@@ -622,6 +678,22 @@ export class ShiftsService {
             notes: deposit.notes || 'Nộp tiền về công ty',
             shiftId: shift.id,
           });
+
+          // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
+          // CHỈ ghi nếu sourceType = 'RETAIL' hoặc không có sourceType (mặc định là bán lẻ)
+          // KHÔNG ghi nếu sourceType = 'RECEIPT' (tiền từ phiếu thu - đã ghi CREDIT cho khách EXTERNAL rồi)
+          if (internalCustomer && deposit.sourceType !== 'RECEIPT') {
+            await manager.save(DebtLedger, {
+              customerId: internalCustomer,
+              storeId: shift.storeId,
+              refType: 'DEPOSIT',
+              refId: depositRecord.id,
+              debit: 0,
+              credit: deposit.amount,
+              notes: deposit.notes || 'Nộp tiền về công ty - Giảm nợ',
+              shiftId: shift.id,
+            });
+          }
         }
       }
     }

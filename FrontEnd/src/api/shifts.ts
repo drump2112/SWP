@@ -33,6 +33,7 @@ export interface CloseShiftDto {
   shiftId: number;
   pumpReadings: PumpReadingDto[];
   debtSales?: ShiftDebtSaleDto[];
+  retailSales?: RetailSaleDto[]; // Bán lẻ - ghi cho khách hàng nội bộ
   receipts?: CreateReceiptDto[];
   deposits?: CashDepositDto[];
   inventoryImports?: InventoryImportDto[];
@@ -40,6 +41,14 @@ export interface CloseShiftDto {
   closedAt?: string;
   handoverName?: string;
   receiverName?: string;
+}
+
+// DTO cho bán lẻ - ghi nhận cho khách hàng nội bộ (không phải công nợ)
+export interface RetailSaleDto {
+  customerId: number; // Khách hàng nội bộ
+  productId: number;
+  quantity: number;
+  unitPrice: number;
 }
 
 export interface CreateShiftDto {
@@ -103,6 +112,7 @@ export interface CashDepositDto {
   receiverName?: string;
   notes?: string;
   paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
+  sourceType?: 'RETAIL' | 'RECEIPT'; // Nguồn gốc: RETAIL (bán lẻ) hoặc RECEIPT (thu nợ)
 }
 
 export interface ReceiptDetailDto {

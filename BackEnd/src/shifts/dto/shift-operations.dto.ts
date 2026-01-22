@@ -127,4 +127,8 @@ export class CreateCashDepositDto {
   @IsOptional()
   @IsString()
   paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
+
+  @IsOptional()
+  @IsString()
+  sourceType?: string; // 'RETAIL' (từ bán lẻ) hoặc 'RECEIPT' (từ phiếu thu)
 }
