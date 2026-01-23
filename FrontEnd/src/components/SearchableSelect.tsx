@@ -186,10 +186,9 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         noOptionsMessage={() => 'Không tìm thấy kết quả'}
         loadingMessage={() => 'Đang tải...'}
         menuPortalTarget={document.body}
-        menuPosition="fixed"
         styles={{
           ...customStyles,
-          menuPortal: (base) => ({ ...base, zIndex: 9999, overflow: 'hidden' }),
+          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
         }}
         components={hideSelectedValues ? { ValueContainer } : undefined}
       />
