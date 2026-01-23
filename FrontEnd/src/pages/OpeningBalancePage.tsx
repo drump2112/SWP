@@ -29,6 +29,9 @@ export const OpeningBalancePage: React.FC = () => {
   const [selectedStoreId, setSelectedStoreId] = useState<number | null>(null);
   const [balance, setBalance] = useState<string>('');
   const [notes, setNotes] = useState('');
+  const [addTransactionDate, setAddTransactionDate] = useState<string>(
+    new Date().toISOString().split('T')[0]
+  );
 
   // State cho import Excel
   const [showImportSection, setShowImportSection] = useState(false);
@@ -87,7 +90,7 @@ export const OpeningBalancePage: React.FC = () => {
       // Gọi import API với 1 item
       return customersApi.importOpeningBalance({
         storeId: selectedStoreId,
-        transactionDate: new Date().toISOString().split('T')[0],
+        transactionDate: addTransactionDate,
         items: [
           {
             customerCode: customer.code,
@@ -106,6 +109,7 @@ export const OpeningBalancePage: React.FC = () => {
         setSelectedStoreId(null);
         setBalance('');
         setNotes('');
+        setAddTransactionDate(new Date().toISOString().split('T')[0]);
         setShowAddForm(false);
       } else if (response.errors.length > 0) {
         toast.error(response.errors[0].message);
@@ -361,6 +365,21 @@ export const OpeningBalancePage: React.FC = () => {
               </div>
 
               <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Ngày ghi nhận <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={addTransactionDate}
+                  onChange={(e) => setAddTransactionDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Ngày ghi nhận số dư đầu kỳ (dùng để tính báo cáo công nợ)
+                </p>
+              </div>
+
+              <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Ghi chú</label>
                 <input
                   type="text"
@@ -391,6 +410,7 @@ export const OpeningBalancePage: React.FC = () => {
                   setSelectedStoreId(null);
                   setBalance('');
                   setNotes('');
+                  setAddTransactionDate(new Date().toISOString().split('T')[0]);
                 }}
                 className="px-3 py-1.5 text-sm bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-md shadow hover:shadow-lg hover:from-gray-600 hover:to-gray-700 transition-all duration-300 flex items-center gap-2 font-medium"
               >

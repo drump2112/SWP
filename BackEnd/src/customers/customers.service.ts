@@ -784,6 +784,7 @@ export class CustomersService {
             debtLedger.credit = Math.abs(item.openingBalance);
           }
           debtLedger.notes = item.description || 'Số dư đầu kỳ công nợ';
+          debtLedger.ledgerAt = new Date(transactionDate); // ⏰ Set ledgerAt cho báo cáo
           debtLedger.createdAt = new Date(transactionDate);
 
           const savedLedger = await manager.save(debtLedger);

@@ -356,34 +356,109 @@ const InventoryReportPage: React.FC = () => {
                 }
               });
             });
+
+            // 🔥 Tổng theo từng mặt hàng CHỈ CỦA KỲ NÀY
+            const periodProductTotals: Record<number, {
+              productId: number;
+              productName: string;
+              openingBalance: number;
+              importQuantity: number;
+              exportQuantity: number;
+              lossAmount: number;
+              closingBalance: number;
+            }> = {};
+
+            period.items.forEach((item: any) => {
+              if (!periodProductTotals[item.productId]) {
+                periodProductTotals[item.productId] = {
+                  productId: item.productId,
+                  productName: item.productName,
+                  openingBalance: 0,
+                  importQuantity: 0,
+                  exportQuantity: 0,
+                  lossAmount: 0,
+                  closingBalance: 0,
+                };
+              }
+              periodProductTotals[item.productId].openingBalance += Number(item.openingBalance);
+              periodProductTotals[item.productId].importQuantity += Number(item.importQuantity);
+              periodProductTotals[item.productId].exportQuantity += Number(item.exportQuantity);
+              periodProductTotals[item.productId].lossAmount += Number(item.lossAmount || 0);
+              periodProductTotals[item.productId].closingBalance += Number(item.closingBalance);
+            });
+
+            const periodProductList = Object.values(periodProductTotals);
+            const periodTotal = {
+              openingBalance: periodProductList.reduce((sum, p) => sum + p.openingBalance, 0),
+              importQuantity: periodProductList.reduce((sum, p) => sum + p.importQuantity, 0),
+              exportQuantity: periodProductList.reduce((sum, p) => sum + p.exportQuantity, 0),
+              lossAmount: periodProductList.reduce((sum, p) => sum + p.lossAmount, 0),
+              closingBalance: periodProductList.reduce((sum, p) => sum + p.closingBalance, 0),
+            };
+
+            const periodBgColor = period.periodType === 'CLOSED' ? 'FFD4EDDA' : 'FFFFF3CD';
+
+            // Tổng từng mặt hàng của kỳ
+            periodProductList.forEach((product) => {
+              const row = worksheet.addRow([
+                '',
+                '',
+                '',
+                `Tổng ${product.productName}`,
+                'lít',
+                '-',
+                product.openingBalance,
+                product.importQuantity,
+                product.exportQuantity,
+                product.closingBalance,
+              ]);
+              row.font = STYLES.boldFont;
+              row.eachCell((cell, colNumber) => {
+                cell.fill = {
+                  type: 'pattern',
+                  pattern: 'solid',
+                  fgColor: { argb: periodBgColor },
+                };
+                cell.border = STYLES.borderStyle;
+                if (colNumber >= 7) {
+                  cell.alignment = STYLES.rightAlign;
+                  cell.numFmt = '#,##0.00';
+                }
+              });
+              worksheet.mergeCells(`A${row.number}:C${row.number}`);
+            });
+
+            // Tổng tất cả mặt hàng của kỳ
+            const periodTotalRow = worksheet.addRow([
+              '',
+              '',
+              '',
+              '',
+              `🏁 Tổng cộng kỳ ${period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}`,
+              '',
+              periodTotal.openingBalance,
+              periodTotal.importQuantity,
+              periodTotal.exportQuantity,
+              periodTotal.closingBalance,
+            ]);
+            periodTotalRow.font = STYLES.boldFont;
+            periodTotalRow.eachCell((cell, colNumber) => {
+              cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: periodBgColor },
+              };
+              cell.border = STYLES.borderStyle;
+              if (colNumber >= 7) {
+                cell.alignment = STYLES.rightAlign;
+                cell.numFmt = '#,##0.00';
+              }
+            });
+            worksheet.mergeCells(`A${periodTotalRow.number}:D${periodTotalRow.number}`);
+            worksheet.mergeCells(`E${periodTotalRow.number}:F${periodTotalRow.number}`);
           });
         }
       }
-
-      // Total Row (🔥 THEO BỂ - 10 cột)
-      const totalRow = worksheet.addRow([
-        '',
-        '',
-        '',
-        '',
-        '',
-        'Tổng cộng',
-        totalOpening,
-        totalImport,
-        totalExport,
-        totalClosing,
-      ]);
-      totalRow.font = STYLES.boldFont;
-      totalRow.eachCell((cell, colNumber) => {
-        cell.border = STYLES.borderStyle;
-        if (colNumber === 6) {
-          cell.alignment = STYLES.centerAlign;
-        } else if (colNumber >= 7) {
-          cell.alignment = STYLES.rightAlign;
-          cell.numFmt = '#,##0.00';
-        }
-      });
-      worksheet.mergeCells(`A${totalRow.number}:E${totalRow.number}`);
 
       addReportFooter(worksheet);
       await downloadExcel(workbook, 'Bao_cao_nhap_xuat_ton');
@@ -595,6 +670,69 @@ const InventoryReportPage: React.FC = () => {
                 </tr>
               `;
             });
+
+            // 🔥 Tổng theo từng mặt hàng CHỈ CỦA KỲ NÀY
+            const periodProductTotals: Record<number, {
+              productId: number;
+              productName: string;
+              openingBalance: number;
+              importQuantity: number;
+              exportQuantity: number;
+              closingBalance: number;
+            }> = {};
+
+            period.items.forEach((item: any) => {
+              if (!periodProductTotals[item.productId]) {
+                periodProductTotals[item.productId] = {
+                  productId: item.productId,
+                  productName: item.productName,
+                  openingBalance: 0,
+                  importQuantity: 0,
+                  exportQuantity: 0,
+                  closingBalance: 0,
+                };
+              }
+              periodProductTotals[item.productId].openingBalance += Number(item.openingBalance);
+              periodProductTotals[item.productId].importQuantity += Number(item.importQuantity);
+              periodProductTotals[item.productId].exportQuantity += Number(item.exportQuantity);
+              periodProductTotals[item.productId].closingBalance += Number(item.closingBalance);
+            });
+
+            const periodProductList = Object.values(periodProductTotals);
+            const periodTotal = {
+              openingBalance: periodProductList.reduce((sum, p) => sum + p.openingBalance, 0),
+              importQuantity: periodProductList.reduce((sum, p) => sum + p.importQuantity, 0),
+              exportQuantity: periodProductList.reduce((sum, p) => sum + p.exportQuantity, 0),
+              closingBalance: periodProductList.reduce((sum, p) => sum + p.closingBalance, 0),
+            };
+
+            // Tổng từng mặt hàng của kỳ
+            periodProductList.forEach((product) => {
+              tableRows += `
+                <tr style="background-color: ${bgColor};">
+                  <td colspan="3" class="text-left font-bold">Tổng ${product.productName}</td>
+                  <td class="text-center">lít</td>
+                  <td class="text-right">-</td>
+                  <td class="text-right font-bold">${formatNumber(product.openingBalance)}</td>
+                  <td class="text-right font-bold" style="color: green;">${formatNumber(product.importQuantity)}</td>
+                  <td class="text-right font-bold" style="color: red;">${formatNumber(product.exportQuantity)}</td>
+                  <td class="text-right">-</td>
+                  <td class="text-right font-bold" style="color: blue;">${formatNumber(product.closingBalance)}</td>
+                </tr>
+              `;
+            });
+
+            // Tổng tất cả mặt hàng của kỳ
+            tableRows += `
+              <tr style="background-color: ${bgColor}; border-bottom: 2px solid;">
+                <td colspan="5" class="text-left font-bold">🏁 Tổng cộng kỳ ${period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}</td>
+                <td class="text-right font-bold">${formatNumber(periodTotal.openingBalance)}</td>
+                <td class="text-right font-bold" style="color: green;">${formatNumber(periodTotal.importQuantity)}</td>
+                <td class="text-right font-bold" style="color: red;">${formatNumber(periodTotal.exportQuantity)}</td>
+                <td class="text-right">-</td>
+                <td class="text-right font-bold" style="color: blue;">${formatNumber(periodTotal.closingBalance)}</td>
+              </tr>
+            `;
           });
         }
       }
@@ -617,13 +755,6 @@ const InventoryReportPage: React.FC = () => {
           </thead>
           <tbody>
             ${tableRows}
-            <tr class="total-row">
-              <td colspan="6" class="text-center">Tổng cộng</td>
-              <td class="text-right">${formatNumber(totalOpening)}</td>
-              <td class="text-right">${formatNumber(totalImport)}</td>
-              <td class="text-right">${formatNumber(totalExport)}</td>
-              <td class="text-right">${formatNumber(totalClosing)}</td>
-            </tr>
           </tbody>
         </table>
       `;
@@ -971,7 +1102,8 @@ const InventoryReportPage: React.FC = () => {
                   ))
                 ) : reportType === 'summary' && !isAllStores && reportWithPeriods && reportWithPeriods.periods.length > 0 ? (
                   // 🔥 NEW: Single store mode - TÁCH THEO KỲ CHỐT
-                  reportWithPeriods.periods.map((period: any, periodIndex: number) => (
+                  <>
+                  {reportWithPeriods.periods.map((period: any, periodIndex: number) => (
                     <React.Fragment key={periodIndex}>
                       {/* Period Header */}
                       <tr className={period.periodType === 'CLOSED' ? 'bg-green-50' : 'bg-yellow-50'}>
@@ -1062,8 +1194,105 @@ const InventoryReportPage: React.FC = () => {
                           </tr>
                         );
                       })}
+                      {/* 🔥 Tổng của kỳ này */}
+                      {(() => {
+                        // Tính tổng theo từng mặt hàng CHỈ CỦA KỲ NÀY
+                        const periodProductTotals: Record<number, {
+                          productId: number;
+                          productName: string;
+                          openingBalance: number;
+                          importQuantity: number;
+                          exportQuantity: number;
+                          lossAmount: number;
+                          closingBalance: number;
+                        }> = {};
+
+                        period.items.forEach((item: any) => {
+                          if (!periodProductTotals[item.productId]) {
+                            periodProductTotals[item.productId] = {
+                              productId: item.productId,
+                              productName: item.productName,
+                              openingBalance: 0,
+                              importQuantity: 0,
+                              exportQuantity: 0,
+                              lossAmount: 0,
+                              closingBalance: 0,
+                            };
+                          }
+                          periodProductTotals[item.productId].openingBalance += Number(item.openingBalance);
+                          periodProductTotals[item.productId].importQuantity += Number(item.importQuantity);
+                          periodProductTotals[item.productId].exportQuantity += Number(item.exportQuantity);
+                          periodProductTotals[item.productId].lossAmount += Number(item.lossAmount || 0);
+                          periodProductTotals[item.productId].closingBalance += Number(item.closingBalance);
+                        });
+
+                        const periodProductList = Object.values(periodProductTotals);
+                        const periodTotal = {
+                          openingBalance: periodProductList.reduce((sum, p) => sum + p.openingBalance, 0),
+                          importQuantity: periodProductList.reduce((sum, p) => sum + p.importQuantity, 0),
+                          exportQuantity: periodProductList.reduce((sum, p) => sum + p.exportQuantity, 0),
+                          lossAmount: periodProductList.reduce((sum, p) => sum + p.lossAmount, 0),
+                          closingBalance: periodProductList.reduce((sum, p) => sum + p.closingBalance, 0),
+                        };
+
+                        const bgColor = period.periodType === 'CLOSED' ? 'bg-green-100' : 'bg-yellow-100';
+                        const borderColor = period.periodType === 'CLOSED' ? 'border-green-400' : 'border-yellow-400';
+                        const textColor = period.periodType === 'CLOSED' ? 'text-green-800' : 'text-yellow-800';
+
+                        return (
+                          <>
+                            {/* Tổng từng mặt hàng của kỳ */}
+                            {periodProductList.map((product, idx) => (
+                              <tr key={`period-${periodIndex}-product-${idx}`} className={`${bgColor} hover:opacity-80`}>
+                                <td colSpan={3} className={`px-6 py-2 whitespace-nowrap text-sm font-semibold ${textColor}`}>
+                                  Tổng {product.productName}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-500">lít</td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-500">-</td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                                  {product.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-green-600">
+                                  {product.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-red-600">
+                                  {product.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-orange-600">
+                                  {product.lossAmount > 0 ? product.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
+                                </td>
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-700">
+                                  {product.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                </td>
+                              </tr>
+                            ))}
+                            {/* Tổng tất cả mặt hàng của kỳ */}
+                            <tr className={`${bgColor} border-b-2 ${borderColor}`}>
+                              <td colSpan={5} className={`px-6 py-2 whitespace-nowrap text-sm font-bold ${textColor}`}>
+                                🏁 Tổng cộng kỳ {period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}
+                              </td>
+                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-gray-900">
+                                {periodTotal.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-green-700">
+                                {periodTotal.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-red-700">
+                                {periodTotal.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-orange-700">
+                                {periodTotal.lossAmount > 0 ? periodTotal.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
+                              </td>
+                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-800">
+                                {periodTotal.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </React.Fragment>
-                  ))
+                  ))}
+                  </>
                 ) : reportType !== 'summary' && documents && documents.length > 0 ? (
                   documents.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">

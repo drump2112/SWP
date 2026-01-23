@@ -64,7 +64,7 @@ const navigation: NavItem[] = [
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Hạn mức công nợ', href: '/customers/credit', icon: CreditCardIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: CurrencyDollarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      // { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
       { name: 'Chốt Tồn Kho', href: '/inventory/closing', icon: CheckBadgeIcon, roles: ['ADMIN'] },
     ],

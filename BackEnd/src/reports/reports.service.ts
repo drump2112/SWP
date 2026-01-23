@@ -226,6 +226,7 @@ export class ReportsService {
 
   /**
    * Tính số dư công nợ của khách hàng tại 1 thời điểm
+   * ⏰ Sử dụng ledger_at (thời điểm nghiệp vụ) thay vì created_at
    */
   private async getCustomerBalance(
     customerId: number,
@@ -237,7 +238,7 @@ export class ReportsService {
       .createQueryBuilder('dl')
       .select('SUM(dl.debit - dl.credit)', 'balance')
       .where('dl.customer_id = :customerId', { customerId })
-      .andWhere('dl.created_at < :toDate', { toDate });
+      .andWhere('dl.ledger_at < :toDate', { toDate }); // ⏰ Dùng ledger_at
 
     if (storeId) {
       query.andWhere('dl.store_id = :storeId', { storeId });

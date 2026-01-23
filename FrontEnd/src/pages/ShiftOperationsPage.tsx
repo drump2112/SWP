@@ -143,6 +143,7 @@ const ShiftOperationsPage: React.FC = () => {
     heightTotal: number;        // Chiều cao chung (mm)
     heightWater: number;        // Chiều cao nước (mm)
     actualStock: number;        // Tồn thực tế (lít)
+    bookStock?: number;         // Tồn sổ sách (có thể sửa)
   }>>({}); // tankId -> data bể
   const [pumpMeterReadings, setPumpMeterReadings] = useState<Record<number, number>>({}); // pumpId -> số máy điện tử
   const [inventoryReason, setInventoryReason] = useState("");      // Nguyên nhân
@@ -2554,10 +2555,10 @@ const ShiftOperationsPage: React.FC = () => {
 
           {/* Tab 2: Debt Sales */}
           {activeTab === "debt" && (
-            <div className="space-y-6">
+            <div className="space-y-6 overflow-visible">
               {/* Retail Quantity Verification Section */}
               {canEdit ? (
-                <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm">
+                <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm overflow-visible">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">⛽ Đối chiếu lượng hàng bán</h3>
                     {retailCustomer ? (
@@ -2657,7 +2658,7 @@ const ShiftOperationsPage: React.FC = () => {
                 </div>
               ) : null}
 
-              <div className="border-t pt-6">
+              <div className="border-t pt-6 overflow-visible">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Danh sách bán nợ  </h3>
                 {canEdit && (
                   <div className="mb-4">
@@ -2686,7 +2687,7 @@ const ShiftOperationsPage: React.FC = () => {
                     data-form="debt-sale"
                     onSubmit={handleDebtSaleSubmit}
                     onKeyDown={handleFormKeyDown}
-                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
+                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4 overflow-visible"
                   >
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
@@ -2931,6 +2932,34 @@ const ShiftOperationsPage: React.FC = () => {
                         </tr>
                       )}
                   </tbody>
+                  {/* Dòng tổng cộng */}
+                  {((canEdit && draftDebtSales.length > 0) || (!canEdit && report?.debtSales && report.debtSales.length > 0)) && (
+                    <tfoot className="bg-orange-50 border-t-2 border-orange-200">
+                      <tr>
+                        <td colSpan={2} className="px-6 py-3 text-sm font-bold text-gray-900 uppercase">
+                          Tổng cộng
+                        </td>
+                        <td className="px-6 py-3 text-sm text-right font-bold text-gray-900">
+                          {(canEdit
+                            ? draftDebtSales.reduce((sum, sale) => sum + Number(sale.quantity), 0)
+                            : (report?.debtSales || []).reduce((sum: number, sale: any) => sum + Number(sale.quantity), 0)
+                          ).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
+                        </td>
+                        <td className="px-6 py-3 text-sm text-right font-bold text-gray-500">
+                          —
+                        </td>
+                        <td className="px-6 py-3 text-sm text-right font-bold text-orange-600">
+                          {(canEdit
+                            ? draftDebtSales.reduce((sum, sale) => sum + (sale.amount ?? Math.round(sale.quantity * sale.unitPrice)), 0)
+                            : (report?.debtSales || []).reduce((sum: number, sale: any) => sum + Number(sale.amount), 0)
+                          ).toLocaleString("vi-VN")} ₫
+                        </td>
+                        {canEdit && (
+                          <td className="px-6 py-3"></td>
+                        )}
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
 
@@ -3705,8 +3734,9 @@ const ShiftOperationsPage: React.FC = () => {
                             <tbody className="divide-y divide-gray-200">
                               {productTanks.map((tank: any) => {
                                 const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
-                                const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0 };
-                                const bookStock = Number(tank.currentStock) || 0;
+                                const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
+                                const defaultBookStock = Number(tank.currentStock) || 0;
+                                const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
                                 const diff = (tankData.actualStock || 0) - bookStock;
 
                                 return (
@@ -3756,8 +3786,19 @@ const ShiftOperationsPage: React.FC = () => {
                                         className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
                                       />
                                     </td>
-                                    <td className="px-3 py-2 text-right text-gray-600">
-                                      {bookStock.toLocaleString("vi-VN")}
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock || ""}
+                                        onChange={(e) => setInventoryCheckData(prev => ({
+                                          ...prev,
+                                          [tank.id]: { ...prev[tank.id], bookStock: e.target.value ? Number(e.target.value) : undefined }
+                                        }))}
+                                        placeholder={defaultBookStock.toLocaleString("vi-VN")}
+                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right bg-gray-50"
+                                      />
                                     </td>
                                     <td className={`px-3 py-2 text-right font-medium ${diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500'}`}>
                                       {tankData.actualStock ? (diff > 0 ? '+' : '') + diff.toLocaleString("vi-VN") : '-'}
@@ -3845,7 +3886,7 @@ const ShiftOperationsPage: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       // Validate
                       const filledTanks = Object.entries(inventoryCheckData).filter(([_, data]) =>
                         data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0
@@ -3865,32 +3906,52 @@ const ShiftOperationsPage: React.FC = () => {
                         if (productTanks.length === 0) return;
 
                         stt++;
-                        let isFirstRow = true;
+                        let isFirstProductRow = true;
 
                         productTanks.forEach((tank: any) => {
-                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0 };
-                          const bookStock = Number(tank.currentStock) || 0;
+                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
+                          const defaultBookStock = Number(tank.currentStock) || 0;
+                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
                           const diff = (tankData.actualStock || 0) - bookStock;
 
-                          // Get pump readings for this tank
+                          // Get pumps for this tank
                           const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
-                          const pumpReadingsStr = tankPumps
-                            .map((p: any) => `${p.pumpCode}: ${(pumpMeterReadings[p.id] || 0).toLocaleString("vi-VN")}`)
-                            .join(", ");
 
-                          rows.push({
-                            stt: isFirstRow ? stt : '',
-                            productName: isFirstRow ? product.name : '',
-                            tankName: tank.tankCode || tank.name,
-                            heightTotal: tankData.heightTotal || '',
-                            heightWater: tankData.heightWater || '',
-                            actualStock: tankData.actualStock || '',
-                            bookStock: bookStock,
-                            difference: tankData.actualStock ? diff : '',
-                            pumpElectronic: pumpReadingsStr,
-                            pumpMechanical: ''
-                          });
-                          isFirstRow = false;
+                          if (tankPumps.length === 0) {
+                            // Bể không có vòi - vẫn xuất 1 dòng
+                            rows.push({
+                              stt: isFirstProductRow ? stt : '',
+                              productName: isFirstProductRow ? product.name : '',
+                              tankName: tank.tankCode || tank.name,
+                              heightTotal: tankData.heightTotal || '',
+                              heightWater: tankData.heightWater || '',
+                              actualStock: tankData.actualStock || '',
+                              bookStock: bookStock || '',
+                              difference: tankData.actualStock ? diff : '',
+                              pumpElectronic: '',
+                              pumpMechanical: ''
+                            });
+                            isFirstProductRow = false;
+                          } else {
+                            // Mỗi vòi 1 dòng
+                            let isFirstTankRow = true;
+                            tankPumps.forEach((pump: any) => {
+                              rows.push({
+                                stt: isFirstProductRow ? stt : '',
+                                productName: isFirstProductRow ? product.name : '',
+                                tankName: isFirstTankRow ? (tank.tankCode || tank.name) : '',
+                                heightTotal: isFirstTankRow ? (tankData.heightTotal || '') : '',
+                                heightWater: isFirstTankRow ? (tankData.heightWater || '') : '',
+                                actualStock: isFirstTankRow ? (tankData.actualStock || '') : '',
+                                bookStock: isFirstTankRow ? (bookStock || '') : '',
+                                difference: isFirstTankRow && tankData.actualStock ? diff : '',
+                                pumpElectronic: `${pump.pumpCode}: ${(pumpMeterReadings[pump.id] || 0).toLocaleString("vi-VN")}`,
+                                pumpMechanical: ''
+                              });
+                              isFirstProductRow = false;
+                              isFirstTankRow = false;
+                            });
+                          }
                         });
                       });
 
@@ -3909,7 +3970,7 @@ const ShiftOperationsPage: React.FC = () => {
                       };
 
                       const fileName = `Kiem_ke_${store?.code || 'store'}_${dayjs().format("YYYYMMDD_HHmm")}`;
-                      exportInventoryCheckExcel(exportData, fileName);
+                      await exportInventoryCheckExcel(exportData, fileName);
                       toast.success("Đã xuất file Excel kiểm kê!");
                     }}
                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"

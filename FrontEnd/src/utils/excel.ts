@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 
 export const exportToExcel = (data: any[], fileName: string, sheetName: string = 'Sheet1') => {
   const worksheet = XLSX.utils.json_to_sheet(data);
@@ -41,116 +42,245 @@ export interface InventoryCheckExportData {
   conclusion: string;            // Kiến nghị / kết luận
 }
 
-export const exportInventoryCheckExcel = (data: InventoryCheckExportData, fileName: string) => {
-  const workbook = XLSX.utils.book_new();
+// Style helpers
+const thinBorder: Partial<ExcelJS.Border> = { style: 'thin', color: { argb: '000000' } };
+const allBorders: Partial<ExcelJS.Borders> = {
+  top: thinBorder,
+  left: thinBorder,
+  bottom: thinBorder,
+  right: thinBorder
+};
 
-  // Tạo array of arrays cho sheet
-  const rows: any[][] = [];
-
-  // Row 1-2: Header công ty
-  rows.push([data.companyName, '', '', '', '', 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM']);
-  rows.push([data.branchName, '', '', '', '', 'ĐỘC LẬP - TỰ DO - HẠNH PHÚC', '', '', '', '', 'Mẫu M01']);
-  rows.push([]); // Empty row
-
-  // Row 4: Title
-  rows.push(['', '', '', 'BIÊN BẢN KIỂM KÊ TỒN KHO XĂNG DẦU']);
-  rows.push(['', '', '', `Thời gian: ${data.checkTime}`]);
-  rows.push([]); // Empty row
-
-  // Thành phần tổ kiểm kê
-  rows.push(['Thành phần Tổ kiểm kê gồm:']);
-  data.members.forEach((member, idx) => {
-    rows.push([`- Ông (Bà): ${member.name}`, '', '', '', `Đơn vị: ${member.department}`]);
-  });
-  rows.push(['Cùng nhau tiến hành kiểm kê hàng hóa tồn kho và đã thống nhất kết quả kiểm kê như sau:']);
-  rows.push([]); // Empty row
-
-  // Table Header
-  rows.push([
-    'STT',
-    'TÊN HÀNG HÓA',
-    'BỂ CHỨA',
-    'SỐ ĐO BỂ',
-    '',
-    'TỒN KHO',
-    '',
-    'CHÊNH LỆCH',
-    'SỐ MÁY',
-    ''
-  ]);
-  rows.push([
-    '',
-    '',
-    '',
-    'Chiều cao chung (mm)',
-    'Chiều cao nước (mm)',
-    'Thực tế (Lít TT)',
-    'Số sách (Lít TT)',
-    'Thừa (+)/Thiếu(-) (Lít TT)',
-    'Số máy điện tử',
-    'Số máy cơ'
-  ]);
-
-  // Data rows
-  data.rows.forEach(row => {
-    rows.push([
-      row.stt,
-      row.productName,
-      row.tankName,
-      row.heightTotal,
-      row.heightWater,
-      row.actualStock,
-      row.bookStock,
-      row.difference,
-      row.pumpElectronic,
-      row.pumpMechanical
-    ]);
-  });
-
-  rows.push([]); // Empty row
-
-  // Nguyên nhân & Kiến nghị
-  rows.push(['Nguyên nhân:', data.reason || '']);
-  rows.push([]);
-  rows.push(['Kiến nghị (hoặc kết luận):', data.conclusion || '']);
-  rows.push([]);
-  rows.push([]);
-
-  // Chữ ký
-  rows.push(['', '', 'CN ĐỐNG ĐA', '', '', '', 'PHỤ TRÁCH CỬA HÀNG']);
-  rows.push(['', '', '', '', '', '', '(Ký, ghi rõ họ tên)']);
-  rows.push(['', 'PHÒNG KD', '', 'PHÒNG KT']);
-
-  const worksheet = XLSX.utils.aoa_to_sheet(rows);
+export const exportInventoryCheckExcel = async (data: InventoryCheckExportData, fileName: string) => {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Kiểm Kê');
 
   // Set column widths
-  worksheet['!cols'] = [
-    { wch: 5 },   // STT
-    { wch: 25 },  // Tên hàng hóa
-    { wch: 12 },  // Bể chứa
-    { wch: 18 },  // Chiều cao chung
-    { wch: 18 },  // Chiều cao nước
-    { wch: 15 },  // Thực tế
-    { wch: 15 },  // Số sách
-    { wch: 18 },  // Chênh lệch
-    { wch: 15 },  // Số máy điện tử
-    { wch: 12 }   // Số máy cơ
+  sheet.columns = [
+    { width: 6 },   // A - STT
+    { width: 22 },  // B - Tên hàng hóa
+    { width: 12 },  // C - Bể chứa
+    { width: 16 },  // D - Chiều cao chung
+    { width: 16 },  // E - Chiều cao nước
+    { width: 14 },  // F - Thực tế
+    { width: 14 },  // G - Số sách
+    { width: 18 },  // H - Chênh lệch
+    { width: 18 },  // I - Số máy điện tử
+    { width: 12 },  // J - Số máy cơ
   ];
 
-  // Merge cells cho header
-  worksheet['!merges'] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 4 } },   // Company name
-    { s: { r: 0, c: 5 }, e: { r: 0, c: 9 } },   // CHXHCNVN
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 4 } },   // Branch name
-    { s: { r: 1, c: 5 }, e: { r: 1, c: 8 } },   // Độc lập - Tự do
-    { s: { r: 3, c: 3 }, e: { r: 3, c: 7 } },   // Title
-    { s: { r: 4, c: 3 }, e: { r: 4, c: 7 } },   // Thời gian
-    // Table header merges
-    { s: { r: rows.length - data.rows.length - 10, c: 3 }, e: { r: rows.length - data.rows.length - 10, c: 4 } }, // Số đo bể
-    { s: { r: rows.length - data.rows.length - 10, c: 5 }, e: { r: rows.length - data.rows.length - 10, c: 6 } }, // Tồn kho
-    { s: { r: rows.length - data.rows.length - 10, c: 8 }, e: { r: rows.length - data.rows.length - 10, c: 9 } }, // Số máy
-  ];
+  let rowNum = 1;
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Kiem_Ke');
-  XLSX.writeFile(workbook, `${fileName}.xlsx`);
+  // Row 1: Company name + CHXHCNVN
+  sheet.mergeCells(`A${rowNum}:E${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = data.companyName;
+  sheet.getCell(`A${rowNum}`).font = { bold: true, size: 11 };
+  sheet.mergeCells(`F${rowNum}:J${rowNum}`);
+  sheet.getCell(`F${rowNum}`).value = 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM';
+  sheet.getCell(`F${rowNum}`).font = { bold: true, size: 12 };
+  sheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center' };
+  rowNum++;
+
+  // Row 2: Branch name + Độc lập
+  sheet.mergeCells(`A${rowNum}:E${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = data.branchName;
+  sheet.mergeCells(`F${rowNum}:J${rowNum}`);
+  sheet.getCell(`F${rowNum}`).value = 'ĐỘC LẬP - TỰ DO - HẠNH PHÚC';
+  sheet.getCell(`F${rowNum}`).font = { bold: true, size: 11 };
+  sheet.getCell(`F${rowNum}`).alignment = { horizontal: 'center' };
+  rowNum++;
+
+  // Empty row
+  rowNum++;
+
+  // Row 4: Title
+  sheet.mergeCells(`A${rowNum}:J${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = 'BIÊN BẢN KIỂM KÊ TỒN KHO XĂNG DẦU';
+  sheet.getCell(`A${rowNum}`).font = { bold: true, size: 14 };
+  sheet.getCell(`A${rowNum}`).alignment = { horizontal: 'center' };
+  rowNum++;
+
+  // Row 5: Time
+  sheet.mergeCells(`A${rowNum}:J${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = `Thời gian: ${data.checkTime}`;
+  sheet.getCell(`A${rowNum}`).alignment = { horizontal: 'center' };
+  sheet.getCell(`A${rowNum}`).font = { italic: true };
+  rowNum++;
+
+  // Empty row
+  rowNum++;
+
+  // Thành phần tổ kiểm kê
+  sheet.getCell(`A${rowNum}`).value = 'Thành phần Tổ kiểm kê gồm:';
+  sheet.getCell(`A${rowNum}`).font = { bold: true };
+  rowNum++;
+
+  data.members.forEach((member) => {
+    sheet.mergeCells(`A${rowNum}:D${rowNum}`);
+    sheet.getCell(`A${rowNum}`).value = `- Ông (Bà): ${member.name}`;
+    sheet.mergeCells(`E${rowNum}:J${rowNum}`);
+    sheet.getCell(`E${rowNum}`).value = member.department ? `Đơn vị: ${member.department}` : '';
+    rowNum++;
+  });
+
+  sheet.mergeCells(`A${rowNum}:J${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = 'Cùng nhau tiến hành kiểm kê hàng hóa tồn kho và đã thống nhất kết quả kiểm kê như sau:';
+  rowNum++;
+
+  // Empty row
+  rowNum++;
+
+  // ============ TABLE HEADER ============
+  const headerRow1 = rowNum;
+
+  // Header Row 1 (merged cells)
+  sheet.getCell(`A${rowNum}`).value = 'STT';
+  sheet.mergeCells(`A${rowNum}:A${rowNum + 1}`);
+
+  sheet.getCell(`B${rowNum}`).value = 'TÊN HÀNG HÓA';
+  sheet.mergeCells(`B${rowNum}:B${rowNum + 1}`);
+
+  sheet.getCell(`C${rowNum}`).value = 'BỂ CHỨA';
+  sheet.mergeCells(`C${rowNum}:C${rowNum + 1}`);
+
+  sheet.getCell(`D${rowNum}`).value = 'SỐ ĐO BỂ';
+  sheet.mergeCells(`D${rowNum}:E${rowNum}`);
+
+  sheet.getCell(`F${rowNum}`).value = 'TỒN KHO';
+  sheet.mergeCells(`F${rowNum}:G${rowNum}`);
+
+  sheet.getCell(`H${rowNum}`).value = 'CHÊNH LỆCH';
+  sheet.mergeCells(`H${rowNum}:H${rowNum + 1}`);
+
+  sheet.getCell(`I${rowNum}`).value = 'SỐ MÁY';
+  sheet.mergeCells(`I${rowNum}:J${rowNum}`);
+
+  rowNum++;
+
+  // Header Row 2 (sub-headers)
+  sheet.getCell(`D${rowNum}`).value = 'Chiều cao chung (mm)';
+  sheet.getCell(`E${rowNum}`).value = 'Chiều cao nước (mm)';
+  sheet.getCell(`F${rowNum}`).value = 'Thực tế (Lít TT)';
+  sheet.getCell(`G${rowNum}`).value = 'Số sách (Lít TT)';
+  sheet.getCell(`H${rowNum}`).value = 'Thừa (+)/Thiếu(-) (Lít TT)';
+  sheet.getCell(`I${rowNum}`).value = 'Số máy điện tử';
+  sheet.getCell(`J${rowNum}`).value = 'Số máy cơ';
+
+  // Style header rows
+  for (let r = headerRow1; r <= rowNum; r++) {
+    for (let c = 1; c <= 10; c++) {
+      const cell = sheet.getCell(r, c);
+      cell.font = { bold: true, size: 10 };
+      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+      cell.border = allBorders;
+    }
+  }
+  sheet.getRow(headerRow1).height = 25;
+  sheet.getRow(rowNum).height = 35;
+
+  rowNum++;
+
+  // ============ DATA ROWS ============
+  const dataStartRow = rowNum;
+  data.rows.forEach((row) => {
+    sheet.getCell(`A${rowNum}`).value = row.stt;
+    sheet.getCell(`B${rowNum}`).value = row.productName;
+    sheet.getCell(`C${rowNum}`).value = row.tankName;
+    sheet.getCell(`D${rowNum}`).value = row.heightTotal;
+    sheet.getCell(`E${rowNum}`).value = row.heightWater;
+    sheet.getCell(`F${rowNum}`).value = row.actualStock;
+    sheet.getCell(`G${rowNum}`).value = row.bookStock;
+    sheet.getCell(`H${rowNum}`).value = row.difference;
+    sheet.getCell(`I${rowNum}`).value = row.pumpElectronic;
+    sheet.getCell(`J${rowNum}`).value = row.pumpMechanical;
+
+    // Style data rows
+    for (let c = 1; c <= 10; c++) {
+      const cell = sheet.getCell(rowNum, c);
+      cell.border = allBorders;
+      cell.alignment = { vertical: 'middle', wrapText: true };
+      // Number columns center/right align
+      if (c >= 4 && c <= 8) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' };
+      }
+      if (c === 1) {
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+    }
+
+    // Color difference column
+    const diffCell = sheet.getCell(`H${rowNum}`);
+    if (typeof row.difference === 'number') {
+      if (row.difference > 0) {
+        diffCell.font = { color: { argb: 'FF008000' } }; // Green
+      } else if (row.difference < 0) {
+        diffCell.font = { color: { argb: 'FFFF0000' } }; // Red
+      }
+    }
+
+    rowNum++;
+  });
+
+  // Add empty rows if no data
+  if (data.rows.length === 0) {
+    for (let i = 0; i < 5; i++) {
+      for (let c = 1; c <= 10; c++) {
+        sheet.getCell(rowNum, c).border = allBorders;
+      }
+      rowNum++;
+    }
+  }
+
+  // Empty row
+  rowNum++;
+
+  // Nguyên nhân
+  sheet.mergeCells(`A${rowNum}:J${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = `Nguyên nhân: ${data.reason || ''}`;
+  rowNum++;
+
+  // Empty row
+  rowNum++;
+
+  // Kiến nghị
+  sheet.mergeCells(`A${rowNum}:J${rowNum}`);
+  sheet.getCell(`A${rowNum}`).value = `Kiến nghị (hoặc kết luận): ${data.conclusion || ''}`;
+  rowNum++;
+
+  // Empty rows
+  rowNum += 2;
+
+  // Signatures
+  sheet.getCell(`C${rowNum}`).value = 'CN ĐỐNG ĐA';
+  sheet.getCell(`C${rowNum}`).font = { bold: true };
+  sheet.getCell(`C${rowNum}`).alignment = { horizontal: 'center' };
+
+  sheet.getCell(`H${rowNum}`).value = 'PHỤ TRÁCH CỬA HÀNG';
+  sheet.getCell(`H${rowNum}`).font = { bold: true };
+  sheet.getCell(`H${rowNum}`).alignment = { horizontal: 'center' };
+  rowNum++;
+
+  sheet.getCell(`H${rowNum}`).value = '(Ký, ghi rõ họ tên)';
+  sheet.getCell(`H${rowNum}`).font = { italic: true };
+  sheet.getCell(`H${rowNum}`).alignment = { horizontal: 'center' };
+  rowNum++;
+
+  sheet.getCell(`B${rowNum}`).value = 'PHÒNG KD';
+  sheet.getCell(`B${rowNum}`).font = { bold: true };
+  sheet.getCell(`B${rowNum}`).alignment = { horizontal: 'center' };
+
+  sheet.getCell(`D${rowNum}`).value = 'PHÒNG KT';
+  sheet.getCell(`D${rowNum}`).font = { bold: true };
+  sheet.getCell(`D${rowNum}`).alignment = { horizontal: 'center' };
+
+  // Download file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${fileName}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
