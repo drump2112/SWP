@@ -12,6 +12,7 @@ import {
 import { ShiftsService } from './shifts.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
+import { UpdateOpeningInfoDto } from './dto/update-opening-info.dto';
 import {
   CreateShiftDebtSaleDto,
   CreateCashDepositDto,
@@ -61,6 +62,16 @@ export class ShiftsController {
   ) {
     console.log('Updating shift with ID:', id);
     return this.shiftsService.update(+id, closeShiftDto, user);
+  }
+
+  @Put(':id/opening-info')
+  @Roles('STORE', 'ADMIN')
+  updateOpeningInfo(
+    @Param('id') id: string,
+    @Body() dto: UpdateOpeningInfoDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.shiftsService.updateOpeningInfo(+id, dto, user);
   }
 
   @Put(':id/reopen')

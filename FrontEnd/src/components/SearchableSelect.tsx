@@ -112,7 +112,8 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
       borderRadius: '0.5rem',
       boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       marginTop: '4px',
-      zIndex: 9999, // Increased z-index to appear above modals
+      zIndex: 9999,
+      maxWidth: 'calc(100vw - 32px)',
     }),
     menuList: (provided) => ({
       ...provided,
@@ -170,7 +171,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
   };
 
   return (
-    <div className={className}>
+    <div className={`relative ${className}`}>
       <Select
         value={getValue()}
         onChange={handleChange}
@@ -185,9 +186,10 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
         noOptionsMessage={() => 'Không tìm thấy kết quả'}
         loadingMessage={() => 'Đang tải...'}
         menuPortalTarget={document.body}
+        menuPosition="fixed"
         styles={{
           ...customStyles,
-          menuPortal: (base) => ({ ...base, zIndex: 9999 }),
+          menuPortal: (base) => ({ ...base, zIndex: 9999, overflow: 'hidden' }),
         }}
         components={hideSelectedValues ? { ValueContainer } : undefined}
       />

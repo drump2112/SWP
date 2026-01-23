@@ -264,6 +264,15 @@ const ShiftOperationsPage: React.FC = () => {
     }
   }, [storeUsers, usersError]);
 
+  // ✅ Lọc products chỉ lấy những mặt hàng có kinh doanh tại cửa hàng (có trong pumps)
+  const storeProducts = React.useMemo(() => {
+    if (!products || !pumps) return [];
+    // Lấy danh sách productId duy nhất từ pumps của cửa hàng
+    const storeProductIds = new Set(pumps.map((pump: any) => pump.productId));
+    // Filter products chỉ lấy những sản phẩm có trong pumps
+    return products.filter((product: any) => storeProductIds.has(product.id));
+  }, [products, pumps]);
+
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -1190,7 +1199,7 @@ const ShiftOperationsPage: React.FC = () => {
       setDraftDebtSales((prev) => [...prev, data]);
       toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
     }
-    
+
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
@@ -1842,7 +1851,7 @@ const ShiftOperationsPage: React.FC = () => {
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 overflow-x-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-lg p-6 border border-gray-200">
         <div className="flex items-center justify-between">
@@ -2724,7 +2733,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mặt hàng *</label>
                       <SearchableSelect
-                        options={products?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
+                        options={storeProducts?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
                         value={selectedDebtProduct}
                         onChange={(value) => {
                           setSelectedDebtProduct(value as number);
@@ -2751,6 +2760,12 @@ const ShiftOperationsPage: React.FC = () => {
                         step="0.001"
                         min="0.001"
                         value={debtSaleFormQuantity || ""}
+                        onKeyDown={(e) => {
+                          // Chặn phím mũi tên để không ảnh hưởng đến Select component
+                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.stopPropagation();
+                          }
+                        }}
                         onChange={(e) => {
                           const qty = parseFloat(e.target.value) || 0;
                           setDebtSaleFormQuantity(qty);
@@ -2805,6 +2820,11 @@ const ShiftOperationsPage: React.FC = () => {
                         required
                         readOnly
                         value={debtSaleFormPrice || ""}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.stopPropagation();
+                          }
+                        }}
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-100 cursor-not-allowed"
                         placeholder="Tự động theo mặt hàng"
                       />
@@ -2816,6 +2836,11 @@ const ShiftOperationsPage: React.FC = () => {
                         type="number"
                         step="1"
                         value={debtSaleFormAmount || ""}
+                        onKeyDown={(e) => {
+                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                            e.stopPropagation();
+                          }
+                        }}
                         onChange={(e) => {
                           const amount = parseFloat(e.target.value) || 0;
                           // Làm tròn số tiền ngay khi nhập
@@ -3602,7 +3627,7 @@ const ShiftOperationsPage: React.FC = () => {
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
                             <option value="">-- Chọn mặt hàng --</option>
-                            {products?.map((p) => (
+                            {storeProducts?.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
                               </option>

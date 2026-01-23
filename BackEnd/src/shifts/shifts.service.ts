@@ -31,6 +31,7 @@ import { ShiftCheckpointStock } from '../entities/shift-checkpoint-stock.entity'
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateCheckpointDto } from './dto/create-checkpoint.dto';
+import { UpdateOpeningInfoDto } from './dto/update-opening-info.dto';
 import {
   CreateShiftDebtSaleDto,
   CreateCashDepositDto,
@@ -1182,6 +1183,96 @@ export class ShiftsService {
     });
 
     console.log(`✏️ Shift ${shiftId} edit enabled by user ${user?.id}`);
+    return updatedShift;
+  }
+
+  /**
+   * Cập nhật thông tin mở ca (shiftDate, shiftNo, openedAt, handoverName, receiverName)
+   * Chỉ cho phép khi ca đang mở và chưa chốt lần nào
+   */
+  async updateOpeningInfo(shiftId: number, dto: UpdateOpeningInfoDto, user: any): Promise<Shift> {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: ['store'],
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Không tìm thấy ca làm việc');
+    }
+
+    if (shift.status !== 'OPEN') {
+      throw new BadRequestException('Chỉ có thể sửa thông tin mở ca khi ca đang mở');
+    }
+
+    // Chỉ cho phép sửa nếu ca chưa từng chốt (closedAt = null)
+    if (shift.closedAt) {
+      throw new BadRequestException('Không thể sửa thông tin mở ca sau khi ca đã chốt. Vui lòng sử dụng chức năng Sửa ca.');
+    }
+
+    const oldData = {
+      shiftDate: shift.shiftDate,
+      shiftNo: shift.shiftNo,
+      openedAt: shift.openedAt,
+      handoverName: shift.handoverName,
+      receiverName: shift.receiverName,
+    };
+
+    // Kiểm tra nếu đổi ngày hoặc số ca, đảm bảo không trùng
+    if (dto.shiftDate || dto.shiftNo) {
+      const targetDate = dto.shiftDate ? new Date(dto.shiftDate) : shift.shiftDate;
+      const targetNo = dto.shiftNo ?? shift.shiftNo;
+
+      const existingShift = await this.shiftRepository.findOne({
+        where: {
+          storeId: shift.storeId,
+          shiftDate: targetDate,
+          shiftNo: targetNo,
+        },
+      });
+
+      if (existingShift && existingShift.id !== shiftId) {
+        throw new BadRequestException(
+          `Ca ${targetNo} ngày ${dto.shiftDate || shift.shiftDate.toISOString().split('T')[0]} đã tồn tại.`,
+        );
+      }
+    }
+
+    // Cập nhật các trường
+    if (dto.shiftDate) {
+      shift.shiftDate = new Date(dto.shiftDate);
+    }
+    if (dto.shiftNo !== undefined) {
+      shift.shiftNo = dto.shiftNo;
+    }
+    if (dto.openedAt) {
+      shift.openedAt = new Date(dto.openedAt);
+    }
+    if (dto.handoverName !== undefined) {
+      shift.handoverName = dto.handoverName || null;
+    }
+    if (dto.receiverName !== undefined) {
+      shift.receiverName = dto.receiverName || null;
+    }
+
+    const updatedShift = await this.shiftRepository.save(shift);
+
+    // Ghi audit log
+    await this.auditLogRepository.save({
+      tableName: 'shifts',
+      recordId: shift.id,
+      action: 'UPDATE_OPENING_INFO',
+      oldData,
+      newData: {
+        shiftDate: shift.shiftDate,
+        shiftNo: shift.shiftNo,
+        openedAt: shift.openedAt,
+        handoverName: shift.handoverName,
+        receiverName: shift.receiverName,
+      },
+      changedBy: user?.id,
+    });
+
+    console.log(`📝 Shift ${shiftId} opening info updated by user ${user?.id}`);
     return updatedShift;
   }
 

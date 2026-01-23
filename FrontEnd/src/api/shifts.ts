@@ -62,6 +62,14 @@ export interface CreateShiftDto {
   receiverName?: string;
 }
 
+export interface UpdateOpeningInfoDto {
+  shiftDate?: string;
+  shiftNo?: number;
+  openedAt?: string;
+  handoverName?: string;
+  receiverName?: string;
+}
+
 export interface Shift {
   id: number;
   storeId: number;
@@ -152,6 +160,11 @@ export const shiftsApi = {
 
   update: async (id: number, data: CloseShiftDto): Promise<Shift> => {
     const response = await api.put(`/shifts/${id}`, data);
+    return response.data;
+  },
+
+  updateOpeningInfo: async (id: number, data: UpdateOpeningInfoDto): Promise<Shift> => {
+    const response = await api.put(`/shifts/${id}/opening-info`, data);
     return response.data;
   },
 

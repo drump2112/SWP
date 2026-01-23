@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { shiftsApi, type CreateShiftDto } from "../api/shifts";
+import { shiftsApi, type CreateShiftDto, type UpdateOpeningInfoDto, type Shift } from "../api/shifts";
 import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
 import { showSuccess, showError, showWarning, showConfirm } from "../utils/sweetalert";
 import { toast } from "react-toastify";
-import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
 
@@ -16,6 +16,13 @@ const ShiftManagementPage: React.FC = () => {
   const queryClient = useQueryClient();
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditOpeningModalOpen, setIsEditOpeningModalOpen] = useState(false);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
+  const [editShiftDate, setEditShiftDate] = useState("");
+  const [editShiftNo, setEditShiftNo] = useState(1);
+  const [editShiftTime, setEditShiftTime] = useState("");
+  const [editHandoverName, setEditHandoverName] = useState("");
+  const [editReceiverName, setEditReceiverName] = useState("");
   const [newShiftDate, setNewShiftDate] = useState(dayjs().format("YYYY-MM-DD"));
   const [newShiftNo, setNewShiftNo] = useState(1);
   const [newShiftTime, setNewShiftTime] = useState(dayjs().format("HH:mm"));
@@ -87,6 +94,20 @@ const ShiftManagementPage: React.FC = () => {
     },
   });
 
+  // Update opening info mutation
+  const updateOpeningInfoMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateOpeningInfoDto }) => shiftsApi.updateOpeningInfo(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setIsEditOpeningModalOpen(false);
+      setEditingShift(null);
+      showSuccess("Đã cập nhật thông tin mở ca thành công!");
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || "Cập nhật thông tin thất bại");
+    },
+  });
+
   const handleEnableEdit = async (shiftId: number, shiftInfo: string) => {
     const confirmed = await showConfirm(
       `Bạn có chắc chắn muốn mở chế độ sửa cho ${shiftInfo}?\n\nSau khi mở, cửa hàng sẽ thấy nút Sửa và có thể chỉnh sửa ca này.`,
@@ -102,6 +123,32 @@ const ShiftManagementPage: React.FC = () => {
 
   const handleLockShift = (shiftId: number) => {
     lockShiftMutation.mutate(shiftId);
+  };
+
+  const handleOpenEditOpeningModal = (shift: Shift) => {
+    setEditingShift(shift);
+    setEditShiftDate(dayjs(shift.shiftDate).format("YYYY-MM-DD"));
+    setEditShiftNo(shift.shiftNo);
+    setEditShiftTime(dayjs(shift.openedAt).format("HH:mm"));
+    setEditHandoverName(shift.handoverName || "");
+    setEditReceiverName(shift.receiverName || "");
+    setIsEditOpeningModalOpen(true);
+  };
+
+  const handleUpdateOpeningInfo = () => {
+    if (!editingShift) return;
+
+    const openedAtDateTime = dayjs(`${editShiftDate} ${editShiftTime}`);
+
+    const dto: UpdateOpeningInfoDto = {
+      shiftDate: editShiftDate,
+      shiftNo: editShiftNo,
+      openedAt: openedAtDateTime.toISOString(),
+      handoverName: editHandoverName || undefined,
+      receiverName: editReceiverName || undefined,
+    };
+
+    updateOpeningInfoMutation.mutate({ id: editingShift.id, data: dto });
   };
 
   const handleCreateShift = () => {
@@ -350,13 +397,13 @@ const ShiftManagementPage: React.FC = () => {
                           {/* Ca đã từng chốt (được admin mở lại) */}
                           {shift.closedAt && (
                             <>
-                              {/* Nút Sửa - cho user cửa hàng và admin */}
+                              {/* Nút Sửa ca - cho user cửa hàng và admin */}
                               <button
                                 onClick={() => navigate(`/shifts/${shift.id}/operations?mode=edit`)}
                                 className="inline-flex items-center px-3 py-1.5 border border-orange-300 rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100"
                               >
                                 <PencilIcon className="h-4 w-4 mr-1" />
-                                Sửa
+                                Sửa ca
                               </button>
                               {/* Nút Khóa - chỉ admin thấy, để đóng lại ca mà giữ nguyên dữ liệu */}
                               {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
@@ -371,6 +418,17 @@ const ShiftManagementPage: React.FC = () => {
                                 </button>
                               )}
                             </>
+                          )}
+                          {/* Ca mới (chưa từng chốt) - hiện nút Sửa thông tin mở ca */}
+                          {!shift.closedAt && (
+                            <button
+                              onClick={() => handleOpenEditOpeningModal(shift)}
+                              className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                              title="Sửa ngày, số ca, giờ mở ca"
+                            >
+                              <PencilSquareIcon className="h-4 w-4 mr-1" />
+                              Sửa thông tin
+                            </button>
                           )}
                         </>
                       )}
@@ -520,6 +578,139 @@ const ShiftManagementPage: React.FC = () => {
         </div>
       )}
 
+      {/* Edit Opening Info Modal */}
+      {isEditOpeningModalOpen && editingShift && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-md bg-white rounded-xl shadow-2xl transform transition-all">
+            <div className="flex justify-between items-center p-6 border-b border-gray-200">
+              <h3 className="text-xl font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                Sửa thông tin mở ca
+              </h3>
+              <button
+                onClick={() => { setIsEditOpeningModalOpen(false); setEditingShift(null); }}
+                className="text-gray-400 hover:text-gray-500 transition-colors"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Ngày <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="date"
+                  value={editShiftDate}
+                  onChange={(e) => setEditShiftDate(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Số ca <span className="text-red-500">*</span>
+                </label>
+                <SearchableSelect
+                  options={[
+                    { value: 1, label: "Ca 1 - Sáng" },
+                    { value: 2, label: "Ca 2 - Chiều" },
+                    { value: 3, label: "Ca 3 - Tối" },
+                  ]}
+                  value={editShiftNo}
+                  onChange={(value) => setEditShiftNo(value as number)}
+                  placeholder="Chọn ca"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Giờ mở ca <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="time"
+                  value={editShiftTime}
+                  onChange={(e) => setEditShiftTime(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Người giao ca
+                </label>
+                <input
+                  type="text"
+                  value={editHandoverName}
+                  onChange={(e) => setEditHandoverName(e.target.value)}
+                  placeholder="Tên người giao ca"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Người nhận ca
+                </label>
+                <input
+                  type="text"
+                  value={editReceiverName}
+                  onChange={(e) => setEditReceiverName(e.target.value)}
+                  placeholder="Tên người nhận ca"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 px-6 py-4 bg-gray-50 rounded-b-xl">
+              <button
+                onClick={() => { setIsEditOpeningModalOpen(false); setEditingShift(null); }}
+                className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleUpdateOpeningInfo}
+                disabled={updateOpeningInfoMutation.isPending}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium inline-flex items-center"
+              >
+                {updateOpeningInfoMutation.isPending ? (
+                  <>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
+                    </svg>
+                    Đang lưu...
+                  </>
+                ) : (
+                  <>
+                    <PencilSquareIcon className="h-5 w-5 mr-1.5" />
+                    Lưu thay đổi
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Info */}
       <div className="mt-6 bg-blue-50 border-l-4 border-blue-400 p-4">
         <div className="flex">
@@ -536,6 +727,7 @@ const ShiftManagementPage: React.FC = () => {
             <p className="text-sm text-blue-700">
               <strong>Hướng dẫn:</strong>
               <br />• Bấm "Tạo ca mới" để tạo ca làm việc
+              <br />• Bấm "Sửa thông tin" để sửa ngày, số ca, giờ mở ca trước khi chốt
               <br />• Bấm "Chốt ca" để nhập số liệu vòi bơm, công nợ, phiếu thu/nộp tiền
               <br />• Ca đã chốt có thể xem lại chi tiết
             </p>

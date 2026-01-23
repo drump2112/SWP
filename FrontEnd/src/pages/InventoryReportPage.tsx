@@ -429,12 +429,24 @@ const InventoryReportPage: React.FC = () => {
             });
 
             // Tổng tất cả mặt hàng của kỳ
+              // const periodTotalRow = worksheet.addRow([
+              //   '',
+              //   '',
+              //   '',
+              //   '',
+              //   `🏁 Tổng cộng kỳ ${period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}`,
+              //   '',
+              //   periodTotal.openingBalance,
+              //   periodTotal.importQuantity,
+              //   periodTotal.exportQuantity,
+              //   periodTotal.closingBalance,
+              // ]);
             const periodTotalRow = worksheet.addRow([
               '',
               '',
               '',
               '',
-              `🏁 Tổng cộng kỳ ${period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}`,
+              `🏁 Tổng cộng: `,
               '',
               periodTotal.openingBalance,
               periodTotal.importQuantity,
@@ -945,33 +957,30 @@ const InventoryReportPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setReportType('summary')}
-              className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                reportType === 'summary'
+              className={`relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${reportType === 'summary'
                   ? 'bg-blue-50 text-blue-600 border-blue-500 z-10'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+                }`}
             >
               Tổng hợp
             </button>
             <button
               type="button"
               onClick={() => setReportType('import')}
-              className={`-ml-px relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                reportType === 'import'
+              className={`-ml-px relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${reportType === 'import'
                   ? 'bg-blue-50 text-blue-600 border-blue-500 z-10'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+                }`}
             >
               Bảng kê Nhập
             </button>
             <button
               type="button"
               onClick={() => setReportType('export')}
-              className={`-ml-px relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${
-                reportType === 'export'
+              className={`-ml-px relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 text-sm font-medium focus:z-10 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 ${reportType === 'export'
                   ? 'bg-blue-50 text-blue-600 border-blue-500 z-10'
                   : 'bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+                }`}
             >
               Bảng kê Xuất
             </button>
@@ -1103,195 +1112,194 @@ const InventoryReportPage: React.FC = () => {
                 ) : reportType === 'summary' && !isAllStores && reportWithPeriods && reportWithPeriods.periods.length > 0 ? (
                   // 🔥 NEW: Single store mode - TÁCH THEO KỲ CHỐT
                   <>
-                  {reportWithPeriods.periods.map((period: any, periodIndex: number) => (
-                    <React.Fragment key={periodIndex}>
-                      {/* Period Header */}
-                      <tr className={period.periodType === 'CLOSED' ? 'bg-green-50' : 'bg-yellow-50'}>
-                        <td colSpan={10} className="px-6 py-3 text-left">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                period.periodType === 'CLOSED'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-yellow-100 text-yellow-800'
-                              }`}>
-                                {period.periodType === 'CLOSED' ? '✓ Đã chốt' : '⏳ Chưa chốt'}
-                              </span>
-                              <span className="text-sm font-semibold text-gray-900">
-                                {dayjs(period.periodFrom).format('DD/MM/YYYY')} → {dayjs(period.periodTo).format('DD/MM/YYYY')}
-                              </span>
+                    {reportWithPeriods.periods.map((period: any, periodIndex: number) => (
+                      <React.Fragment key={periodIndex}>
+                        {/* Period Header */}
+                        <tr className={period.periodType === 'CLOSED' ? 'bg-green-50' : 'bg-yellow-50'}>
+                          <td colSpan={10} className="px-6 py-3 text-left">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${period.periodType === 'CLOSED'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                  }`}>
+                                  {period.periodType === 'CLOSED' ? '✓ Đã chốt' : '⏳ Chưa chốt'}
+                                </span>
+                                <span className="text-sm font-semibold text-gray-900">
+                                  {dayjs(period.periodFrom).format('DD/MM/YYYY')} → {dayjs(period.periodTo).format('DD/MM/YYYY')}
+                                </span>
+                              </div>
+                              {period.closingDate && (
+                                <span className="text-xs text-gray-500">
+                                  Chốt lúc: {dayjs(period.closingDate).format('DD/MM/YYYY HH:mm')}
+                                </span>
+                              )}
                             </div>
-                            {period.closingDate && (
-                              <span className="text-xs text-gray-500">
-                                Chốt lúc: {dayjs(period.closingDate).format('DD/MM/YYYY HH:mm')}
-                              </span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                      {/* Period Items */}
-                      {period.items.map((item: any, itemIndex: number) => {
-                        const lossData = showLossColumn && period.periodType === 'OPEN' ? calculateLossForItem(item) : null;
-                        return (
-                          <tr key={`${periodIndex}-${itemIndex}`} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {item.tankCode}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {item.tankName}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {item.productName}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {item.unitName}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
-                              {Number(item.capacity).toLocaleString('vi-VN')}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                              {Number(item.openingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                              {Number(item.importQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                              {Number(item.exportQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                            </td>
-                            {/* Hao hụt - hiển thị nếu đã chốt hoặc đang tính */}
-                            {period.periodType === 'CLOSED' ? (
-                              <>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-orange-600">
-                                  {Number(item.lossAmount || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                                  {item.lossRate > 0 && (
-                                    <span className="text-xs text-gray-400 ml-1">
-                                      ({(Number(item.lossRate) * 100).toFixed(3)}%)
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                                  {Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                                </td>
-                              </>
-                            ) : (
-                              <>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">
-                                  {lossData ? (
-                                    <>
-                                      {lossData.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                                      <span className="text-xs ml-1">({(lossData.lossRate * 100).toFixed(3)}%)</span>
-                                    </>
-                                  ) : '-'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                                  {lossData
-                                    ? lossData.closingAfterLoss.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-                                    : Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-                                  }
-                                </td>
-                              </>
-                            )}
-                          </tr>
-                        );
-                      })}
-                      {/* 🔥 Tổng của kỳ này */}
-                      {(() => {
-                        // Tính tổng theo từng mặt hàng CHỈ CỦA KỲ NÀY
-                        const periodProductTotals: Record<number, {
-                          productId: number;
-                          productName: string;
-                          openingBalance: number;
-                          importQuantity: number;
-                          exportQuantity: number;
-                          lossAmount: number;
-                          closingBalance: number;
-                        }> = {};
+                          </td>
+                        </tr>
+                        {/* Period Items */}
+                        {period.items.map((item: any, itemIndex: number) => {
+                          const lossData = showLossColumn && period.periodType === 'OPEN' ? calculateLossForItem(item) : null;
+                          return (
+                            <tr key={`${periodIndex}-${itemIndex}`} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {item.tankCode}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.tankName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.productName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {item.unitName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+                                {Number(item.capacity).toLocaleString('vi-VN')}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                                {Number(item.openingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
+                                {Number(item.importQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                                {Number(item.exportQuantity).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                              </td>
+                              {/* Hao hụt - hiển thị nếu đã chốt hoặc đang tính */}
+                              {period.periodType === 'CLOSED' ? (
+                                <>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-orange-600">
+                                    {Number(item.lossAmount || 0).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                    {item.lossRate > 0 && (
+                                      <span className="text-xs text-gray-400 ml-1">
+                                        ({(Number(item.lossRate) * 100).toFixed(3)}%)
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                                    {Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-400">
+                                    {lossData ? (
+                                      <>
+                                        {lossData.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                        <span className="text-xs ml-1">({(lossData.lossRate * 100).toFixed(3)}%)</span>
+                                      </>
+                                    ) : '-'}
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
+                                    {lossData
+                                      ? lossData.closingAfterLoss.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+                                      : Number(item.closingBalance).toLocaleString('vi-VN', { maximumFractionDigits: 2 })
+                                    }
+                                  </td>
+                                </>
+                              )}
+                            </tr>
+                          );
+                        })}
+                        {/* 🔥 Tổng của kỳ này */}
+                        {(() => {
+                          // Tính tổng theo từng mặt hàng CHỈ CỦA KỲ NÀY
+                          const periodProductTotals: Record<number, {
+                            productId: number;
+                            productName: string;
+                            openingBalance: number;
+                            importQuantity: number;
+                            exportQuantity: number;
+                            lossAmount: number;
+                            closingBalance: number;
+                          }> = {};
 
-                        period.items.forEach((item: any) => {
-                          if (!periodProductTotals[item.productId]) {
-                            periodProductTotals[item.productId] = {
-                              productId: item.productId,
-                              productName: item.productName,
-                              openingBalance: 0,
-                              importQuantity: 0,
-                              exportQuantity: 0,
-                              lossAmount: 0,
-                              closingBalance: 0,
-                            };
-                          }
-                          periodProductTotals[item.productId].openingBalance += Number(item.openingBalance);
-                          periodProductTotals[item.productId].importQuantity += Number(item.importQuantity);
-                          periodProductTotals[item.productId].exportQuantity += Number(item.exportQuantity);
-                          periodProductTotals[item.productId].lossAmount += Number(item.lossAmount || 0);
-                          periodProductTotals[item.productId].closingBalance += Number(item.closingBalance);
-                        });
+                          period.items.forEach((item: any) => {
+                            if (!periodProductTotals[item.productId]) {
+                              periodProductTotals[item.productId] = {
+                                productId: item.productId,
+                                productName: item.productName,
+                                openingBalance: 0,
+                                importQuantity: 0,
+                                exportQuantity: 0,
+                                lossAmount: 0,
+                                closingBalance: 0,
+                              };
+                            }
+                            periodProductTotals[item.productId].openingBalance += Number(item.openingBalance);
+                            periodProductTotals[item.productId].importQuantity += Number(item.importQuantity);
+                            periodProductTotals[item.productId].exportQuantity += Number(item.exportQuantity);
+                            periodProductTotals[item.productId].lossAmount += Number(item.lossAmount || 0);
+                            periodProductTotals[item.productId].closingBalance += Number(item.closingBalance);
+                          });
 
-                        const periodProductList = Object.values(periodProductTotals);
-                        const periodTotal = {
-                          openingBalance: periodProductList.reduce((sum, p) => sum + p.openingBalance, 0),
-                          importQuantity: periodProductList.reduce((sum, p) => sum + p.importQuantity, 0),
-                          exportQuantity: periodProductList.reduce((sum, p) => sum + p.exportQuantity, 0),
-                          lossAmount: periodProductList.reduce((sum, p) => sum + p.lossAmount, 0),
-                          closingBalance: periodProductList.reduce((sum, p) => sum + p.closingBalance, 0),
-                        };
+                          const periodProductList = Object.values(periodProductTotals);
+                          const periodTotal = {
+                            openingBalance: periodProductList.reduce((sum, p) => sum + p.openingBalance, 0),
+                            importQuantity: periodProductList.reduce((sum, p) => sum + p.importQuantity, 0),
+                            exportQuantity: periodProductList.reduce((sum, p) => sum + p.exportQuantity, 0),
+                            lossAmount: periodProductList.reduce((sum, p) => sum + p.lossAmount, 0),
+                            closingBalance: periodProductList.reduce((sum, p) => sum + p.closingBalance, 0),
+                          };
 
-                        const bgColor = period.periodType === 'CLOSED' ? 'bg-green-100' : 'bg-yellow-100';
-                        const borderColor = period.periodType === 'CLOSED' ? 'border-green-400' : 'border-yellow-400';
-                        const textColor = period.periodType === 'CLOSED' ? 'text-green-800' : 'text-yellow-800';
+                          const bgColor = period.periodType === 'CLOSED' ? 'bg-green-100' : 'bg-yellow-100';
+                          const borderColor = period.periodType === 'CLOSED' ? 'border-green-400' : 'border-yellow-400';
+                          const textColor = period.periodType === 'CLOSED' ? 'text-green-800' : 'text-yellow-800';
 
-                        return (
-                          <>
-                            {/* Tổng từng mặt hàng của kỳ */}
-                            {periodProductList.map((product, idx) => (
-                              <tr key={`period-${periodIndex}-product-${idx}`} className={`${bgColor} hover:opacity-80`}>
-                                <td colSpan={3} className={`px-6 py-2 whitespace-nowrap text-sm font-semibold ${textColor}`}>
-                                  Tổng {product.productName}
+                          return (
+                            <>
+                              {/* Tổng từng mặt hàng của kỳ */}
+                              {periodProductList.map((product, idx) => (
+                                <tr key={`period-${periodIndex}-product-${idx}`} className={`${bgColor} hover:opacity-80`}>
+                                  <td colSpan={3} className={`px-6 py-2 whitespace-nowrap text-sm font-semibold ${textColor}`}>
+                                    Tổng {product.productName}
+                                  </td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-500">lít</td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-500">-</td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
+                                    {product.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-green-600">
+                                    {product.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-red-600">
+                                    {product.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-orange-600">
+                                    {product.lossAmount > 0 ? product.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
+                                  </td>
+                                  <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-700">
+                                    {product.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                  </td>
+                                </tr>
+                              ))}
+                              {/* Tổng tất cả mặt hàng của kỳ */}
+                              <tr className={`${bgColor} border-b-2 ${borderColor}`}>
+                                <td colSpan={5} className={`px-6 py-2 whitespace-nowrap text-sm font-bold ${textColor}`}>
+                                  🏁 Tổng cộng kỳ {period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-gray-500">lít</td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right text-gray-500">-</td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-gray-900">
-                                  {product.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-gray-900">
+                                  {periodTotal.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-green-600">
-                                  {product.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-green-700">
+                                  {periodTotal.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-red-600">
-                                  {product.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-red-700">
+                                  {periodTotal.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-semibold text-orange-600">
-                                  {product.lossAmount > 0 ? product.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-orange-700">
+                                  {periodTotal.lossAmount > 0 ? periodTotal.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
                                 </td>
-                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-700">
-                                  {product.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
+                                <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-800">
+                                  {periodTotal.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
                                 </td>
                               </tr>
-                            ))}
-                            {/* Tổng tất cả mặt hàng của kỳ */}
-                            <tr className={`${bgColor} border-b-2 ${borderColor}`}>
-                              <td colSpan={5} className={`px-6 py-2 whitespace-nowrap text-sm font-bold ${textColor}`}>
-                                🏁 Tổng cộng kỳ {period.periodType === 'CLOSED' ? 'đã chốt' : 'chưa chốt'}
-                              </td>
-                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-gray-900">
-                                {periodTotal.openingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-green-700">
-                                {periodTotal.importQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-red-700">
-                                {periodTotal.exportQuantity.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                              </td>
-                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-orange-700">
-                                {periodTotal.lossAmount > 0 ? periodTotal.lossAmount.toLocaleString('vi-VN', { maximumFractionDigits: 2 }) : '-'}
-                              </td>
-                              <td className="px-6 py-2 whitespace-nowrap text-sm text-right font-bold text-blue-800">
-                                {periodTotal.closingBalance.toLocaleString('vi-VN', { maximumFractionDigits: 2 })}
-                              </td>
-                            </tr>
-                          </>
-                        );
-                      })()}
-                    </React.Fragment>
-                  ))}
+                            </>
+                          );
+                        })()}
+                      </React.Fragment>
+                    ))}
                   </>
                 ) : reportType !== 'summary' && documents && documents.length > 0 ? (
                   documents.map((item, index) => (
@@ -1328,8 +1336,8 @@ const InventoryReportPage: React.FC = () => {
                           {reportType === 'summary'
                             ? 'Chưa có dữ liệu nhập xuất tồn trong kỳ này'
                             : reportType === 'import'
-                            ? 'Chưa có phiếu nhập hàng trong kỳ này'
-                            : 'Chưa có phiếu xuất hàng trong kỳ này'
+                              ? 'Chưa có phiếu nhập hàng trong kỳ này'
+                              : 'Chưa có phiếu xuất hàng trong kỳ này'
                           }
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
