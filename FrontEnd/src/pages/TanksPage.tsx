@@ -364,8 +364,20 @@ const TanksPage: React.FC = () => {
                   />
                 </div>
 
-                {/* Trường Tồn kho đã ẩn - quản lý tồn riêng */}
-                <input type="hidden" name="currentStock" value="0" />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tồn đầu (Lít)
+                  </label>
+                  <input
+                    type="number"
+                    name="currentStock"
+                    defaultValue={editingTank?.currentStock || 0}
+                    step="0.001"
+                    min="0"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
+                    placeholder="VD: 23000"
+                  />
+                </div>
 
                 <div className="flex items-center">
                   <input

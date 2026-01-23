@@ -1020,7 +1020,7 @@ export class InventoryService {
           productName: item.product?.name,
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
-          amount: Number(item.quantity) * Number(item.unitPrice),
+          amount: Math.round(Number(item.quantity) * Number(item.unitPrice)), // Làm tròn để tránh số lẻ thập phân
         });
       }
     }

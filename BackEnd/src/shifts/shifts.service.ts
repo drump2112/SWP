@@ -25,8 +25,12 @@ import { Warehouse } from '../entities/warehouse.entity';
 import { Customer } from '../entities/customer.entity';
 import { InventoryTruckCompartment } from '../entities/inventory-truck-compartment.entity';
 import { InventoryLossCalculation } from '../entities/inventory-loss-calculation.entity';
+import { ShiftCheckpoint } from '../entities/shift-checkpoint.entity';
+import { ShiftCheckpointReading } from '../entities/shift-checkpoint-reading.entity';
+import { ShiftCheckpointStock } from '../entities/shift-checkpoint-stock.entity';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
+import { CreateCheckpointDto } from './dto/create-checkpoint.dto';
 import {
   CreateShiftDebtSaleDto,
   CreateCashDepositDto,
@@ -425,8 +429,9 @@ export class ShiftsService {
 
     // ✅ FIX: Tính tổng tiền bán công nợ để TRỪ RA khỏi tổng từ vòi bơm
     // Vì tiền công nợ CHƯA THU, không được ghi vào sổ quỹ
+    // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
     const totalDebtSalesAmount = (closeShiftDto.debtSales || []).reduce(
-      (sum, ds) => sum + Math.round(ds.quantity * ds.unitPrice), // Làm tròn để tránh phần thập phân
+      (sum, ds) => sum + (ds.amount ?? Math.round(ds.quantity * ds.unitPrice)),
       0,
     );
 
@@ -464,7 +469,8 @@ export class ShiftsService {
       // Group debt sales by customer để tính tổng nợ mới cho mỗi khách
       const debtByCustomer = new Map<number, number>();
       for (const debtSale of closeShiftDto.debtSales) {
-        const totalAmount = Math.round(debtSale.quantity * debtSale.unitPrice); // Làm tròn để tránh phần thập phân
+        // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
+        const totalAmount = debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
         const currentTotal = debtByCustomer.get(debtSale.customerId) || 0;
         debtByCustomer.set(debtSale.customerId, currentTotal + totalAmount);
       }
@@ -520,7 +526,8 @@ export class ShiftsService {
 
     if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
       for (const debtSale of closeShiftDto.debtSales) {
-        const totalAmount = Math.round(debtSale.quantity * debtSale.unitPrice); // Làm tròn để tránh phần thập phân
+        // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
+        const totalAmount = debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
 
         // Lưu vào shift_debt_sales
         const debtSaleRecord = await manager.save(ShiftDebtSale, {
@@ -1266,7 +1273,7 @@ export class ShiftsService {
           .getOne();
 
         if (price) {
-          totalFromPumps += reading.quantity * Number(price.price);
+          totalFromPumps += Math.round(reading.quantity * Number(price.price)); // Làm tròn để tránh số lẻ thập phân
         }
       }
     } else if (shift.sales && shift.sales.length > 0) {
@@ -1369,7 +1376,9 @@ export class ShiftsService {
       }
 
       // 1. Tạo shift debt sale
-      const amount = Math.round(createDto.quantity * createDto.unitPrice); // Làm tròn để tránh phần thập phân
+      // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
+      // Fallback tính lại nếu frontend không gửi amount
+      const amount = createDto.amount ?? Math.round(createDto.quantity * createDto.unitPrice);
       const debtSale = manager.create(ShiftDebtSale, {
         ...createDto,
         amount,
@@ -1688,5 +1697,166 @@ export class ShiftsService {
       previousShiftNo: previousShift.shiftNo,
       readings: readingsMap,
     };
+  }
+
+  // ==================== CHECKPOINT (KIỂM KÊ GIỮA CA) ====================
+
+  /**
+   * Tạo checkpoint (kiểm kê) trong ca đang mở
+   * Ghi nhận số đồng hồ vòi bơm và tồn kho thực tế tại thời điểm kiểm kê
+   */
+  async createCheckpoint(
+    shiftId: number,
+    dto: CreateCheckpointDto,
+    userId: number,
+  ) {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: ['store'],
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Không tìm thấy ca làm việc');
+    }
+
+    if (shift.status !== 'OPEN') {
+      throw new BadRequestException('Chỉ có thể kiểm kê khi ca đang mở');
+    }
+
+    // Tính checkpoint_no tiếp theo
+    const lastCheckpoint = await this.dataSource.getRepository(ShiftCheckpoint).findOne({
+      where: { shiftId },
+      order: { checkpointNo: 'DESC' },
+    });
+    const nextCheckpointNo = (lastCheckpoint?.checkpointNo || 0) + 1;
+
+    // Tạo checkpoint
+    const checkpointRepo = this.dataSource.getRepository(ShiftCheckpoint);
+    const readingRepo = this.dataSource.getRepository(ShiftCheckpointReading);
+    const stockRepo = this.dataSource.getRepository(ShiftCheckpointStock);
+
+    return await this.dataSource.transaction(async (manager) => {
+      // 1. Tạo checkpoint
+      const checkpoint = checkpointRepo.create({
+        shiftId,
+        checkpointNo: nextCheckpointNo,
+        checkpointAt: new Date(dto.checkpointAt),
+        notes: dto.notes,
+        createdBy: userId,
+      });
+      const savedCheckpoint = await manager.save(checkpoint);
+
+      // 2. Lưu số đồng hồ vòi bơm
+      if (dto.readings && dto.readings.length > 0) {
+        const readings = dto.readings.map((r) =>
+          readingRepo.create({
+            checkpointId: savedCheckpoint.id,
+            pumpId: r.pumpId,
+            pumpCode: r.pumpCode,
+            productId: r.productId,
+            meterValue: r.meterValue,
+          }),
+        );
+        await manager.save(readings);
+      }
+
+      // 3. Lưu tồn kho thực tế các bể
+      if (dto.stocks && dto.stocks.length > 0) {
+        const stocks = dto.stocks.map((s) =>
+          stockRepo.create({
+            checkpointId: savedCheckpoint.id,
+            tankId: s.tankId,
+            productId: s.productId,
+            systemQuantity: s.systemQuantity,
+            actualQuantity: s.actualQuantity,
+            notes: s.notes,
+          }),
+        );
+        await manager.save(stocks);
+      }
+
+      // 4. Ghi audit log
+      const auditLog = this.auditLogRepository.create({
+        tableName: 'shift_checkpoints',
+        recordId: savedCheckpoint.id,
+        action: 'CREATE',
+        changedBy: userId,
+        newData: {
+          shiftId,
+          checkpointNo: nextCheckpointNo,
+          checkpointAt: dto.checkpointAt,
+          readingsCount: dto.readings?.length || 0,
+          stocksCount: dto.stocks?.length || 0,
+        },
+      });
+      await manager.save(auditLog);
+
+      return savedCheckpoint;
+    });
+  }
+
+  /**
+   * Lấy danh sách checkpoint của một ca
+   */
+  async getCheckpoints(shiftId: number) {
+    const checkpointRepo = this.dataSource.getRepository(ShiftCheckpoint);
+    return await checkpointRepo.find({
+      where: { shiftId },
+      relations: ['readings', 'readings.pump', 'readings.product', 'stocks', 'stocks.tank', 'stocks.product', 'creator'],
+      order: { checkpointNo: 'ASC' },
+    });
+  }
+
+  /**
+   * Xóa checkpoint (chỉ được xóa checkpoint cuối cùng của ca đang mở)
+   */
+  async deleteCheckpoint(shiftId: number, checkpointId: number, userId: number) {
+    const shift = await this.shiftRepository.findOne({ where: { id: shiftId } });
+
+    if (!shift) {
+      throw new NotFoundException('Không tìm thấy ca làm việc');
+    }
+
+    if (shift.status !== 'OPEN') {
+      throw new BadRequestException('Chỉ có thể xóa kiểm kê khi ca đang mở');
+    }
+
+    const checkpointRepo = this.dataSource.getRepository(ShiftCheckpoint);
+    const checkpoint = await checkpointRepo.findOne({
+      where: { id: checkpointId, shiftId },
+    });
+
+    if (!checkpoint) {
+      throw new NotFoundException('Không tìm thấy phiếu kiểm kê');
+    }
+
+    // Kiểm tra xem có phải checkpoint cuối không
+    const lastCheckpoint = await checkpointRepo.findOne({
+      where: { shiftId },
+      order: { checkpointNo: 'DESC' },
+    });
+
+    if (lastCheckpoint?.id !== checkpointId) {
+      throw new BadRequestException('Chỉ có thể xóa phiếu kiểm kê cuối cùng');
+    }
+
+    // Xóa checkpoint (cascade sẽ xóa readings và stocks)
+    await checkpointRepo.delete(checkpointId);
+
+    // Ghi audit log
+    const auditLog = this.auditLogRepository.create({
+      tableName: 'shift_checkpoints',
+      recordId: checkpointId,
+      action: 'DELETE',
+      changedBy: userId,
+      oldData: {
+        shiftId,
+        checkpointNo: checkpoint.checkpointNo,
+        checkpointAt: checkpoint.checkpointAt,
+      },
+    });
+    await this.auditLogRepository.save(auditLog);
+
+    return { success: true };
   }
 }

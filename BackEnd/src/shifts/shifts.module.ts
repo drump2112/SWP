@@ -14,6 +14,9 @@ import { Receipt } from '../entities/receipt.entity';
 import { ReceiptDetail } from '../entities/receipt-detail.entity';
 import { Expense } from '../entities/expense.entity';
 import { Warehouse } from '../entities/warehouse.entity';
+import { ShiftCheckpoint } from '../entities/shift-checkpoint.entity';
+import { ShiftCheckpointReading } from '../entities/shift-checkpoint-reading.entity';
+import { ShiftCheckpointStock } from '../entities/shift-checkpoint-stock.entity';
 import { ShiftsService } from './shifts.service';
 import { ShiftsController } from './shifts.controller';
 import { CustomersModule } from '../customers/customers.module';
@@ -35,6 +38,9 @@ import { CustomersModule } from '../customers/customers.module';
       ReceiptDetail,
       Expense,
       Warehouse,
+      ShiftCheckpoint,
+      ShiftCheckpointReading,
+      ShiftCheckpointStock,
     ]),
     CustomersModule,
   ],

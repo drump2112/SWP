@@ -215,7 +215,7 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tên</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dung tích</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tồn kho</th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Tồn Đầu</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Trạng Thái</th>
                   <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                 </tr>
@@ -321,7 +321,10 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
                     {products?.filter(p => p.isFuel).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   <input type="number" name="capacity" defaultValue={(editingItem as Tank)?.capacity} required step="0.001" placeholder="Dung tích (L) *" className="w-full px-3 py-2 border rounded-lg" />
-                  <input type="number" name="currentStock" defaultValue={(editingItem as Tank)?.currentStock || 0} step="0.001" placeholder="Tồn kho (L)" className="w-full px-3 py-2 border rounded-lg" />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tồn đầu (L)</label>
+                    <input type="number" name="currentStock" defaultValue={(editingItem as Tank)?.currentStock || 0} min="0" step="0.001" placeholder="Tồn đầu (L)" className="w-full px-3 py-2 border rounded-lg" />
+                  </div>
                 </>
               ) : (
                 <>

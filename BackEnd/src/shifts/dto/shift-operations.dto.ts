@@ -38,6 +38,11 @@ export class CreateShiftDebtSaleDto {
   unitPrice: number;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amount?: number; // Số tiền gốc từ frontend (tránh sai số làm tròn)
+
+  @IsOptional()
   @IsString()
   notes?: string;
 }

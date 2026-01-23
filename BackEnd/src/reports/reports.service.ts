@@ -304,7 +304,7 @@ export class ReportsService {
 
     // Tính toán
     const totalFromPumps = shift.pumpReadings.reduce((sum, reading) => {
-      return sum + Number(reading.quantity) * Number(reading.unitPrice || 0);
+      return sum + Math.round(Number(reading.quantity) * Number(reading.unitPrice || 0)); // Làm tròn để tránh số lẻ thập phân
     }, 0);
 
     // Lấy doanh số bán công nợ từ shift_debt_sales
@@ -819,7 +819,7 @@ export class ReportsService {
       .addSelect('product.code', 'productCode')
       .addSelect('product.name', 'productName')
       .addSelect('SUM(item.quantity)', 'totalQuantity')
-      .addSelect('SUM(item.quantity * item.unitPrice)', 'totalAmount')
+      .addSelect('SUM(ROUND(item.quantity * item.unitPrice))', 'totalAmount')
       .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
       .where('doc.docType IN (:...docTypes)', {
         docTypes: ['IMPORT', 'TRANSFER_IN'],
@@ -882,7 +882,7 @@ export class ReportsService {
       .leftJoin('doc.items', 'items')
       .select('doc.supplierName', 'supplierName')
       .addSelect('COUNT(DISTINCT doc.id)', 'documentCount')
-      .addSelect('SUM(items.quantity * items.unitPrice)', 'totalAmount')
+      .addSelect('SUM(ROUND(items.quantity * items.unitPrice))', 'totalAmount')
       .where('doc.docType IN (:...docTypes)', {
         docTypes: ['IMPORT', 'TRANSFER_IN'],
       })
@@ -1014,7 +1014,7 @@ export class ReportsService {
         'product.code AS "productCode"',
         'product.name AS "productName"',
         'SUM(pr.quantity) AS "totalQuantity"',
-        'SUM(pr.quantity * pr.unitPrice) AS "totalAmount"',
+        'SUM(ROUND(pr.quantity * pr.unitPrice)) AS "totalAmount"',
       ])
       .groupBy('shift.storeId')
       .addGroupBy('store.code')
@@ -1332,7 +1332,7 @@ export class ReportsService {
       .addSelect('COALESCE(pr.test_export, 0)', 'testExport')
       .addSelect('COALESCE(pr.quantity, 0)', 'quantity')
       .addSelect('COALESCE(pr.unit_price, 0)', 'unitPrice')
-      .addSelect('COALESCE(pr.quantity * pr.unit_price, 0)', 'amount')
+      .addSelect('COALESCE(ROUND(pr.quantity * pr.unit_price), 0)', 'amount')
       .where('shift.store_id = :storeId', { storeId })
       .andWhere('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] }); // Bao gồm cả ca điều chỉnh
 

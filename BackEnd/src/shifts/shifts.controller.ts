@@ -17,6 +17,7 @@ import {
   CreateCashDepositDto,
   CreateReceiptDto,
 } from './dto/shift-operations.dto';
+import { CreateCheckpointDto } from './dto/create-checkpoint.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -162,5 +163,45 @@ export class ShiftsController {
   @Roles('STORE', 'ADMIN')
   getPreviousShiftReadings(@Param('shiftId') shiftId: string) {
     return this.shiftsService.getPreviousShiftReadings(+shiftId);
+  }
+
+  // ==================== CHECKPOINTS (KIỂM KÊ GIỮA CA) ====================
+
+  /**
+   * Tạo checkpoint (kiểm kê) trong ca đang mở
+   * POST /shifts/:shiftId/checkpoint
+   */
+  @Post(':shiftId/checkpoint')
+  @Roles('STORE', 'ADMIN')
+  createCheckpoint(
+    @Param('shiftId') shiftId: string,
+    @Body() dto: CreateCheckpointDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.shiftsService.createCheckpoint(+shiftId, dto, user.id);
+  }
+
+  /**
+   * Lấy danh sách checkpoint của một ca
+   * GET /shifts/:shiftId/checkpoints
+   */
+  @Get(':shiftId/checkpoints')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getCheckpoints(@Param('shiftId') shiftId: string) {
+    return this.shiftsService.getCheckpoints(+shiftId);
+  }
+
+  /**
+   * Xóa checkpoint (chỉ được xóa checkpoint cuối cùng của ca đang mở)
+   * DELETE /shifts/:shiftId/checkpoint/:checkpointId
+   */
+  @Delete(':shiftId/checkpoint/:checkpointId')
+  @Roles('STORE', 'ADMIN')
+  deleteCheckpoint(
+    @Param('shiftId') shiftId: string,
+    @Param('checkpointId') checkpointId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.shiftsService.deleteCheckpoint(+shiftId, +checkpointId, user.id);
   }
 }

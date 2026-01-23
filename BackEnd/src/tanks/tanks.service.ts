@@ -14,7 +14,7 @@ export class TanksService {
   ) {}
 
   /**
-   * Lấy danh sách tất cả bể chứa với tồn kho tính từ ledger
+   * Lấy danh sách tất cả bể chứa với tồn kho từ cột current_stock
    */
   async findAll(): Promise<any[]> {
     const tanks = await this.tanksRepository
@@ -27,21 +27,19 @@ export class TanksService {
       .addOrderBy('tank.tankCode', 'ASC')
       .getMany();
 
-    // Lấy tồn kho thực tế từ ledger
-    const tankIds = tanks.map(t => t.id);
-    const stockMap = await this.stockCalculatorService.getTanksCurrentStock(tankIds);
-
+    // Sử dụng current_stock từ bảng tanks
     return tanks.map(tank => ({
       ...tank,
-      currentStock: stockMap.get(tank.id) || 0,
+      currentStock: Number(tank.currentStock) || 0,
       fillPercentage: tank.capacity > 0
-        ? ((stockMap.get(tank.id) || 0) / Number(tank.capacity)) * 100
+        ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
         : 0,
     }));
   }
 
   /**
-   * Lấy danh sách bể theo cửa hàng với tồn kho thực tế
+   * Lấy danh sách bể theo cửa hàng với tồn kho từ cột current_stock
+   * Lưu ý: current_stock trong bảng tanks là giá trị được cập nhật khi chốt kho
    */
   async findByStore(storeId: number): Promise<any[]> {
     const tanks = await this.tanksRepository
@@ -53,21 +51,18 @@ export class TanksService {
       .orderBy('tank.tankCode', 'ASC')
       .getMany();
 
-    // Lấy tồn kho thực tế từ ledger
-    const tankIds = tanks.map(t => t.id);
-    const stockMap = await this.stockCalculatorService.getTanksCurrentStock(tankIds);
-
+    // Sử dụng current_stock từ bảng tanks (giá trị được setup/cập nhật khi chốt kho)
     return tanks.map(tank => ({
       ...tank,
-      currentStock: stockMap.get(tank.id) || 0,
+      currentStock: Number(tank.currentStock) || 0,
       fillPercentage: tank.capacity > 0
-        ? ((stockMap.get(tank.id) || 0) / Number(tank.capacity)) * 100
+        ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
         : 0,
     }));
   }
 
   /**
-   * Lấy một bể chứa với tồn kho thực tế
+   * Lấy một bể chứa với tồn kho từ cột current_stock
    */
   async findOne(id: number): Promise<any | null> {
     const tank = await this.tanksRepository
@@ -83,8 +78,8 @@ export class TanksService {
       return null;
     }
 
-    // Lấy tồn kho thực tế từ ledger
-    const currentStock = await this.stockCalculatorService.getTankCurrentStock(id);
+    // Sử dụng current_stock từ bảng tanks
+    const currentStock = Number(tank.currentStock) || 0;
 
     return {
       ...tank,

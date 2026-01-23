@@ -39,6 +39,49 @@ import {
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 
+// Helper function để xử lý phím Enter - chuyển focus sang input tiếp theo
+const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
+  if (e.key === "Enter") {
+    const target = e.target as HTMLElement;
+    // Không xử lý nếu đang ở textarea hoặc button submit
+    if (target.tagName === "TEXTAREA" || (target.tagName === "BUTTON" && (target as HTMLButtonElement).type === "submit")) {
+      return;
+    }
+
+    e.preventDefault();
+
+    const form = e.currentTarget;
+    // Lấy tất cả các input, select, textarea có thể focus được
+    const focusableElements = Array.from(
+      form.querySelectorAll<HTMLElement>(
+        'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
+      )
+    ).filter((el) => {
+      // Loại bỏ các element bị ẩn
+      const style = window.getComputedStyle(el);
+      return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
+    });
+
+    const currentIndex = focusableElements.indexOf(target as HTMLElement);
+
+    if (currentIndex >= 0 && currentIndex < focusableElements.length - 1) {
+      // Chuyển sang element tiếp theo
+      const nextElement = focusableElements[currentIndex + 1];
+      nextElement.focus();
+      // Nếu là input, select all text
+      if (nextElement.tagName === "INPUT") {
+        (nextElement as HTMLInputElement).select();
+      }
+    } else if (currentIndex === focusableElements.length - 1) {
+      // Nếu đang ở element cuối cùng, submit form
+      const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.click();
+      }
+    }
+  }
+};
+
 const ShiftOperationsPage: React.FC = () => {
   usePageTitle('Thao tác ca');
   const { shiftId } = useParams<{ shiftId: string }>();
@@ -57,6 +100,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [showDebtSaleForm, setShowDebtSaleForm] = useState(false);
   const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
   const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
+  const [isAmountManuallyEntered, setIsAmountManuallyEntered] = useState(false); // Flag để biết người dùng đã nhập thành tiền thủ công
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
   const [showImportForm, setShowImportForm] = useState(false);
@@ -79,6 +123,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [receiverUserId, setReceiverUserId] = useState<number | null>(null);
 
   // Editing state
+  const [editingDebtSaleId, setEditingDebtSaleId] = useState<string | null>(null);
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [editingImportId, setEditingImportId] = useState<string | null>(null);
@@ -92,6 +137,11 @@ const ShiftOperationsPage: React.FC = () => {
   const [draftImports, setDraftImports] = useState<any[]>([]);
   const [draftExports, setDraftExports] = useState<any[]>([]);
   const [draftInventoryChecks, setDraftInventoryChecks] = useState<any[]>([]);
+
+  // State cho checkpoint (kiểm kê)
+  const [checkpointReadings, setCheckpointReadings] = useState<Record<number, number>>({}); // pumpId -> meterValue
+  const [checkpointStocks, setCheckpointStocks] = useState<Record<number, number>>({}); // tankId -> actualQuantity
+  const [checkpointNotes, setCheckpointNotes] = useState("");
 
   // Fetch shift report
   const { data: report, isLoading } = useQuery({
@@ -170,6 +220,16 @@ const ShiftOperationsPage: React.FC = () => {
     enabled: !!report?.shift.storeId,
   });
 
+  // ✅ Fetch checkpoints (kiểm kê giữa ca)
+  const { data: checkpoints, refetch: refetchCheckpoints } = useQuery({
+    queryKey: ["checkpoints", shiftId],
+    queryFn: async () => {
+      if (!shiftId) return [];
+      return shiftsApi.getCheckpoints(Number(shiftId));
+    },
+    enabled: !!shiftId,
+  });
+
   // Fetch users cho select Người Giao/Nhận
   const { data: storeUsers, isLoading: isLoadingUsers, error: usersError } = useQuery({
     queryKey: ["users", report?.shift.storeId],
@@ -189,6 +249,15 @@ const ShiftOperationsPage: React.FC = () => {
       console.log("✅ Loaded store users:", storeUsers.length, storeUsers);
     }
   }, [storeUsers, usersError]);
+
+  // ✅ Lọc products chỉ lấy những mặt hàng có kinh doanh tại cửa hàng (có trong pumps)
+  const storeProducts = React.useMemo(() => {
+    if (!products || !pumps) return [];
+    // Lấy danh sách productId duy nhất từ pumps của cửa hàng
+    const storeProductIds = new Set(pumps.map((pump: any) => pump.productId));
+    // Filter products chỉ lấy những sản phẩm có trong pumps
+    return products.filter((product: any) => storeProductIds.has(product.id));
+  }, [products, pumps]);
 
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
   useEffect(() => {
@@ -278,11 +347,15 @@ const ShiftOperationsPage: React.FC = () => {
       const net = gross - (reading.testExport || 0);
       if (net > 0) {
         const price = productPrices[reading.productId] || 0;
-        totalPumpSales += net * price;
+        // Làm tròn từng vòi bơm để tránh sai số tích lũy
+        totalPumpSales += Math.round(net * price);
       }
     });
 
-    const totalDebtSales = draftDebtSales.reduce((sum, ds) => sum + ds.quantity * ds.unitPrice, 0);
+    const totalDebtSales = draftDebtSales.reduce(
+      (sum, ds) => sum + (ds.amount ?? Math.round(ds.quantity * ds.unitPrice)),
+      0
+    );
     const totalRetail = Math.max(0, totalPumpSales - totalDebtSales);
 
     // Trừ đi các khoản đã nộp (thủ công) để gợi ý số còn lại.
@@ -496,6 +569,7 @@ const ShiftOperationsPage: React.FC = () => {
           productId: ds.productId,
           quantity: Number(ds.quantity),
           unitPrice: Number(ds.unitPrice),
+          amount: ds.amount ? Number(ds.amount) : Math.round(Number(ds.quantity) * Number(ds.unitPrice)), // Lấy amount đã lưu hoặc tính lại
           notes: ds.notes,
         }))
       );
@@ -768,9 +842,9 @@ const ShiftOperationsPage: React.FC = () => {
       return 0;
     }
 
-    const amount = quantity * price;
-    // Cắt bỏ phần thập phân ở đây
-    return Math.floor(isNaN(amount) ? 0 : amount);
+    // Làm tròn để tránh sai số thập phân
+    const amount = Math.round(quantity * price);
+    return isNaN(amount) ? 0 : amount;
   };
 
   const handleCloseShift = async () => {
@@ -779,7 +853,10 @@ const ShiftOperationsPage: React.FC = () => {
     // Tính toán trước để dùng cho validation
     const totalLiters = readingsArray.reduce((sum, r) => sum + (r.endValue - r.startValue), 0);
     const totalAmount = calculateTotalFromPumps();
-    const draftDebtTotal = draftDebtSales.reduce((sum, ds) => sum + ds.quantity * ds.unitPrice, 0);
+    const draftDebtTotal = draftDebtSales.reduce(
+      (sum, ds) => sum + (ds.amount ?? Math.round(ds.quantity * ds.unitPrice)),
+      0
+    );
     const draftReceiptTotal = draftReceipts.reduce((sum, r) => sum + r.amount, 0);
     const draftDepositTotal = draftDeposits.reduce((sum, d) => sum + d.amount, 0);
     const totalRetailCalc = totalAmount - draftDebtTotal;
@@ -998,6 +1075,7 @@ const ShiftOperationsPage: React.FC = () => {
         productId: ds.productId,
         quantity: ds.quantity,
         unitPrice: ds.unitPrice,
+        amount: ds.amount ?? Math.round(ds.quantity * ds.unitPrice), // Gửi amount đã lưu hoặc tính lại
         notes: ds.notes,
       })),
       retailSales: retailSalesData, // Bán lẻ cho khách hàng nội bộ
@@ -1072,25 +1150,53 @@ const ShiftOperationsPage: React.FC = () => {
     // Lấy dữ liệu TRƯỚC khi async call (tránh event bị cleanup)
     const form = e.currentTarget;
     const formData = new FormData(form);
+    const quantity = Number(formData.get("quantity"));
+
+    // Làm tròn amount để tránh số lẻ thập phân
+    // Nếu người dùng đã nhập thành tiền thủ công, dùng giá trị đó
+    // Nếu không, tính từ quantity * price
+    const amount = Math.round(debtSaleFormAmount) || Math.round(quantity * debtSaleFormPrice);
+
+    console.log("💰 Debt Sale Submit:", {
+      quantity,
+      unitPrice: debtSaleFormPrice,
+      debtSaleFormAmount,
+      calculatedAmount: amount,
+      isAmountManuallyEntered,
+      editingDebtSaleId,
+    });
 
     const data: ShiftDebtSaleDto & { id: string } = {
-      id: `draft_${Date.now()}`, // Temporary ID
+      id: editingDebtSaleId || `draft_${Date.now()}`, // Dùng id cũ nếu đang sửa
       shiftId: Number(shiftId),
       customerId: Number(formData.get("customerId")),
       productId: Number(formData.get("productId")),
-      quantity: Number(formData.get("quantity")),
+      quantity,
       unitPrice: debtSaleFormPrice,
+      amount, // Gửi số tiền gốc (tránh sai số làm tròn)
       notes: (formData.get("notes") as string) || undefined,
     };
 
     // Lưu vào draft state thay vì API
-    setDraftDebtSales((prev) => [...prev, data]);
+    if (editingDebtSaleId) {
+      // Đang sửa - cập nhật item hiện có
+      setDraftDebtSales((prev) => prev.map((item) => (item.id === editingDebtSaleId ? data : item)));
+      toast.success("Đã cập nhật doanh số công nợ", { position: "top-right", autoClose: 3000 });
+    } else {
+      // Thêm mới
+      setDraftDebtSales((prev) => [...prev, data]);
+      toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
+    }
+
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
+    setDebtSaleFormQuantity(0);
+    setDebtSaleFormAmount(0);
+    setIsAmountManuallyEntered(false);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
-    toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
+    setEditingDebtSaleId(null);
   };
 
   const handleReceiptSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1432,7 +1538,7 @@ const ShiftOperationsPage: React.FC = () => {
       return;
     }
 
-    const amount = quantity * unitPrice;
+    const amount = Math.round(quantity * unitPrice); // Làm tròn để tránh số lẻ thập phân
 
     const newItem = {
       id: `draft_${Date.now()}`,
@@ -1552,7 +1658,8 @@ const ShiftOperationsPage: React.FC = () => {
       const quantity = calculateQuantity(reading);
       // Ưu tiên dùng giá đã lưu (unitPrice) khi xem ca đã chốt, fallback sang giá hiện tại khi đang nhập liệu
       const price = reading.unitPrice ?? productPrices[reading.productId] ?? 0;
-      total += quantity * price;
+      // Làm tròn từng vòi bơm để tránh sai số tích lũy
+      total += Math.round(quantity * price);
     });
     return total;
   };
@@ -1564,8 +1671,11 @@ const ShiftOperationsPage: React.FC = () => {
 
   // Tính toán real-time
   const totalFromPumps = calculateTotalFromPumps();
-  // Math.floor để cắt bỏ phần thập phân
-  const totalDebtSales = Math.floor(draftDebtSales.reduce((sum, sale) => sum + sale.quantity * sale.unitPrice, 0));
+  // Sử dụng amount đã lưu (tránh sai số làm tròn), fallback nếu chưa có
+  const totalDebtSales = draftDebtSales.reduce(
+    (sum, sale) => sum + (sale.amount ?? Math.round(sale.quantity * sale.unitPrice)),
+    0
+  );
   const totalRetailSales = Math.floor(totalFromPumps) - totalDebtSales;
   const totalRevenue = Math.floor(totalFromPumps); // Tổng doanh thu = Tổng từ vòi bơm (bao gồm cả bán lẻ và bán công nợ)
 
@@ -2127,15 +2237,19 @@ const ShiftOperationsPage: React.FC = () => {
                                       e.preventDefault();
                                       const currentInput = e.currentTarget;
                                       const currentRow = currentInput.closest("tr");
-                                      const nextInput = currentRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
-                                      if (nextInput && nextInput !== currentInput) {
+                                      const allInputs = Array.from(currentRow?.querySelectorAll('input[type="number"]:not([disabled])') || []) as HTMLInputElement[];
+                                      const currentIndex = allInputs.indexOf(currentInput);
+                                      const nextInput = allInputs[currentIndex + 1];
+                                      if (nextInput) {
                                         nextInput.focus();
+                                        nextInput.select();
                                       } else {
-                                        // Nếu không tìm thấy input tiếp theo trong hàng, chuyển sang hàng tiếp theo
+                                        // Nếu hết input trong hàng, chuyển sang hàng tiếp theo
                                         const nextRow = currentRow?.nextElementSibling;
                                         const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
                                         if (firstInput) {
                                           firstInput.focus();
+                                          firstInput.select();
                                         }
                                       }
                                     }
@@ -2184,12 +2298,14 @@ const ShiftOperationsPage: React.FC = () => {
                                       const nextInput = allInputs[currentIndex + 1];
                                       if (nextInput) {
                                         nextInput.focus();
+                                        nextInput.select();
                                       } else {
                                         // Nếu hết input trong hàng, chuyển sang hàng tiếp theo
                                         const nextRow = currentRow?.nextElementSibling;
                                         const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
                                         if (firstInput) {
                                           firstInput.focus();
+                                          firstInput.select();
                                         }
                                       }
                                     }
@@ -2238,6 +2354,7 @@ const ShiftOperationsPage: React.FC = () => {
                                       const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
                                       if (firstInput) {
                                         firstInput.focus();
+                                        firstInput.select();
                                       }
                                     }
                                   }}
@@ -2337,7 +2454,7 @@ const ShiftOperationsPage: React.FC = () => {
                           // Nếu không có (dữ liệu cũ), fallback sang productPrices (giá hiện tại - có thể sai)
                           const unitPrice = reading.unitPrice || productPrices[reading.productId] || 0;
                           const quantity = Number(reading.quantity) || 0;
-                          const amount = quantity * unitPrice;
+                          const amount = Math.round(quantity * unitPrice); // Làm tròn để tránh số lẻ thập phân
 
                           console.log("💵 Closed shift reading:", {
                             pumpCode: reading.pumpCode,
@@ -2426,7 +2543,7 @@ const ShiftOperationsPage: React.FC = () => {
                           <span className="inline-flex px-4 py-2 bg-green-600 text-white rounded-lg font-bold">
                             {formatCurrency(
                               report?.pumpReadings?.reduce((sum: number, r: any) => {
-                                const amount = Number(r.amount || 0) || (Number(r.quantity || 0) * Number(r.unitPrice || r.price || 0));
+                                const amount = Number(r.amount || 0) || Math.round(Number(r.quantity || 0) * Number(r.unitPrice || r.price || 0));
                                 return sum + amount;
                               }, 0) || 0
                             )}
@@ -2558,8 +2675,10 @@ const ShiftOperationsPage: React.FC = () => {
                           setDebtSaleFormPrice(0);
                           setDebtSaleFormQuantity(0);
                           setDebtSaleFormAmount(0);
+                          setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
+                          setEditingDebtSaleId(null);
                         }
                       }}
                       className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
@@ -2574,6 +2693,7 @@ const ShiftOperationsPage: React.FC = () => {
                   <form
                     data-form="debt-sale"
                     onSubmit={handleDebtSaleSubmit}
+                    onKeyDown={handleFormKeyDown}
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
@@ -2591,14 +2711,14 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mặt hàng *</label>
                       <SearchableSelect
-                        options={products?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
+                        options={storeProducts?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
                         value={selectedDebtProduct}
                         onChange={(value) => {
                           setSelectedDebtProduct(value as number);
                           if (value && productPrices[value as number]) {
                             setDebtSaleFormPrice(productPrices[value as number]);
-                            // Tính lại thành tiền khi đổi mặt hàng
-                            setDebtSaleFormAmount(debtSaleFormQuantity * productPrices[value as number]);
+                            // Tính lại thành tiền khi đổi mặt hàng - làm tròn
+                            setDebtSaleFormAmount(Math.round(debtSaleFormQuantity * productPrices[value as number]));
                           } else {
                             setDebtSaleFormPrice(0);
                             setDebtSaleFormAmount(0);
@@ -2621,7 +2741,10 @@ const ShiftOperationsPage: React.FC = () => {
                         onChange={(e) => {
                           const qty = parseFloat(e.target.value) || 0;
                           setDebtSaleFormQuantity(qty);
-                          setDebtSaleFormAmount(qty * debtSaleFormPrice);
+                          // Chỉ tính lại amount nếu người dùng ĐANG nhập số lượng (không phải từ nhập thành tiền)
+                          // Reset flag vì người dùng đang nhập số lượng trực tiếp
+                          setIsAmountManuallyEntered(false);
+                          setDebtSaleFormAmount(Math.round(qty * debtSaleFormPrice));
                         }}
                         onBlur={(e) => {
                           const qty = parseFloat(e.target.value) || 0;
@@ -2682,7 +2805,10 @@ const ShiftOperationsPage: React.FC = () => {
                         value={debtSaleFormAmount || ""}
                         onChange={(e) => {
                           const amount = parseFloat(e.target.value) || 0;
-                          setDebtSaleFormAmount(amount);
+                          // Làm tròn số tiền ngay khi nhập
+                          setDebtSaleFormAmount(Math.round(amount));
+                          // Đánh dấu người dùng đã nhập thành tiền thủ công
+                          setIsAmountManuallyEntered(true);
                           if (debtSaleFormPrice > 0) {
                             const rawQty = amount / debtSaleFormPrice;
                             // Lấy 3 số sau dấu phẩy và không làm tròn (truncate)
@@ -2711,8 +2837,10 @@ const ShiftOperationsPage: React.FC = () => {
                           setDebtSaleFormPrice(0);
                           setDebtSaleFormQuantity(0);
                           setDebtSaleFormAmount(0);
+                          setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
+                          setEditingDebtSaleId(null);
                         }}
                         className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                       >
@@ -2722,7 +2850,7 @@ const ShiftOperationsPage: React.FC = () => {
                         type="submit"
                         className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                       >
-                        Thêm vào danh sách
+                        {editingDebtSaleId ? "Cập nhật" : "Thêm vào danh sách"}
                       </button>
                     </div>
                   </form>
@@ -2752,7 +2880,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {customer?.code} - {customer?.name}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{product?.code} - {product?.name}</td>
                               <td className="px-6 py-4 text-sm text-right">
                                 {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
                               </td>
@@ -2760,16 +2888,37 @@ const ShiftOperationsPage: React.FC = () => {
                                 {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
                               </td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
-                                {(sale.quantity * sale.unitPrice).toLocaleString("vi-VN")} ₫
+                                {(sale.amount ?? Math.round(sale.quantity * sale.unitPrice)).toLocaleString("vi-VN")} ₫
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button
-                                  onClick={() => handleDeleteDebtSale(sale.id)}
-                                  className="text-red-600 hover:text-red-900"
-                                  type="button"
-                                >
-                                  <TrashIcon className="h-5 w-5" />
-                                </button>
+                                <div className="flex justify-end space-x-2">
+                                  <button
+                                    onClick={() => {
+                                      // Load data vào form để sửa
+                                      setEditingDebtSaleId(sale.id);
+                                      setSelectedDebtCustomer(sale.customerId);
+                                      setSelectedDebtProduct(sale.productId);
+                                      setDebtSaleFormQuantity(sale.quantity);
+                                      setDebtSaleFormPrice(sale.unitPrice);
+                                      setDebtSaleFormAmount(sale.amount ?? Math.round(sale.quantity * sale.unitPrice));
+                                      setIsAmountManuallyEntered(false);
+                                      setShowDebtSaleForm(true);
+                                    }}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    type="button"
+                                    title="Sửa"
+                                  >
+                                    <PencilIcon className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteDebtSale(sale.id)}
+                                    className="text-red-600 hover:text-red-900"
+                                    type="button"
+                                    title="Xóa"
+                                  >
+                                    <TrashIcon className="h-5 w-5" />
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -2791,7 +2940,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {customer?.code || sale.customer?.code} - {customer?.name || sale.customer?.name}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name || sale.product?.name}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{product?.code || sale.product?.code} - {product?.name || sale.product?.name}</td>
                               <td className="px-6 py-4 text-sm text-right">
                                 {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
                               </td>
@@ -2843,6 +2992,7 @@ const ShiftOperationsPage: React.FC = () => {
                     key={editingReceiptId || "new"}
                     data-form="receipt"
                     onSubmit={handleReceiptSubmit}
+                    onKeyDown={handleFormKeyDown}
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
@@ -3070,6 +3220,7 @@ const ShiftOperationsPage: React.FC = () => {
                     key={editingDepositId || "new"}
                     data-form="deposit"
                     onSubmit={handleDepositSubmit}
+                    onKeyDown={handleFormKeyDown}
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
@@ -3379,6 +3530,7 @@ const ShiftOperationsPage: React.FC = () => {
                   <form
                     data-form="export"
                     onSubmit={handleExportSubmit}
+                    onKeyDown={handleFormKeyDown}
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
@@ -3421,7 +3573,7 @@ const ShiftOperationsPage: React.FC = () => {
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
                             <option value="">-- Chọn mặt hàng --</option>
-                            {products?.map((p) => (
+                            {storeProducts?.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
                               </option>
@@ -3520,143 +3672,266 @@ const ShiftOperationsPage: React.FC = () => {
           {/* Tab 7: Inventory (Kiểm kê) */}
           {activeTab === "inventory" && (
             <div className="space-y-6">
+              {/* Form tạo checkpoint mới */}
               <div className="border border-purple-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Phiếu Kiểm Kê</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Kiểm Kê Tồn Kho (Checkpoint)</h3>
 
                 {isShiftOpen && (
-                  <div className="mb-4">
-                    <button
-                      onClick={() => setShowInventoryForm(!showInventoryForm)}
-                      className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                    >
-                      <PlusIcon className="h-5 w-5 mr-2" />
-                      Tạo phiếu kiểm kê
-                    </button>
-                  </div>
-                )}
-
-                {showInventoryForm && (
-                  <form
-                    data-form="inventory"
-                    onSubmit={handleInventorySubmit}
-                    className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
-                  >
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">mặt hàng *</label>
-                      <select
-                        name="productId"
-                        required
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                      >
-                        <option value="">-- Chọn mặt hàng --</option>
-                        {products?.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tồn kho hệ thống</label>
-                      <input
-                        type="number"
-                        name="systemQuantity"
-                        step="0.01"
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Tồn kho thực tế *</label>
-                      <input
-                        type="number"
-                        name="actualQuantity"
-                        step="0.01"
-                        required
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
-                      <input
-                        type="text"
-                        name="notes"
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="Diễn giải thêm..."
-                      />
-                    </div>
-
-                    <div className="md:col-span-2 flex justify-end space-x-3 mt-4">
+                  <>
+                    <div className="mb-4">
                       <button
-                        type="button"
-                        onClick={() => setShowInventoryForm(false)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                        onClick={() => setShowInventoryForm(!showInventoryForm)}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                       >
-                        Hủy
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                      >
-                        Lưu phiếu kiểm kê
+                        <PlusIcon className="h-5 w-5 mr-2" />
+                        {showInventoryForm ? "Ẩn form" : "Tạo kiểm kê mới"}
                       </button>
                     </div>
-                  </form>
-                )}
 
-                <table className="w-full border rounded-lg">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">mặt hàng</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tồn hệ thống</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thực tế</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chênh lệch</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {draftInventoryChecks.length > 0 ? (
-                      draftInventoryChecks.map((item) => {
-                        const product = products?.find((p) => p.id === item.productId);
-                        return (
-                          <tr key={item.id}>
-                            <td className="px-6 py-4 text-sm text-gray-900">{product?.name || "N/A"}</td>
-                            <td className="px-6 py-4 text-sm text-right text-gray-900">
-                              {Number(item.systemQuantity || 0).toLocaleString("vi-VN")}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-right text-gray-900">
-                              {Number(item.actualQuantity || 0).toLocaleString("vi-VN")}
-                            </td>
-                            <td
-                              className={`px-6 py-4 text-sm text-right font-semibold ${item.difference < 0 ? "text-red-600" : "text-green-600"
-                                }`}
-                            >
-                              {Number(item.difference || 0).toLocaleString("vi-VN")}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{item.notes || "-"}</td>
-                            <td className="px-6 py-4 text-right text-sm font-medium">
-                              <button
-                                onClick={() => handleDeleteInventory(item.id)}
-                                className="text-red-600 hover:text-red-900"
-                                type="button"
-                              >
-                                <TrashIcon className="h-5 w-5 inline" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    ) : (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
-                          Chưa có phiếu kiểm kê
-                        </td>
-                      </tr>
+                    {showInventoryForm && (
+                      <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                        <h4 className="font-medium text-purple-800 mb-4">Nhập số liệu kiểm kê</h4>
+
+                        {/* Số đồng hồ vòi bơm */}
+                        <div className="mb-6">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">📊 Số đồng hồ vòi bơm tại thời điểm kiểm kê</h5>
+                          <div className="space-y-3">
+                            {pumps && pumps.length > 0 ? (
+                              pumps.map((pump: any, idx: number) => {
+                                const product = products?.find(p => p.id === pump.productId);
+                                return (
+                                  <div key={pump.id} className="flex items-center gap-4 bg-white p-3 rounded-lg border">
+                                    <div className="flex-1">
+                                      <span className="font-medium text-gray-900">{pump.pumpCode}</span>
+                                      <span className="text-gray-500 ml-2">- {pump.name}</span>
+                                      <span className="text-sm text-gray-400 ml-2">({product?.name || "N/A"})</span>
+                                    </div>
+                                    <div className="w-48">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        data-checkpoint-input={idx}
+                                        value={checkpointReadings[pump.id] || ""}
+                                        onChange={(e) => setCheckpointReadings(prev => ({
+                                          ...prev,
+                                          [pump.id]: Number(e.target.value)
+                                        }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const nextInput = document.querySelector(`[data-checkpoint-input="${idx + 1}"]`) as HTMLInputElement;
+                                            if (nextInput) nextInput.focus();
+                                            else {
+                                              const firstTank = document.querySelector('[data-tank-input="0"]') as HTMLInputElement;
+                                              if (firstTank) firstTank.focus();
+                                            }
+                                          }
+                                        }}
+                                        placeholder="Số đồng hồ"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right"
+                                      />
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-gray-500 text-sm">Chưa có vòi bơm nào</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Tồn thực tế các bể */}
+                        <div className="mb-6">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">🛢️ Tồn kho thực tế các bể</h5>
+                          <div className="space-y-3">
+                            {tanks && tanks.length > 0 ? (
+                              tanks.map((tank: any, idx: number) => {
+                                const product = products?.find(p => p.id === tank.productId);
+                                return (
+                                  <div key={tank.id} className="flex items-center gap-4 bg-white p-3 rounded-lg border">
+                                    <div className="flex-1">
+                                      <span className="font-medium text-gray-900">{tank.code}</span>
+                                      <span className="text-gray-500 ml-2">- {tank.name}</span>
+                                      <span className="text-sm text-gray-400 ml-2">({product?.name || "N/A"})</span>
+                                    </div>
+                                    <div className="w-40">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        data-tank-input={idx}
+                                        value={checkpointStocks[tank.id] || ""}
+                                        onChange={(e) => setCheckpointStocks(prev => ({
+                                          ...prev,
+                                          [tank.id]: Number(e.target.value)
+                                        }))}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            const nextInput = document.querySelector(`[data-tank-input="${idx + 1}"]`) as HTMLInputElement;
+                                            if (nextInput) nextInput.focus();
+                                          }
+                                        }}
+                                        placeholder="Tồn thực tế"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right"
+                                      />
+                                    </div>
+                                    <span className="text-sm text-gray-500">lít</span>
+                                  </div>
+                                );
+                              })
+                            ) : (
+                              <div className="text-gray-500 text-sm">Chưa có bể nào</div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Ghi chú */}
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                          <input
+                            type="text"
+                            value={checkpointNotes}
+                            onChange={(e) => setCheckpointNotes(e.target.value)}
+                            placeholder="VD: Kiểm kê giữa ca, đổi ca..."
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                          />
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="flex justify-end gap-3">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowInventoryForm(false);
+                              setCheckpointReadings({});
+                              setCheckpointStocks({});
+                              setCheckpointNotes("");
+                            }}
+                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                          >
+                            Hủy
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              // Validate - phải nhập ít nhất 1 số đồng hồ hoặc 1 tồn kho
+                              const filledReadings = Object.entries(checkpointReadings).filter(([_, val]) => val > 0);
+                              const filledStocks = Object.entries(checkpointStocks).filter(([_, val]) => val > 0);
+
+                              if (filledReadings.length === 0 && filledStocks.length === 0) {
+                                toast.error("Vui lòng nhập ít nhất số đồng hồ 1 vòi hoặc tồn thực tế 1 bể");
+                                return;
+                              }
+
+                              // Prepare data
+                              const readings = filledReadings.map(([pumpIdStr, meterValue]) => {
+                                const pump = pumps?.find((p: any) => p.id === Number(pumpIdStr));
+                                return {
+                                  pumpId: Number(pumpIdStr),
+                                  pumpCode: pump?.pumpCode,
+                                  productId: pump?.productId,
+                                  meterValue: meterValue,
+                                };
+                              });
+
+                              const stocks = filledStocks.map(([tankIdStr, actualQty]) => {
+                                const tank = tanks?.find((t: any) => t.id === Number(tankIdStr));
+                                return {
+                                  tankId: Number(tankIdStr),
+                                  productId: tank?.productId,
+                                  actualQuantity: actualQty,
+                                };
+                              });
+
+                              try {
+                                await shiftsApi.createCheckpoint(Number(shiftId), {
+                                  checkpointAt: dayjs().toISOString(),
+                                  notes: checkpointNotes || undefined,
+                                  readings,
+                                  stocks,
+                                });
+                                toast.success("Đã lưu kiểm kê thành công!");
+                                setShowInventoryForm(false);
+                                setCheckpointReadings({});
+                                setCheckpointStocks({});
+                                setCheckpointNotes("");
+                                refetchCheckpoints();
+                              } catch (error: any) {
+                                toast.error(error.response?.data?.message || "Lỗi khi lưu kiểm kê");
+                              }
+                            }}
+                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                          >
+                            💾 Lưu kiểm kê
+                          </button>
+                        </div>
+                      </div>
                     )}
-                  </tbody>
-                </table>
+                  </>
+                )}
+
+                {/* Danh sách checkpoint đã lưu */}
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900 mb-3">📋 Lịch sử kiểm kê trong ca</h4>
+                  {checkpoints && checkpoints.length > 0 ? (
+                    <div className="space-y-4">
+                      {checkpoints.map((cp: any) => (
+                        <div key={cp.id} className="bg-gray-50 rounded-lg p-4 border">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                Kiểm kê #{cp.checkpointNo}
+                              </span>
+                              <span className="ml-3 text-sm text-gray-600">
+                                {dayjs(cp.checkpointAt).format("DD/MM/YYYY HH:mm:ss")}
+                              </span>
+                              {cp.notes && (
+                                <span className="ml-3 text-sm text-gray-500 italic">- {cp.notes}</span>
+                              )}
+                            </div>
+                            {isShiftOpen && checkpoints.indexOf(cp) === checkpoints.length - 1 && (
+                              <button
+                                onClick={async () => {
+                                  const confirmed = await showConfirm("Xóa kiểm kê này?", "Xác nhận xóa");
+                                  if (confirmed) {
+                                    try {
+                                      await shiftsApi.deleteCheckpoint(Number(shiftId), cp.id);
+                                      toast.success("Đã xóa kiểm kê");
+                                      refetchCheckpoints();
+                                    } catch (error: any) {
+                                      toast.error(error.response?.data?.message || "Lỗi khi xóa");
+                                    }
+                                  }
+                                }}
+                                className="text-red-600 hover:text-red-800"
+                              >
+                                <TrashIcon className="h-5 w-5" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Hiển thị tồn kho đã ghi */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            {cp.stocks?.map((stock: any) => (
+                              <div key={stock.id} className="bg-white p-2 rounded border text-sm">
+                                <div className="font-medium text-gray-700">{stock.tank?.code || `Bể ${stock.tankId}`}</div>
+                                <div className="text-purple-600 font-semibold">
+                                  {Number(stock.actualQuantity).toLocaleString("vi-VN")} lít
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      Chưa có kiểm kê nào trong ca này
+                    </div>
+                  )}
+                </div>
               </div>
 
               <TabNavigation />

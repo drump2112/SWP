@@ -101,6 +101,7 @@ export interface ShiftDebtSaleDto {
   productId: number;
   quantity: number;
   unitPrice: number;
+  amount?: number; // Số tiền gốc từ người dùng nhập (tránh sai số làm tròn)
   notes?: string;
 }
 
@@ -239,4 +240,45 @@ export const shiftsApi = {
     const response = await api.get(`/shifts/${shiftId}/previous-readings`);
     return response.data;
   },
+
+  // ==================== CHECKPOINTS (KIỂM KÊ GIỮA CA) ====================
+
+  createCheckpoint: async (shiftId: number, data: CreateCheckpointDto) => {
+    const response = await api.post(`/shifts/${shiftId}/checkpoint`, data);
+    return response.data;
+  },
+
+  getCheckpoints: async (shiftId: number) => {
+    const response = await api.get(`/shifts/${shiftId}/checkpoints`);
+    return response.data;
+  },
+
+  deleteCheckpoint: async (shiftId: number, checkpointId: number) => {
+    const response = await api.delete(`/shifts/${shiftId}/checkpoint/${checkpointId}`);
+    return response.data;
+  },
 };
+
+// ==================== CHECKPOINT DTOs ====================
+
+export interface CheckpointReadingDto {
+  pumpId?: number;
+  pumpCode?: string;
+  productId: number;
+  meterValue: number;
+}
+
+export interface CheckpointStockDto {
+  tankId: number;
+  productId?: number;
+  systemQuantity?: number;
+  actualQuantity: number;
+  notes?: string;
+}
+
+export interface CreateCheckpointDto {
+  checkpointAt: string;
+  notes?: string;
+  readings: CheckpointReadingDto[];
+  stocks: CheckpointStockDto[];
+}
