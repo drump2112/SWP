@@ -1410,7 +1410,7 @@ const ShiftOperationsPage: React.FC = () => {
       };
       // Lưu vào draft state thay vì API
       setDraftDeposits((prev) => [...prev, data]);
-      toast.success("Đã thêm vào danh sách nộp tiền (chưa lưu vào database)", {
+      toast.success("Đã thêm vào danh sách nộp tiền", {
         position: "top-right",
         autoClose: 3000,
       });
@@ -1530,7 +1530,7 @@ const ShiftOperationsPage: React.FC = () => {
         notes: formData.notes,
       };
       setDraftImports((prev) => [...prev, newItem]);
-      toast.success("Đã thêm vào danh sách nhập hàng (chưa lưu vào database)", {
+      toast.success("Đã thêm vào danh sách nhập hàng", {
         position: "top-right",
         autoClose: 3000,
       });
