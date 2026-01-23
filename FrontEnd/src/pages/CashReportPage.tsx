@@ -13,6 +13,8 @@ import {
   PrinterIcon,
   CalendarIcon,
   BuildingStorefrontIcon,
+  EyeIcon,
+  ChevronUpIcon,
 } from '@heroicons/react/24/outline';
 import dayjs from 'dayjs';
 import SearchableSelect from '../components/SearchableSelect';
@@ -519,9 +521,23 @@ const CashReportPage: React.FC = () => {
                         {ledger.details && (
                           <button
                             onClick={() => setShowDetails(showDetails === ledger.id ? null : ledger.id)}
-                            className="text-blue-600 hover:text-blue-800 font-medium"
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 border shadow-sm hover:shadow ${
+                              showDetails === ledger.id
+                                ? 'text-gray-600 bg-gray-100 hover:bg-gray-200 border-gray-300'
+                                : 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200 hover:border-blue-300'
+                            }`}
                           >
-                            {showDetails === ledger.id ? 'Ẩn' : 'Chi tiết'}
+                            {showDetails === ledger.id ? (
+                              <>
+                                <ChevronUpIcon className="h-4 w-4" />
+                                Ẩn
+                              </>
+                            ) : (
+                              <>
+                                <EyeIcon className="h-4 w-4" />
+                                Chi tiết
+                              </>
+                            )}
                           </button>
                         )}
                       </td>

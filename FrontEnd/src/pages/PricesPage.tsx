@@ -4,7 +4,9 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import {
   productsApi,
   type SetRegionPricesDto,
-  type ProductPriceItem
+  type ProductPriceItem,
+  type ProductPrice,
+  type UpdateProductPriceDto
 } from '../api/products';
 import { regionsApi } from '../api/regions';
 import {
@@ -13,7 +15,8 @@ import {
   XMarkIcon,
   CalendarIcon,
   CurrencyDollarIcon,
-  MapPinIcon
+  MapPinIcon,
+  PencilSquareIcon
 } from '@heroicons/react/24/outline';
 import { showSuccess, showError, showConfirm } from '../utils/sweetalert';
 import SearchableSelect from '../components/SearchableSelect';
@@ -22,6 +25,17 @@ const PricesPage: React.FC = () => {
   usePageTitle('Giá');
   const [selectedRegionId, setSelectedRegionId] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingPrice, setEditingPrice] = useState<ProductPrice | null>(null);
+  const [editFormData, setEditFormData] = useState<{
+    price: number;
+    validFrom: string;
+    validTo: string;
+  }>({
+    price: 0,
+    validFrom: '',
+    validTo: '',
+  });
   const [priceItems, setPriceItems] = useState<ProductPriceItem[]>([]);
   // Khởi tạo với datetime đầy đủ (ISO 8601 format: YYYY-MM-DDTHH:mm)
   const [validFrom, setValidFrom] = useState<string>(
@@ -59,6 +73,21 @@ const PricesPage: React.FC = () => {
     },
     onError: (error: any) => {
       showError(error.response?.data?.message || 'Không thể áp dụng giá');
+    },
+  });
+
+  // Update price mutation
+  const updatePriceMutation = useMutation({
+    mutationFn: ({ priceId, data }: { priceId: number; data: UpdateProductPriceDto }) =>
+      productsApi.updatePrice(priceId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['region-prices'] });
+      setIsEditModalOpen(false);
+      setEditingPrice(null);
+      showSuccess('Đã cập nhật giá thành công!');
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || 'Không thể cập nhật giá');
     },
   });
 
@@ -106,6 +135,52 @@ const PricesPage: React.FC = () => {
     };
 
     setRegionPricesMutation.mutate(data);
+  };
+
+  const handleOpenEditModal = (price: ProductPrice) => {
+    setEditingPrice(price);
+    setEditFormData({
+      price: Number(price.price),
+      validFrom: price.validFrom ? new Date(price.validFrom).toISOString().slice(0, 16) : '',
+      validTo: price.validTo ? new Date(price.validTo).toISOString().slice(0, 16) : '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingPrice) return;
+
+    if (editFormData.price <= 0) {
+      showError('Giá phải lớn hơn 0');
+      return;
+    }
+
+    const productName = editingPrice.product?.name || getProductName(editingPrice.productId);
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn cập nhật giá cho "${productName}" thành ${formatPrice(editFormData.price)}?`,
+      'Xác nhận cập nhật giá',
+      'question',
+      'Cập nhật',
+      'Hủy'
+    );
+
+    if (!confirmed) return;
+
+    const updateData: UpdateProductPriceDto = {
+      price: editFormData.price,
+    };
+
+    if (editFormData.validFrom) {
+      updateData.validFrom = new Date(editFormData.validFrom).toISOString();
+    }
+    if (editFormData.validTo) {
+      updateData.validTo = new Date(editFormData.validTo).toISOString();
+    }
+
+    updatePriceMutation.mutate({
+      priceId: editingPrice.id,
+      data: updateData,
+    });
   };
 
   const formatPrice = (price: number) => {
@@ -228,6 +303,9 @@ const PricesPage: React.FC = () => {
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Hiệu lực đến
                         </th>
+                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Thao tác
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
@@ -260,6 +338,18 @@ const PricesPage: React.FC = () => {
                               {price.validTo ? formatDate(price.validTo) :
                                 <span className="text-green-600 font-medium">Đang áp dụng</span>
                               }
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center justify-center">
+                              <button
+                                onClick={() => handleOpenEditModal(price)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-all duration-200 border border-amber-200 hover:border-amber-300 shadow-sm hover:shadow"
+                                title="Sửa giá"
+                              >
+                                <PencilSquareIcon className="h-4 w-4" />
+                                Sửa
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -409,6 +499,96 @@ const PricesPage: React.FC = () => {
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
                 {setRegionPricesMutation.isPending ? 'Đang xử lý...' : 'Áp dụng giá'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal - Edit Price */}
+      {isEditModalOpen && editingPrice && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+            <div className="flex justify-between items-center p-6 border-b">
+              <div>
+                <h2 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Sửa giá mặt hàng
+                </h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  {editingPrice.product?.name || getProductName(editingPrice.productId)}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingPrice(null);
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <CurrencyDollarIcon className="h-4 w-4 inline mr-1" />
+                  Giá bán (VNĐ) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={editFormData.price || ''}
+                  onChange={(e) => setEditFormData({ ...editFormData, price: Number(e.target.value) })}
+                  placeholder="0"
+                  min="0"
+                  step="100"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <CalendarIcon className="h-4 w-4 inline mr-1" />
+                  Hiệu lực từ
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editFormData.validFrom}
+                  onChange={(e) => setEditFormData({ ...editFormData, validFrom: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <CalendarIcon className="h-4 w-4 inline mr-1" />
+                  Hiệu lực đến (để trống nếu vẫn đang áp dụng)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editFormData.validTo}
+                  onChange={(e) => setEditFormData({ ...editFormData, validTo: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t bg-gray-50 flex gap-3">
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingPrice(null);
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                disabled={updatePriceMutation.isPending}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {updatePriceMutation.isPending ? 'Đang xử lý...' : 'Cập nhật giá'}
               </button>
             </div>
           </div>

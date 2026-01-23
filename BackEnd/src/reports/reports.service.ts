@@ -1033,14 +1033,14 @@ export class ReportsService {
       pumpReadingsQuery.andWhere('shift.storeId = :storeId', { storeId });
     }
 
-    // Filter theo thời gian
+    // Filter theo thời gian - Dùng closedAt thay vì openedAt để tính đúng doanh thu theo thời điểm đóng ca
     if (fromDateTime) {
-      pumpReadingsQuery.andWhere('shift.openedAt >= :fromDateTime', {
+      pumpReadingsQuery.andWhere('shift.closedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      pumpReadingsQuery.andWhere('shift.openedAt <= :toDateTime', {
+      pumpReadingsQuery.andWhere('shift.closedAt <= :toDateTime', {
         toDateTime: new Date(toDateTime),
       });
     }
@@ -1067,13 +1067,14 @@ export class ReportsService {
     if (storeId) {
       debtSalesQuery.andWhere('shift.storeId = :storeId', { storeId });
     }
+    // Filter theo thời gian - Dùng closedAt thay vì openedAt để tính đúng doanh thu theo thời điểm đóng ca
     if (fromDateTime) {
-      debtSalesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+      debtSalesQuery.andWhere('shift.closedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      debtSalesQuery.andWhere('shift.openedAt <= :toDateTime', {
+      debtSalesQuery.andWhere('shift.closedAt <= :toDateTime', {
         toDateTime: new Date(toDateTime),
       });
     }
@@ -1230,14 +1231,14 @@ export class ReportsService {
       salesQuery.andWhere('sale.productId = :productId', { productId });
     }
 
-    // Filter theo thời gian
+    // Filter theo thời gian - Dùng closedAt thay vì openedAt để tính đúng doanh thu theo thời điểm đóng ca
     if (fromDateTime) {
-      salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+      salesQuery.andWhere('shift.closedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      salesQuery.andWhere('shift.openedAt <= :toDateTime', {
+      salesQuery.andWhere('shift.closedAt <= :toDateTime', {
         toDateTime: new Date(toDateTime),
       });
     }

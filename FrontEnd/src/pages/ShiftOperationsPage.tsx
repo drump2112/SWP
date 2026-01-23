@@ -38,6 +38,7 @@ import {
   DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
+import { exportInventoryCheckExcel, type InventoryCheckRow, type InventoryCheckExportData } from "../utils/excel";
 
 // Helper function để xử lý phím Enter - chuyển focus sang input tiếp theo
 const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
@@ -123,7 +124,6 @@ const ShiftOperationsPage: React.FC = () => {
   const [receiverUserId, setReceiverUserId] = useState<number | null>(null);
 
   // Editing state
-  const [editingDebtSaleId, setEditingDebtSaleId] = useState<string | null>(null);
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [editingImportId, setEditingImportId] = useState<string | null>(null);
@@ -138,7 +138,19 @@ const ShiftOperationsPage: React.FC = () => {
   const [draftExports, setDraftExports] = useState<any[]>([]);
   const [draftInventoryChecks, setDraftInventoryChecks] = useState<any[]>([]);
 
-  // State cho checkpoint (kiểm kê)
+  // State cho kiểm kê tồn kho - form mới theo mẫu Excel
+  const [inventoryCheckData, setInventoryCheckData] = useState<Record<number, {
+    heightTotal: number;        // Chiều cao chung (mm)
+    heightWater: number;        // Chiều cao nước (mm)
+    actualStock: number;        // Tồn thực tế (lít)
+  }>>({}); // tankId -> data bể
+  const [pumpMeterReadings, setPumpMeterReadings] = useState<Record<number, number>>({}); // pumpId -> số máy điện tử
+  const [inventoryReason, setInventoryReason] = useState("");      // Nguyên nhân
+  const [inventoryConclusion, setInventoryConclusion] = useState(""); // Kiến nghị/kết luận
+  const [inventoryMember1, setInventoryMember1] = useState("");    // Thành viên 1
+  const [inventoryMember2, setInventoryMember2] = useState("");    // Thành viên 2
+
+  // Legacy state (giữ lại để tương thích)
   const [checkpointReadings, setCheckpointReadings] = useState<Record<number, number>>({}); // pumpId -> meterValue
   const [checkpointStocks, setCheckpointStocks] = useState<Record<number, number>>({}); // tankId -> actualQuantity
   const [checkpointNotes, setCheckpointNotes] = useState("");
@@ -249,15 +261,6 @@ const ShiftOperationsPage: React.FC = () => {
       console.log("✅ Loaded store users:", storeUsers.length, storeUsers);
     }
   }, [storeUsers, usersError]);
-
-  // ✅ Lọc products chỉ lấy những mặt hàng có kinh doanh tại cửa hàng (có trong pumps)
-  const storeProducts = React.useMemo(() => {
-    if (!products || !pumps) return [];
-    // Lấy danh sách productId duy nhất từ pumps của cửa hàng
-    const storeProductIds = new Set(pumps.map((pump: any) => pump.productId));
-    // Filter products chỉ lấy những sản phẩm có trong pumps
-    return products.filter((product: any) => storeProductIds.has(product.id));
-  }, [products, pumps]);
 
   // Cảnh báo khi rời trang có dữ liệu chưa lưu
   useEffect(() => {
@@ -1163,11 +1166,10 @@ const ShiftOperationsPage: React.FC = () => {
       debtSaleFormAmount,
       calculatedAmount: amount,
       isAmountManuallyEntered,
-      editingDebtSaleId,
     });
 
     const data: ShiftDebtSaleDto & { id: string } = {
-      id: editingDebtSaleId || `draft_${Date.now()}`, // Dùng id cũ nếu đang sửa
+      id: `draft_${Date.now()}`, // Temporary ID
       shiftId: Number(shiftId),
       customerId: Number(formData.get("customerId")),
       productId: Number(formData.get("productId")),
@@ -1178,16 +1180,7 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     // Lưu vào draft state thay vì API
-    if (editingDebtSaleId) {
-      // Đang sửa - cập nhật item hiện có
-      setDraftDebtSales((prev) => prev.map((item) => (item.id === editingDebtSaleId ? data : item)));
-      toast.success("Đã cập nhật doanh số công nợ", { position: "top-right", autoClose: 3000 });
-    } else {
-      // Thêm mới
-      setDraftDebtSales((prev) => [...prev, data]);
-      toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
-    }
-
+    setDraftDebtSales((prev) => [...prev, data]);
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
@@ -1196,7 +1189,7 @@ const ShiftOperationsPage: React.FC = () => {
     setIsAmountManuallyEntered(false);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
-    setEditingDebtSaleId(null);
+    toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
   };
 
   const handleReceiptSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -2678,7 +2671,6 @@ const ShiftOperationsPage: React.FC = () => {
                           setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
-                          setEditingDebtSaleId(null);
                         }
                       }}
                       className="inline-flex items-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
@@ -2711,7 +2703,7 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Mặt hàng *</label>
                       <SearchableSelect
-                        options={storeProducts?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
+                        options={products?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
                         value={selectedDebtProduct}
                         onChange={(value) => {
                           setSelectedDebtProduct(value as number);
@@ -2840,7 +2832,6 @@ const ShiftOperationsPage: React.FC = () => {
                           setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
-                          setEditingDebtSaleId(null);
                         }}
                         className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                       >
@@ -2850,7 +2841,7 @@ const ShiftOperationsPage: React.FC = () => {
                         type="submit"
                         className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                       >
-                        {editingDebtSaleId ? "Cập nhật" : "Thêm vào danh sách"}
+                        Thêm vào danh sách
                       </button>
                     </div>
                   </form>
@@ -2880,7 +2871,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {customer?.code} - {customer?.name}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.code} - {product?.name}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name}</td>
                               <td className="px-6 py-4 text-sm text-right">
                                 {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
                               </td>
@@ -2891,34 +2882,13 @@ const ShiftOperationsPage: React.FC = () => {
                                 {(sale.amount ?? Math.round(sale.quantity * sale.unitPrice)).toLocaleString("vi-VN")} ₫
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <div className="flex justify-end space-x-2">
-                                  <button
-                                    onClick={() => {
-                                      // Load data vào form để sửa
-                                      setEditingDebtSaleId(sale.id);
-                                      setSelectedDebtCustomer(sale.customerId);
-                                      setSelectedDebtProduct(sale.productId);
-                                      setDebtSaleFormQuantity(sale.quantity);
-                                      setDebtSaleFormPrice(sale.unitPrice);
-                                      setDebtSaleFormAmount(sale.amount ?? Math.round(sale.quantity * sale.unitPrice));
-                                      setIsAmountManuallyEntered(false);
-                                      setShowDebtSaleForm(true);
-                                    }}
-                                    className="text-blue-600 hover:text-blue-900"
-                                    type="button"
-                                    title="Sửa"
-                                  >
-                                    <PencilIcon className="h-5 w-5" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleDeleteDebtSale(sale.id)}
-                                    className="text-red-600 hover:text-red-900"
-                                    type="button"
-                                    title="Xóa"
-                                  >
-                                    <TrashIcon className="h-5 w-5" />
-                                  </button>
-                                </div>
+                                <button
+                                  onClick={() => handleDeleteDebtSale(sale.id)}
+                                  className="text-red-600 hover:text-red-900"
+                                  type="button"
+                                >
+                                  <TrashIcon className="h-5 w-5" />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -2940,7 +2910,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {customer?.code || sale.customer?.code} - {customer?.name || sale.customer?.name}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.code || sale.product?.code} - {product?.name || sale.product?.name}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name || sale.product?.name}</td>
                               <td className="px-6 py-4 text-sm text-right">
                                 {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
                               </td>
@@ -3573,7 +3543,7 @@ const ShiftOperationsPage: React.FC = () => {
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                           >
                             <option value="">-- Chọn mặt hàng --</option>
-                            {storeProducts?.map((p) => (
+                            {products?.map((p) => (
                               <option key={p.id} value={p.id}>
                                 {p.name}
                               </option>
@@ -3669,268 +3639,284 @@ const ShiftOperationsPage: React.FC = () => {
             </div>
           )}
 
-          {/* Tab 7: Inventory (Kiểm kê) */}
+          {/* Tab 7: Inventory (Kiểm kê) - Xuất Excel theo mẫu */}
           {activeTab === "inventory" && (
             <div className="space-y-6">
-              {/* Form tạo checkpoint mới */}
               <div className="border border-purple-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Kiểm Kê Tồn Kho (Checkpoint)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Biên Bản Kiểm Kê Tồn Kho Xăng Dầu</h3>
 
-                {isShiftOpen && (
-                  <>
-                    <div className="mb-4">
-                      <button
-                        onClick={() => setShowInventoryForm(!showInventoryForm)}
-                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                      >
-                        <PlusIcon className="h-5 w-5 mr-2" />
-                        {showInventoryForm ? "Ẩn form" : "Tạo kiểm kê mới"}
-                      </button>
+                {/* Thông tin tổ kiểm kê */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-gray-800 mb-3">Thành phần Tổ kiểm kê</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Thành viên 1</label>
+                      <input
+                        type="text"
+                        value={inventoryMember1}
+                        onChange={(e) => setInventoryMember1(e.target.value)}
+                        placeholder="Họ tên người kiểm kê"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Thành viên 2</label>
+                      <input
+                        type="text"
+                        value={inventoryMember2}
+                        onChange={(e) => setInventoryMember2(e.target.value)}
+                        placeholder="Họ tên người kiểm kê"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
 
-                    {showInventoryForm && (
-                      <div className="mb-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                        <h4 className="font-medium text-purple-800 mb-4">Nhập số liệu kiểm kê</h4>
+                {/* Bảng nhập liệu theo Mặt hàng -> Bể -> Vòi */}
+                <div className="mb-6">
+                  <h4 className="font-medium text-gray-800 mb-3">📊 Số liệu kiểm kê</h4>
 
-                        {/* Số đồng hồ vòi bơm */}
-                        <div className="mb-6">
-                          <h5 className="text-sm font-medium text-gray-700 mb-2">📊 Số đồng hồ vòi bơm tại thời điểm kiểm kê</h5>
-                          <div className="space-y-3">
-                            {pumps && pumps.length > 0 ? (
-                              pumps.map((pump: any, idx: number) => {
-                                const product = products?.find(p => p.id === pump.productId);
+                  {/* Group by Product */}
+                  {products?.filter(p => p.isFuel).map((product, productIdx) => {
+                    const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
+                    if (productTanks.length === 0) return null;
+
+                    return (
+                      <div key={product.id} className="mb-6 border rounded-lg overflow-hidden">
+                        {/* Product Header */}
+                        <div className="bg-blue-50 px-4 py-2 border-b">
+                          <h5 className="font-semibold text-blue-800">{productIdx + 1}. {product.name}</h5>
+                        </div>
+
+                        {/* Tanks table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="bg-gray-100">
+                              <tr>
+                                <th className="px-3 py-2 text-left font-medium text-gray-700">Bể chứa</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chiều cao chung (mm)</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chiều cao nước (mm)</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-700">Tồn thực tế (Lít)</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-700">Tồn sổ sách (Lít)</th>
+                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chênh lệch</th>
+                                <th className="px-3 py-2 text-left font-medium text-gray-700">Số máy các vòi</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {productTanks.map((tank: any) => {
+                                const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
+                                const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0 };
+                                const bookStock = Number(tank.currentStock) || 0;
+                                const diff = (tankData.actualStock || 0) - bookStock;
+
                                 return (
-                                  <div key={pump.id} className="flex items-center gap-4 bg-white p-3 rounded-lg border">
-                                    <div className="flex-1">
-                                      <span className="font-medium text-gray-900">{pump.pumpCode}</span>
-                                      <span className="text-gray-500 ml-2">- {pump.name}</span>
-                                      <span className="text-sm text-gray-400 ml-2">({product?.name || "N/A"})</span>
-                                    </div>
-                                    <div className="w-48">
+                                  <tr key={tank.id} className="hover:bg-gray-50">
+                                    <td className="px-3 py-2 font-medium text-gray-900">
+                                      {tank.tankCode || tank.name}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={tankData.heightTotal || ""}
+                                        onChange={(e) => setInventoryCheckData(prev => ({
+                                          ...prev,
+                                          [tank.id]: { ...prev[tank.id], heightTotal: Number(e.target.value) }
+                                        }))}
+                                        placeholder="0"
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        value={tankData.heightWater || ""}
+                                        onChange={(e) => setInventoryCheckData(prev => ({
+                                          ...prev,
+                                          [tank.id]: { ...prev[tank.id], heightWater: Number(e.target.value) }
+                                        }))}
+                                        placeholder="0"
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2">
                                       <input
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        data-checkpoint-input={idx}
-                                        value={checkpointReadings[pump.id] || ""}
-                                        onChange={(e) => setCheckpointReadings(prev => ({
+                                        value={tankData.actualStock || ""}
+                                        onChange={(e) => setInventoryCheckData(prev => ({
                                           ...prev,
-                                          [pump.id]: Number(e.target.value)
+                                          [tank.id]: { ...prev[tank.id], actualStock: Number(e.target.value) }
                                         }))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            const nextInput = document.querySelector(`[data-checkpoint-input="${idx + 1}"]`) as HTMLInputElement;
-                                            if (nextInput) nextInput.focus();
-                                            else {
-                                              const firstTank = document.querySelector('[data-tank-input="0"]') as HTMLInputElement;
-                                              if (firstTank) firstTank.focus();
-                                            }
-                                          }
-                                        }}
-                                        placeholder="Số đồng hồ"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right"
+                                        placeholder="0"
+                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
                                       />
-                                    </div>
-                                  </div>
+                                    </td>
+                                    <td className="px-3 py-2 text-right text-gray-600">
+                                      {bookStock.toLocaleString("vi-VN")}
+                                    </td>
+                                    <td className={`px-3 py-2 text-right font-medium ${diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500'}`}>
+                                      {tankData.actualStock ? (diff > 0 ? '+' : '') + diff.toLocaleString("vi-VN") : '-'}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                      <div className="flex flex-wrap gap-2">
+                                        {tankPumps.map((pump: any) => (
+                                          <div key={pump.id} className="flex items-center gap-1">
+                                            <span className="text-xs text-gray-500">{pump.pumpCode}:</span>
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              step="0.01"
+                                              value={pumpMeterReadings[pump.id] || ""}
+                                              onChange={(e) => setPumpMeterReadings(prev => ({
+                                                ...prev,
+                                                [pump.id]: Number(e.target.value)
+                                              }))}
+                                              placeholder="0"
+                                              className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
+                                            />
+                                          </div>
+                                        ))}
+                                        {tankPumps.length === 0 && (
+                                          <span className="text-xs text-gray-400">Không có vòi</span>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
                                 );
-                              })
-                            ) : (
-                              <div className="text-gray-500 text-sm">Chưa có vòi bơm nào</div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Tồn thực tế các bể */}
-                        <div className="mb-6">
-                          <h5 className="text-sm font-medium text-gray-700 mb-2">🛢️ Tồn kho thực tế các bể</h5>
-                          <div className="space-y-3">
-                            {tanks && tanks.length > 0 ? (
-                              tanks.map((tank: any, idx: number) => {
-                                const product = products?.find(p => p.id === tank.productId);
-                                return (
-                                  <div key={tank.id} className="flex items-center gap-4 bg-white p-3 rounded-lg border">
-                                    <div className="flex-1">
-                                      <span className="font-medium text-gray-900">{tank.code}</span>
-                                      <span className="text-gray-500 ml-2">- {tank.name}</span>
-                                      <span className="text-sm text-gray-400 ml-2">({product?.name || "N/A"})</span>
-                                    </div>
-                                    <div className="w-40">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        data-tank-input={idx}
-                                        value={checkpointStocks[tank.id] || ""}
-                                        onChange={(e) => setCheckpointStocks(prev => ({
-                                          ...prev,
-                                          [tank.id]: Number(e.target.value)
-                                        }))}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            e.preventDefault();
-                                            const nextInput = document.querySelector(`[data-tank-input="${idx + 1}"]`) as HTMLInputElement;
-                                            if (nextInput) nextInput.focus();
-                                          }
-                                        }}
-                                        placeholder="Tồn thực tế"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-right"
-                                      />
-                                    </div>
-                                    <span className="text-sm text-gray-500">lít</span>
-                                  </div>
-                                );
-                              })
-                            ) : (
-                              <div className="text-gray-500 text-sm">Chưa có bể nào</div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Ghi chú */}
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                          <input
-                            type="text"
-                            value={checkpointNotes}
-                            onChange={(e) => setCheckpointNotes(e.target.value)}
-                            placeholder="VD: Kiểm kê giữa ca, đổi ca..."
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
-                          />
-                        </div>
-
-                        {/* Buttons */}
-                        <div className="flex justify-end gap-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowInventoryForm(false);
-                              setCheckpointReadings({});
-                              setCheckpointStocks({});
-                              setCheckpointNotes("");
-                            }}
-                            className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-                          >
-                            Hủy
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              // Validate - phải nhập ít nhất 1 số đồng hồ hoặc 1 tồn kho
-                              const filledReadings = Object.entries(checkpointReadings).filter(([_, val]) => val > 0);
-                              const filledStocks = Object.entries(checkpointStocks).filter(([_, val]) => val > 0);
-
-                              if (filledReadings.length === 0 && filledStocks.length === 0) {
-                                toast.error("Vui lòng nhập ít nhất số đồng hồ 1 vòi hoặc tồn thực tế 1 bể");
-                                return;
-                              }
-
-                              // Prepare data
-                              const readings = filledReadings.map(([pumpIdStr, meterValue]) => {
-                                const pump = pumps?.find((p: any) => p.id === Number(pumpIdStr));
-                                return {
-                                  pumpId: Number(pumpIdStr),
-                                  pumpCode: pump?.pumpCode,
-                                  productId: pump?.productId,
-                                  meterValue: meterValue,
-                                };
-                              });
-
-                              const stocks = filledStocks.map(([tankIdStr, actualQty]) => {
-                                const tank = tanks?.find((t: any) => t.id === Number(tankIdStr));
-                                return {
-                                  tankId: Number(tankIdStr),
-                                  productId: tank?.productId,
-                                  actualQuantity: actualQty,
-                                };
-                              });
-
-                              try {
-                                await shiftsApi.createCheckpoint(Number(shiftId), {
-                                  checkpointAt: dayjs().toISOString(),
-                                  notes: checkpointNotes || undefined,
-                                  readings,
-                                  stocks,
-                                });
-                                toast.success("Đã lưu kiểm kê thành công!");
-                                setShowInventoryForm(false);
-                                setCheckpointReadings({});
-                                setCheckpointStocks({});
-                                setCheckpointNotes("");
-                                refetchCheckpoints();
-                              } catch (error: any) {
-                                toast.error(error.response?.data?.message || "Lỗi khi lưu kiểm kê");
-                              }
-                            }}
-                            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-                          >
-                            💾 Lưu kiểm kê
-                          </button>
+                              })}
+                            </tbody>
+                          </table>
                         </div>
                       </div>
-                    )}
-                  </>
-                )}
+                    );
+                  })}
 
-                {/* Danh sách checkpoint đã lưu */}
-                <div className="mt-6">
-                  <h4 className="font-medium text-gray-900 mb-3">📋 Lịch sử kiểm kê trong ca</h4>
-                  {checkpoints && checkpoints.length > 0 ? (
-                    <div className="space-y-4">
-                      {checkpoints.map((cp: any) => (
-                        <div key={cp.id} className="bg-gray-50 rounded-lg p-4 border">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                                Kiểm kê #{cp.checkpointNo}
-                              </span>
-                              <span className="ml-3 text-sm text-gray-600">
-                                {dayjs(cp.checkpointAt).format("DD/MM/YYYY HH:mm:ss")}
-                              </span>
-                              {cp.notes && (
-                                <span className="ml-3 text-sm text-gray-500 italic">- {cp.notes}</span>
-                              )}
-                            </div>
-                            {isShiftOpen && checkpoints.indexOf(cp) === checkpoints.length - 1 && (
-                              <button
-                                onClick={async () => {
-                                  const confirmed = await showConfirm("Xóa kiểm kê này?", "Xác nhận xóa");
-                                  if (confirmed) {
-                                    try {
-                                      await shiftsApi.deleteCheckpoint(Number(shiftId), cp.id);
-                                      toast.success("Đã xóa kiểm kê");
-                                      refetchCheckpoints();
-                                    } catch (error: any) {
-                                      toast.error(error.response?.data?.message || "Lỗi khi xóa");
-                                    }
-                                  }
-                                }}
-                                className="text-red-600 hover:text-red-800"
-                              >
-                                <TrashIcon className="h-5 w-5" />
-                              </button>
-                            )}
-                          </div>
-
-                          {/* Hiển thị tồn kho đã ghi */}
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            {cp.stocks?.map((stock: any) => (
-                              <div key={stock.id} className="bg-white p-2 rounded border text-sm">
-                                <div className="font-medium text-gray-700">{stock.tank?.code || `Bể ${stock.tankId}`}</div>
-                                <div className="text-purple-600 font-semibold">
-                                  {Number(stock.actualQuantity).toLocaleString("vi-VN")} lít
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
+                  {(!products?.filter(p => p.isFuel).length || !tanks?.length) && (
                     <div className="text-center py-8 text-gray-500">
-                      Chưa có kiểm kê nào trong ca này
+                      Chưa có cấu hình bể/mặt hàng cho cửa hàng này
                     </div>
                   )}
+                </div>
+
+                {/* Nguyên nhân & Kiến nghị */}
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Nguyên nhân (nếu có chênh lệch)</label>
+                    <textarea
+                      value={inventoryReason}
+                      onChange={(e) => setInventoryReason(e.target.value)}
+                      placeholder="Nhập nguyên nhân chênh lệch..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Kiến nghị / Kết luận</label>
+                    <textarea
+                      value={inventoryConclusion}
+                      onChange={(e) => setInventoryConclusion(e.target.value)}
+                      placeholder="Nhập kiến nghị hoặc kết luận..."
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInventoryCheckData({});
+                      setPumpMeterReadings({});
+                      setInventoryReason("");
+                      setInventoryConclusion("");
+                      setInventoryMember1("");
+                      setInventoryMember2("");
+                    }}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Xóa dữ liệu
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Validate
+                      const filledTanks = Object.entries(inventoryCheckData).filter(([_, data]) =>
+                        data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0
+                      );
+
+                      if (filledTanks.length === 0) {
+                        toast.error("Vui lòng nhập ít nhất số liệu cho 1 bể");
+                        return;
+                      }
+
+                      // Build export data
+                      const rows: InventoryCheckRow[] = [];
+                      let stt = 0;
+
+                      products?.filter(p => p.isFuel).forEach(product => {
+                        const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
+                        if (productTanks.length === 0) return;
+
+                        stt++;
+                        let isFirstRow = true;
+
+                        productTanks.forEach((tank: any) => {
+                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0 };
+                          const bookStock = Number(tank.currentStock) || 0;
+                          const diff = (tankData.actualStock || 0) - bookStock;
+
+                          // Get pump readings for this tank
+                          const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
+                          const pumpReadingsStr = tankPumps
+                            .map((p: any) => `${p.pumpCode}: ${(pumpMeterReadings[p.id] || 0).toLocaleString("vi-VN")}`)
+                            .join(", ");
+
+                          rows.push({
+                            stt: isFirstRow ? stt : '',
+                            productName: isFirstRow ? product.name : '',
+                            tankName: tank.tankCode || tank.name,
+                            heightTotal: tankData.heightTotal || '',
+                            heightWater: tankData.heightWater || '',
+                            actualStock: tankData.actualStock || '',
+                            bookStock: bookStock,
+                            difference: tankData.actualStock ? diff : '',
+                            pumpElectronic: pumpReadingsStr,
+                            pumpMechanical: ''
+                          });
+                          isFirstRow = false;
+                        });
+                      });
+
+                      const exportData: InventoryCheckExportData = {
+                        companyName: "CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CN ĐỐNG ĐA",
+                        branchName: store?.name || "CỬA HÀNG XĂNG DẦU",
+                        storeName: store?.name || "",
+                        checkTime: dayjs().format("HH:mm [ngày] DD [tháng] MM [năm] YYYY"),
+                        members: [
+                          { name: inventoryMember1 || "", department: store?.name || "" },
+                          { name: inventoryMember2 || "", department: "" }
+                        ].filter(m => m.name),
+                        rows,
+                        reason: inventoryReason,
+                        conclusion: inventoryConclusion
+                      };
+
+                      const fileName = `Kiem_ke_${store?.code || 'store'}_${dayjs().format("YYYYMMDD_HHmm")}`;
+                      exportInventoryCheckExcel(exportData, fileName);
+                      toast.success("Đã xuất file Excel kiểm kê!");
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  >
+                    <DocumentArrowDownIcon className="h-5 w-5" />
+                    📥 Xuất Excel
+                  </button>
                 </div>
               </div>
 
