@@ -127,6 +127,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [editingImportId, setEditingImportId] = useState<string | null>(null);
+  const [editingDebtSaleId, setEditingDebtSaleId] = useState<string | null>(null);
   const [hasLoadedReportData, setHasLoadedReportData] = useState(false); // Flag để track đã load data từ report chưa
 
   // Draft Mode: Store all data until shift close
@@ -1167,10 +1168,11 @@ const ShiftOperationsPage: React.FC = () => {
       debtSaleFormAmount,
       calculatedAmount: amount,
       isAmountManuallyEntered,
+      isEditing: !!editingDebtSaleId,
     });
 
     const data: ShiftDebtSaleDto & { id: string } = {
-      id: `draft_${Date.now()}`, // Temporary ID
+      id: editingDebtSaleId || `draft_${Date.now()}`, // Use existing ID if editing
       shiftId: Number(shiftId),
       customerId: Number(formData.get("customerId")),
       productId: Number(formData.get("productId")),
@@ -1180,8 +1182,15 @@ const ShiftOperationsPage: React.FC = () => {
       notes: (formData.get("notes") as string) || undefined,
     };
 
-    // Lưu vào draft state thay vì API
-    setDraftDebtSales((prev) => [...prev, data]);
+    // Lưu vào draft state - update nếu đang sửa, thêm mới nếu không
+    if (editingDebtSaleId) {
+      setDraftDebtSales((prev) => prev.map((item) => (item.id === editingDebtSaleId ? data : item)));
+      toast.success("Đã cập nhật doanh số", { position: "top-right", autoClose: 3000 });
+    } else {
+      setDraftDebtSales((prev) => [...prev, data]);
+      toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
+    }
+    
     setShowDebtSaleForm(false);
     form.reset();
     setDebtSaleFormPrice(0);
@@ -1190,7 +1199,7 @@ const ShiftOperationsPage: React.FC = () => {
     setIsAmountManuallyEntered(false);
     setSelectedDebtCustomer(null);
     setSelectedDebtProduct(null);
-    toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
+    setEditingDebtSaleId(null);
   };
 
   const handleReceiptSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1426,6 +1435,17 @@ const ShiftOperationsPage: React.FC = () => {
       setDraftDebtSales((prev) => prev.filter((item) => item.id !== id));
       toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
     }
+  };
+
+  const handleEditDebtSale = (sale: ShiftDebtSaleDto & { id: string }) => {
+    // Set form values from the sale being edited
+    setSelectedDebtCustomer(sale.customerId);
+    setSelectedDebtProduct(sale.productId);
+    setDebtSaleFormQuantity(sale.quantity);
+    setDebtSaleFormPrice(sale.unitPrice);
+    setDebtSaleFormAmount(sale.amount ?? Math.round(sale.quantity * sale.unitPrice));
+    setEditingDebtSaleId(sale.id);
+    setShowDebtSaleForm(true);
   };
 
   const handleDeleteReceipt = async (id: string) => {
@@ -2833,6 +2853,7 @@ const ShiftOperationsPage: React.FC = () => {
                           setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
+                          setEditingDebtSaleId(null);
                         }}
                         className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                       >
@@ -2842,7 +2863,7 @@ const ShiftOperationsPage: React.FC = () => {
                         type="submit"
                         className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
                       >
-                        Thêm vào danh sách
+                        {editingDebtSaleId ? "Cập nhật" : "Thêm vào danh sách"}
                       </button>
                     </div>
                   </form>
@@ -2884,9 +2905,18 @@ const ShiftOperationsPage: React.FC = () => {
                               </td>
                               <td className="px-6 py-4 text-right">
                                 <button
+                                  onClick={() => handleEditDebtSale(sale)}
+                                  className="text-blue-600 hover:text-blue-900 mr-2"
+                                  type="button"
+                                  title="Sửa"
+                                >
+                                  <PencilIcon className="h-5 w-5" />
+                                </button>
+                                <button
                                   onClick={() => handleDeleteDebtSale(sale.id)}
                                   className="text-red-600 hover:text-red-900"
                                   type="button"
+                                  title="Xóa"
                                 >
                                   <TrashIcon className="h-5 w-5" />
                                 </button>
