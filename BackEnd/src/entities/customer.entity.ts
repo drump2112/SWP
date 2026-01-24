@@ -26,6 +26,12 @@ export class Customer {
   @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
   creditLimit: number;
 
+  @Column({ name: 'bypass_credit_limit', type: 'boolean', default: false })
+  bypassCreditLimit: boolean;
+
+  @Column({ name: 'bypass_until', type: 'timestamp', nullable: true })
+  bypassUntil: Date | null;
+
   @Column({ type: 'text', nullable: true })
   notes: string;
 

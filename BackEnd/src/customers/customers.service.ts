@@ -11,7 +11,7 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
 import { ImportCustomersResponseDto } from './dto/import-customers.dto';
-import { UpdateStoreCreditLimitDto } from './dto/update-store-credit-limit.dto';
+import { UpdateStoreCreditLimitDto, ToggleCustomerBypassDto } from './dto/update-store-credit-limit.dto';
 import { ImportOpeningBalanceDto, ImportOpeningBalanceResponseDto } from './dto/import-opening-balance.dto';
 
 @Injectable()
@@ -581,6 +581,11 @@ export class CustomersService {
         const currentDebt = debtBalance.balance;
         const availableCredit = Math.max(0, effectiveLimit - currentDebt);
 
+        // Check bypass status
+        const now = new Date();
+        const storeBypassActive = cs?.bypassCreditLimit && (!cs?.bypassUntil || cs.bypassUntil >= now);
+        const globalBypassActive = customer.bypassCreditLimit && (!customer.bypassUntil || customer.bypassUntil >= now);
+
         return {
           customerId,
           customerName: customer.name,
@@ -594,6 +599,11 @@ export class CustomersService {
           availableCredit,
           creditUsagePercent: effectiveLimit > 0 ? (currentDebt / effectiveLimit) * 100 : 0,
           isOverLimit: currentDebt > effectiveLimit,
+          // Bypass info
+          bypassCreditLimit: cs?.bypassCreditLimit ?? false,
+          bypassUntil: cs?.bypassUntil ?? null,
+          isBypassed: storeBypassActive || globalBypassActive,
+          bypassLevel: storeBypassActive ? 'store' : (globalBypassActive ? 'global' : 'none'),
         };
       })
     );
@@ -603,6 +613,9 @@ export class CustomersService {
       customerName: customer.name,
       customerCode: customer.code,
       defaultCreditLimit: customer.creditLimit,
+      // Global bypass info
+      bypassCreditLimit: customer.bypassCreditLimit ?? false,
+      bypassUntil: customer.bypassUntil ?? null,
       storeLimits,
     };
   }
@@ -642,10 +655,20 @@ export class CustomersService {
         customerId,
         storeId,
         creditLimit: dto.creditLimit ?? null,
+        bypassCreditLimit: dto.bypassCreditLimit ?? false,
+        bypassUntil: dto.bypassUntil ? new Date(dto.bypassUntil) : null,
       });
     } else {
       // Update existing
-      customerStore.creditLimit = dto.creditLimit ?? null;
+      if (dto.creditLimit !== undefined) {
+        customerStore.creditLimit = dto.creditLimit ?? null;
+      }
+      if (dto.bypassCreditLimit !== undefined) {
+        customerStore.bypassCreditLimit = dto.bypassCreditLimit;
+      }
+      if (dto.bypassUntil !== undefined) {
+        customerStore.bypassUntil = dto.bypassUntil ? new Date(dto.bypassUntil) : null;
+      }
     }
 
     await this.customerStoreRepository.save(customerStore);
@@ -676,9 +699,143 @@ export class CustomersService {
   }
 
   /**
+   * Kiểm tra xem khách hàng có được bypass hạn mức không
+   * Ưu tiên: 1. Bypass theo cửa hàng, 2. Bypass toàn bộ (ở customer)
+   */
+  async checkBypassCreditLimit(customerId: number, storeId: number): Promise<{
+    isBypassed: boolean;
+    bypassLevel: 'none' | 'store' | 'global';
+    bypassUntil: Date | null;
+    isExpired: boolean;
+  }> {
+    const now = new Date();
+
+    // 1. Check bypass theo cửa hàng (ưu tiên cao hơn)
+    const customerStore = await this.customerStoreRepository.findOne({
+      where: { customerId, storeId },
+    });
+
+    if (customerStore?.bypassCreditLimit) {
+      const isExpired = customerStore.bypassUntil ? customerStore.bypassUntil < now : false;
+      if (!isExpired) {
+        return {
+          isBypassed: true,
+          bypassLevel: 'store',
+          bypassUntil: customerStore.bypassUntil,
+          isExpired: false,
+        };
+      }
+      // Bypass đã hết hạn, tự động tắt
+      await this.customerStoreRepository.update(
+        { customerId, storeId },
+        { bypassCreditLimit: false, bypassUntil: null }
+      );
+    }
+
+    // 2. Check bypass toàn bộ (ở customer)
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+
+    if (customer?.bypassCreditLimit) {
+      const isExpired = customer.bypassUntil ? customer.bypassUntil < now : false;
+      if (!isExpired) {
+        return {
+          isBypassed: true,
+          bypassLevel: 'global',
+          bypassUntil: customer.bypassUntil,
+          isExpired: false,
+        };
+      }
+      // Bypass đã hết hạn, tự động tắt
+      await this.customerRepository.update(customerId, {
+        bypassCreditLimit: false,
+        bypassUntil: null,
+      });
+    }
+
+    return {
+      isBypassed: false,
+      bypassLevel: 'none',
+      bypassUntil: null,
+      isExpired: false,
+    };
+  }
+
+  /**
+   * Toggle bypass hạn mức cho customer (áp dụng tất cả cửa hàng)
+   */
+  async toggleCustomerBypass(customerId: number, dto: ToggleCustomerBypassDto) {
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException(`Khách hàng #${customerId} không tồn tại`);
+    }
+
+    await this.customerRepository.update(customerId, {
+      bypassCreditLimit: dto.bypassCreditLimit,
+      bypassUntil: dto.bypassUntil ? new Date(dto.bypassUntil) : null,
+    });
+
+    return this.customerRepository.findOne({ where: { id: customerId } });
+  }
+
+  /**
+   * Toggle bypass hạn mức cho customer tại một cửa hàng cụ thể
+   */
+  async toggleStoreBypass(
+    customerId: number,
+    storeId: number,
+    bypassCreditLimit: boolean,
+    bypassUntil?: string | null
+  ) {
+    // Validate
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException(`Khách hàng #${customerId} không tồn tại`);
+    }
+
+    const store = await this.storeRepository.findOne({
+      where: { id: storeId },
+    });
+    if (!store) {
+      throw new NotFoundException(`Cửa hàng #${storeId} không tồn tại`);
+    }
+
+    // Find or create customer_store
+    let customerStore = await this.customerStoreRepository.findOne({
+      where: { customerId, storeId },
+    });
+
+    if (!customerStore) {
+      customerStore = this.customerStoreRepository.create({
+        customerId,
+        storeId,
+        creditLimit: null,
+        bypassCreditLimit,
+        bypassUntil: bypassUntil ? new Date(bypassUntil) : null,
+      });
+    } else {
+      customerStore.bypassCreditLimit = bypassCreditLimit;
+      customerStore.bypassUntil = bypassUntil ? new Date(bypassUntil) : null;
+    }
+
+    await this.customerStoreRepository.save(customerStore);
+
+    return this.getStoreCreditLimits(customerId);
+  }
+
+  /**
    * Validate xem debt mới có vượt hạn mức không
+   * Bao gồm check bypass
    */
   async validateDebtLimit(customerId: number, storeId: number, newDebtAmount: number) {
+    // 1. Kiểm tra bypass trước
+    const bypassStatus = await this.checkBypassCreditLimit(customerId, storeId);
+
     // Lấy nợ hiện tại
     const currentBalance = await this.getDebtBalance(customerId, storeId);
     const currentDebt = currentBalance.balance;
@@ -689,10 +846,31 @@ export class CustomersService {
     // Tính tổng nợ sau khi thêm mới
     const totalDebt = currentDebt + newDebtAmount;
 
+    // Nếu đang được bypass, luôn cho phép (nhưng vẫn trả về thông tin để cảnh báo)
+    if (bypassStatus.isBypassed) {
+      return {
+        isValid: true,
+        isBypassed: true,
+        bypassLevel: bypassStatus.bypassLevel,
+        bypassUntil: bypassStatus.bypassUntil,
+        customerId,
+        storeId,
+        creditLimit,
+        currentDebt,
+        newDebtAmount,
+        totalDebt,
+        exceedAmount: totalDebt > creditLimit ? totalDebt - creditLimit : 0,
+        message: `Đang được mở chặn (${bypassStatus.bypassLevel === 'global' ? 'toàn bộ' : 'theo cửa hàng'})${bypassStatus.bypassUntil ? ` đến ${new Date(bypassStatus.bypassUntil).toLocaleString('vi-VN')}` : ''}`,
+      };
+    }
+
     const isValid = totalDebt <= creditLimit;
 
     return {
       isValid,
+      isBypassed: false,
+      bypassLevel: 'none',
+      bypassUntil: null,
       customerId,
       storeId,
       creditLimit,

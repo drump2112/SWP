@@ -13,6 +13,12 @@ export class CustomerStore {
   @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
   creditLimit: number | null;
 
+  @Column({ name: 'bypass_credit_limit', type: 'boolean', default: false })
+  bypassCreditLimit: boolean;
+
+  @Column({ name: 'bypass_until', type: 'timestamp', nullable: true })
+  bypassUntil: Date | null;
+
   @ManyToOne(() => Customer, (customer) => customer.customerStores)
   @JoinColumn({ name: 'customer_id' })
   customer: Customer;

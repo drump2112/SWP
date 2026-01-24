@@ -4,7 +4,7 @@ import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
-import { UpdateStoreCreditLimitDto } from './dto/update-store-credit-limit.dto';
+import { UpdateStoreCreditLimitDto, ToggleCustomerBypassDto } from './dto/update-store-credit-limit.dto';
 import { ImportOpeningBalanceDto } from './dto/import-opening-balance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -165,5 +165,40 @@ export class CustomersController {
       body.storeId,
       body.newDebtAmount
     );
+  }
+
+  // ============ BYPASS CREDIT LIMIT ENDPOINTS ============
+
+  @Put(':customerId/bypass')
+  @Roles('ADMIN')
+  toggleCustomerBypass(
+    @Param('customerId') customerId: string,
+    @Body() dto: ToggleCustomerBypassDto
+  ) {
+    return this.customersService.toggleCustomerBypass(+customerId, dto);
+  }
+
+  @Put(':customerId/stores/:storeId/bypass')
+  @Roles('ADMIN')
+  toggleStoreBypass(
+    @Param('customerId') customerId: string,
+    @Param('storeId') storeId: string,
+    @Body() body: { bypassCreditLimit: boolean; bypassUntil?: string | null }
+  ) {
+    return this.customersService.toggleStoreBypass(
+      +customerId,
+      +storeId,
+      body.bypassCreditLimit,
+      body.bypassUntil
+    );
+  }
+
+  @Get(':customerId/stores/:storeId/bypass-status')
+  @Roles('STORE', 'SALES', 'ADMIN')
+  getBypassStatus(
+    @Param('customerId') customerId: string,
+    @Param('storeId') storeId: string
+  ) {
+    return this.customersService.checkBypassCreditLimit(+customerId, +storeId);
   }
 }

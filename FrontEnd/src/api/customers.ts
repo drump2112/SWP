@@ -64,6 +64,11 @@ export interface StoreCreditLimit {
   availableCredit: number;
   creditUsagePercent: number;
   isOverLimit: boolean;
+  // Bypass info
+  bypassCreditLimit: boolean;
+  bypassUntil: string | null;
+  isBypassed: boolean;
+  bypassLevel: 'none' | 'store' | 'global';
 }
 
 export interface CustomerStoreLimitsResponse {
@@ -71,11 +76,17 @@ export interface CustomerStoreLimitsResponse {
   customerName: string;
   customerCode: string;
   defaultCreditLimit: number | null;
+  // Global bypass info
+  bypassCreditLimit: boolean;
+  bypassUntil: string | null;
   storeLimits: StoreCreditLimit[];
 }
 
 export interface DebtLimitValidation {
   isValid: boolean;
+  isBypassed?: boolean;
+  bypassLevel?: 'none' | 'store' | 'global';
+  bypassUntil?: string | null;
   customerId: number;
   storeId: number;
   creditLimit: number;
@@ -197,6 +208,48 @@ export const customersApi = {
       storeId,
       newDebtAmount,
     });
+    return response.data;
+  },
+
+  // ============ BYPASS CREDIT LIMIT APIs ============
+
+  toggleCustomerBypass: async (
+    customerId: number,
+    bypassCreditLimit: boolean,
+    bypassUntil?: string | null
+  ): Promise<Customer> => {
+    const response = await api.put(`/customers/${customerId}/bypass`, {
+      bypassCreditLimit,
+      bypassUntil,
+    });
+    return response.data;
+  },
+
+  toggleStoreBypass: async (
+    customerId: number,
+    storeId: number,
+    bypassCreditLimit: boolean,
+    bypassUntil?: string | null
+  ): Promise<CustomerStoreLimitsResponse> => {
+    const response = await api.put(
+      `/customers/${customerId}/stores/${storeId}/bypass`,
+      { bypassCreditLimit, bypassUntil }
+    );
+    return response.data;
+  },
+
+  getBypassStatus: async (
+    customerId: number,
+    storeId: number
+  ): Promise<{
+    isBypassed: boolean;
+    bypassLevel: 'none' | 'store' | 'global';
+    bypassUntil: string | null;
+    isExpired: boolean;
+  }> => {
+    const response = await api.get(
+      `/customers/${customerId}/stores/${storeId}/bypass-status`
+    );
     return response.data;
   },
 

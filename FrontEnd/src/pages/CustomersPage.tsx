@@ -328,6 +328,45 @@ const CustomersPage: React.FC = () => {
     }
   };
 
+  // Toggle bypass cho toàn bộ (customer level)
+  const handleToggleGlobalBypass = async (bypass: boolean, bypassUntil?: string | null) => {
+    if (!selectedCustomerForLimit) return;
+
+    try {
+      await customersApi.toggleCustomerBypass(
+        selectedCustomerForLimit.id,
+        bypass,
+        bypassUntil,
+      );
+      await refetchCreditLimits();
+      showSuccess(bypass ? "Đã mở chặn hạn mức cho tất cả cửa hàng!" : "Đã bật lại chặn hạn mức!");
+    } catch (error: any) {
+      showError(error.response?.data?.message || "Thao tác thất bại");
+    }
+  };
+
+  // Toggle bypass cho từng cửa hàng
+  const handleToggleStoreBypass = async (
+    storeId: number,
+    bypass: boolean,
+    bypassUntil?: string | null,
+  ) => {
+    if (!selectedCustomerForLimit) return;
+
+    try {
+      await customersApi.toggleStoreBypass(
+        selectedCustomerForLimit.id,
+        storeId,
+        bypass,
+        bypassUntil,
+      );
+      await refetchCreditLimits();
+      showSuccess(bypass ? "Đã mở chặn hạn mức cho cửa hàng này!" : "Đã bật lại chặn hạn mức!");
+    } catch (error: any) {
+      showError(error.response?.data?.message || "Thao tác thất bại");
+    }
+  };
+
   const filteredCustomers = customers?.filter((customer) => {
     const matchesSearch =
       customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -936,6 +975,15 @@ const CustomersPage: React.FC = () => {
               {/* Content */}
               {creditLimits && (
                 <div className="space-y-4">
+                  {/* Global Bypass Toggle - Chỉ Admin mới thấy */}
+                  {user?.roleCode === 'ADMIN' && (
+                    <GlobalBypassToggle
+                      isActive={creditLimits.bypassCreditLimit}
+                      bypassUntil={creditLimits.bypassUntil}
+                      onToggle={handleToggleGlobalBypass}
+                    />
+                  )}
+
                   {/* Default Credit Limit */}
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h4 className="font-medium text-blue-900 mb-2">
@@ -964,7 +1012,7 @@ const CustomersPage: React.FC = () => {
 
                     {creditLimits.storeLimits &&
                     creditLimits.storeLimits.length > 0 ? (
-                      <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
@@ -986,6 +1034,11 @@ const CustomersPage: React.FC = () => {
                               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
                                 Sử dụng
                               </th>
+                              {user?.roleCode === 'ADMIN' && (
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
+                                  Mở chặn
+                                </th>
+                              )}
                               <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
                                 Thao tác
                               </th>
@@ -997,7 +1050,10 @@ const CustomersPage: React.FC = () => {
                                 key={limit.storeId}
                                 limit={limit}
                                 defaultLimit={creditLimits.defaultCreditLimit}
+                                globalBypassActive={creditLimits.bypassCreditLimit}
+                                isAdmin={user?.roleCode === 'ADMIN'}
                                 onUpdate={handleUpdateCreditLimit}
+                                onToggleBypass={handleToggleStoreBypass}
                               />
                             ))}
                           </tbody>
@@ -1039,15 +1095,143 @@ const CustomersPage: React.FC = () => {
   );
 };
 
+// Component để toggle bypass toàn bộ (customer level)
+const GlobalBypassToggle: React.FC<{
+  isActive: boolean;
+  bypassUntil: string | null;
+  onToggle: (bypass: boolean, bypassUntil?: string | null) => Promise<void>;
+}> = ({ isActive, bypassUntil, onToggle }) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<string>('unlimited');
+
+  const handleToggle = async () => {
+    if (isActive) {
+      // Tắt bypass
+      setIsLoading(true);
+      try {
+        await onToggle(false, null);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // Hiện options để chọn thời hạn
+      setShowOptions(true);
+    }
+  };
+
+  const handleConfirmBypass = async () => {
+    setIsLoading(true);
+    try {
+      let until: string | null = null;
+      if (selectedDuration !== 'unlimited') {
+        const hours = parseInt(selectedDuration);
+        const date = new Date();
+        date.setHours(date.getHours() + hours);
+        until = date.toISOString();
+      }
+      await onToggle(true, until);
+      setShowOptions(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className={`border rounded-lg p-4 ${isActive ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-200'}`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isActive ? 'bg-orange-500' : 'bg-gray-400'}`}>
+            <span className="text-white text-lg">{isActive ? '🔓' : '🔒'}</span>
+          </div>
+          <div>
+            <h4 className={`font-semibold ${isActive ? 'text-orange-900' : 'text-gray-900'}`}>
+              {isActive ? 'Đang mở chặn hạn mức (Tất cả cửa hàng)' : 'Mở chặn hạn mức (Tất cả cửa hàng)'}
+            </h4>
+            <p className="text-sm text-gray-600">
+              {isActive
+                ? bypassUntil
+                  ? `Hết hạn: ${new Date(bypassUntil).toLocaleString('vi-VN')}`
+                  : 'Không giới hạn thời gian'
+                : 'Cho phép khách hàng mua vượt hạn mức tại tất cả cửa hàng'}
+            </p>
+          </div>
+        </div>
+
+        {!showOptions && (
+          <button
+            onClick={handleToggle}
+            disabled={isLoading}
+            className={`px-4 py-2 rounded-lg font-medium transition-all ${
+              isActive
+                ? 'bg-gray-600 text-white hover:bg-gray-700'
+                : 'bg-orange-500 text-white hover:bg-orange-600'
+            } disabled:opacity-50`}
+          >
+            {isLoading ? 'Đang xử lý...' : isActive ? 'Tắt mở chặn' : 'Bật mở chặn'}
+          </button>
+        )}
+      </div>
+
+      {showOptions && (
+        <div className="mt-4 p-3 bg-white rounded-lg border border-orange-200">
+          <p className="text-sm font-medium text-gray-700 mb-2">Chọn thời hạn mở chặn:</p>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {[
+              { value: '24', label: '24 giờ' },
+              { value: '48', label: '48 giờ' },
+              { value: '72', label: '72 giờ' },
+              { value: '168', label: '1 tuần' },
+              { value: 'unlimited', label: 'Không giới hạn' },
+            ].map((option) => (
+              <button
+                key={option.value}
+                onClick={() => setSelectedDuration(option.value)}
+                className={`px-3 py-1 rounded-full text-sm transition-all ${
+                  selectedDuration === option.value
+                    ? 'bg-orange-500 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleConfirmBypass}
+              disabled={isLoading}
+              className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50"
+            >
+              {isLoading ? 'Đang xử lý...' : 'Xác nhận mở chặn'}
+            </button>
+            <button
+              onClick={() => setShowOptions(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+            >
+              Hủy
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Component riêng để quản lý từng row của credit limit
 const CreditLimitRow: React.FC<{
   limit: any;
   defaultLimit: number | null;
+  globalBypassActive?: boolean;
+  isAdmin?: boolean;
   onUpdate: (storeId: number, creditLimit: number | null) => Promise<void>;
-}> = ({ limit, defaultLimit, onUpdate }) => {
+  onToggleBypass?: (storeId: number, bypass: boolean, bypassUntil?: string | null) => Promise<void>;
+}> = ({ limit, defaultLimit, globalBypassActive, isAdmin, onUpdate, onToggleBypass }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [showBypassOptions, setShowBypassOptions] = useState(false);
+  const [selectedDuration, setSelectedDuration] = useState<string>('24');
 
   const handleEdit = () => {
     setEditValue(limit.creditLimit !== null ? String(limit.creditLimit) : "");
@@ -1072,7 +1256,43 @@ const CreditLimitRow: React.FC<{
     setEditValue("");
   };
 
+  const handleToggleBypass = async () => {
+    if (!onToggleBypass) return;
+
+    if (limit.bypassCreditLimit) {
+      // Tắt bypass
+      setIsSaving(true);
+      try {
+        await onToggleBypass(limit.storeId, false, null);
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setShowBypassOptions(true);
+    }
+  };
+
+  const handleConfirmBypass = async () => {
+    if (!onToggleBypass) return;
+
+    setIsSaving(true);
+    try {
+      let until: string | null = null;
+      if (selectedDuration !== 'unlimited') {
+        const hours = parseInt(selectedDuration);
+        const date = new Date();
+        date.setHours(date.getHours() + hours);
+        until = date.toISOString();
+      }
+      await onToggleBypass(limit.storeId, true, until);
+      setShowBypassOptions(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const getStatusColor = () => {
+    if (limit.isBypassed) return "text-orange-600 bg-orange-100";
     if (limit.isOverLimit) return "text-red-600 bg-red-100";
     if (limit.creditUsagePercent >= 90) return "text-orange-600 bg-orange-100";
     if (limit.creditUsagePercent >= 70) return "text-yellow-600 bg-yellow-100";
@@ -1080,83 +1300,152 @@ const CreditLimitRow: React.FC<{
   };
 
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-4 py-3 text-sm font-medium text-gray-900">
-        {limit.storeName}
-      </td>
-      <td className="px-4 py-3 text-sm text-right">
-        {isEditing ? (
-          <input
-            type="number"
-            value={editValue}
-            onChange={(e) => setEditValue(e.target.value)}
-            placeholder="Để trống = dùng mặc định"
-            className="w-full px-2 py-1 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 text-right"
-            min="0"
-            step="1000"
-          />
-        ) : (
-          <span className="text-gray-700">
-            {limit.creditLimit !== null ? (
-              `${limit.creditLimit.toLocaleString("vi-VN")} ₫`
-            ) : (
-              <span className="text-gray-400 text-xs">Dùng mặc định</span>
+    <>
+      <tr className={`hover:bg-gray-50 ${limit.isBypassed ? 'bg-orange-50' : ''}`}>
+        <td className="px-4 py-3 text-sm font-medium text-gray-900">
+          <div className="flex items-center gap-2">
+            {limit.storeName}
+            {limit.isBypassed && (
+              <span className="text-xs px-2 py-0.5 bg-orange-200 text-orange-800 rounded-full">
+                {limit.bypassLevel === 'global' ? '🔓 Toàn bộ' : '🔓 CH'}
+              </span>
             )}
-          </span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-sm text-right font-semibold text-blue-700">
-        {limit.effectiveLimit.toLocaleString("vi-VN")} ₫
-      </td>
-      <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-        {limit.currentDebt.toLocaleString("vi-VN")} ₫
-      </td>
-      <td className="px-4 py-3 text-sm text-right">
-        <span
-          className={
-            limit.isOverLimit
-              ? "text-red-600 font-semibold"
-              : "text-green-600 font-semibold"
-          }
-        >
-          {limit.availableCredit.toLocaleString("vi-VN")} ₫
-        </span>
-      </td>
-      <td className="px-4 py-3 text-center">
-        <span
-          className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor()}`}
-        >
-          {limit.creditUsagePercent.toFixed(1)}%
-        </span>
-      </td>
-      <td className="px-4 py-3 text-center">
-        {isEditing ? (
-          <div className="flex justify-center gap-2">
-            <button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-            >
-              {isSaving ? "Lưu..." : "Lưu"}
-            </button>
-            <button
-              onClick={handleCancel}
-              disabled={isSaving}
-              className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-            >
-              Hủy
-            </button>
           </div>
-        ) : (
-          <button
-            onClick={handleEdit}
-            className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+        </td>
+        <td className="px-4 py-3 text-sm text-right">
+          {isEditing ? (
+            <input
+              type="number"
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              placeholder="Để trống = dùng mặc định"
+              className="w-full px-2 py-1 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 text-right"
+              min="0"
+              step="1000"
+            />
+          ) : (
+            <span className="text-gray-700">
+              {limit.creditLimit !== null ? (
+                `${limit.creditLimit.toLocaleString("vi-VN")} ₫`
+              ) : (
+                <span className="text-gray-400 text-xs">Dùng mặc định</span>
+              )}
+            </span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-sm text-right font-semibold text-blue-700">
+          {limit.effectiveLimit.toLocaleString("vi-VN")} ₫
+        </td>
+        <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+          {limit.currentDebt.toLocaleString("vi-VN")} ₫
+        </td>
+        <td className="px-4 py-3 text-sm text-right">
+          <span
+            className={
+              limit.isOverLimit && !limit.isBypassed
+                ? "text-red-600 font-semibold"
+                : "text-green-600 font-semibold"
+            }
           >
-            Sửa
-          </button>
+            {limit.availableCredit.toLocaleString("vi-VN")} ₫
+          </span>
+        </td>
+        <td className="px-4 py-3 text-center">
+          <span
+            className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor()}`}
+          >
+            {limit.isBypassed ? '∞' : `${limit.creditUsagePercent.toFixed(1)}%`}
+          </span>
+        </td>
+        {isAdmin && (
+          <td className="px-4 py-3 text-center">
+            {globalBypassActive ? (
+              <span className="text-xs text-orange-600">Đã mở toàn bộ</span>
+            ) : (
+              <button
+                onClick={handleToggleBypass}
+                disabled={isSaving}
+                className={`px-2 py-1 text-xs rounded transition-all ${
+                  limit.bypassCreditLimit
+                    ? 'bg-orange-500 text-white hover:bg-orange-600'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                } disabled:opacity-50`}
+              >
+                {isSaving ? '...' : limit.bypassCreditLimit ? 'Chặn' : 'Mở chặn'}
+              </button>
+            )}
+          </td>
         )}
-      </td>
-    </tr>
+        <td className="px-4 py-3 text-center">
+          {isEditing ? (
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              >
+                {isSaving ? "Lưu..." : "Lưu"}
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={isSaving}
+                className="px-2 py-1 text-xs bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Hủy
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleEdit}
+              className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+            >
+              Sửa
+            </button>
+          )}
+        </td>
+      </tr>
+      {/* Bypass options row */}
+      {showBypassOptions && (
+        <tr className="bg-orange-50">
+          <td colSpan={isAdmin ? 8 : 7} className="px-4 py-3">
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-gray-700">Thời hạn:</span>
+              {[
+                { value: '24', label: '24h' },
+                { value: '48', label: '48h' },
+                { value: '72', label: '72h' },
+                { value: 'unlimited', label: 'Không giới hạn' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setSelectedDuration(option.value)}
+                  className={`px-2 py-1 text-xs rounded transition-all ${
+                    selectedDuration === option.value
+                      ? 'bg-orange-500 text-white'
+                      : 'bg-white text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+              <button
+                onClick={handleConfirmBypass}
+                disabled={isSaving}
+                className="px-3 py-1 text-xs bg-orange-500 text-white rounded hover:bg-orange-600 disabled:opacity-50"
+              >
+                {isSaving ? 'Đang xử lý...' : 'Xác nhận'}
+              </button>
+              <button
+                onClick={() => setShowBypassOptions(false)}
+                className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Hủy
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 };
 
