@@ -66,6 +66,7 @@ const navigation: NavItem[] = [
       { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: CurrencyDollarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       // { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+      { name: 'Biên bản kiểm kê', href: '/inventory/checks', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE'] },
       { name: 'Chốt Tồn Kho', href: '/inventory/closing', icon: CheckBadgeIcon, roles: ['ADMIN'] },
     ],
   },

@@ -443,9 +443,9 @@ const CashReportPage: React.FC = () => {
 
       {/* Report Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-auto max-h-[600px]">
           <table className="w-full">
-            <thead>
+            <thead className="sticky top-0 z-10">
               {/* Opening Balance Row */}
               <tr className="bg-blue-50 border-l-4 border-blue-500">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-700" colSpan={4}>

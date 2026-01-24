@@ -15,7 +15,7 @@ import { usersApi } from "../api/users";
 import { productsApi } from "../api/products";
 import { pumpsApi } from "../api/pumps";
 import { storesApi } from "../api/stores";
-import { inventoryApi } from "../api/inventory";
+import { inventoryApi, inventoryCheckApi, type TankDataDto, type PumpDataDto } from "../api/inventory";
 import { tanksApi } from "../api/tanks"; // ✅ Import tanksApi
 import { useAuth } from "../contexts/AuthContext";
 import { showConfirm } from "../utils/sweetalert";
@@ -113,6 +113,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPreviousShift, setHasPreviousShift] = useState(false);
+  const [hasInitializedData, setHasInitializedData] = useState(false); // Flag để track đã init/restore data chưa
 
   // State cho SearchableSelect
   const [selectedDebtCustomer, setSelectedDebtCustomer] = useState<number | null>(null);
@@ -289,6 +290,12 @@ const ShiftOperationsPage: React.FC = () => {
 
   // Theo dõi thay đổi pump readings và auto-save
   useEffect(() => {
+    // QUAN TRỌNG: Chờ init/restore xong mới bắt đầu save
+    // Tránh ghi đè data cũ bằng object rỗng khi component mới mount
+    if (!hasInitializedData) {
+      return;
+    }
+
     const hasPumpData = Object.values(pumpReadings).some(
       (reading) => reading.startValue !== 0 || reading.endValue !== 0
     );
@@ -301,11 +308,11 @@ const ShiftOperationsPage: React.FC = () => {
       draftInventoryChecks.length > 0;
     setHasUnsavedChanges(hasPumpData || hasDraftData);
 
-    // Auto-save to localStorage (debounced)
+    // Auto-save to localStorage
     if (shiftId) {
       const draftKey = `shift_${shiftId}_draft_data`;
       const draftData = {
-        pumpReadings: hasPumpData ? pumpReadings : {},
+        pumpReadings: pumpReadings,
         debtSales: draftDebtSales,
         receipts: draftReceipts,
         deposits: draftDeposits,
@@ -313,10 +320,13 @@ const ShiftOperationsPage: React.FC = () => {
         exports: draftExports,
         inventoryChecks: draftInventoryChecks,
         declaredRetailQuantities,
+        savedAt: new Date().toISOString(),
       };
       localStorage.setItem(draftKey, JSON.stringify(draftData));
+      console.log("💾 Auto-saved to localStorage:", draftData);
     }
   }, [
+    hasInitializedData, // Thêm dependency
     pumpReadings,
     draftDebtSales,
     draftReceipts,
@@ -415,9 +425,20 @@ const ShiftOperationsPage: React.FC = () => {
     if (savedData) {
       try {
         const parsed = JSON.parse(savedData);
-        if (parsed.pumpReadings && Object.keys(parsed.pumpReadings).length > 0) {
+        // Kiểm tra có BẤT KỲ data nào để restore không
+        const hasSavedPumpReadings = parsed.pumpReadings && Object.keys(parsed.pumpReadings).length > 0;
+        const hasSavedDraftData =
+          (parsed.debtSales && parsed.debtSales.length > 0) ||
+          (parsed.receipts && parsed.receipts.length > 0) ||
+          (parsed.deposits && parsed.deposits.length > 0) ||
+          (parsed.imports && parsed.imports.length > 0) ||
+          (parsed.exports && parsed.exports.length > 0) ||
+          (parsed.inventoryChecks && parsed.inventoryChecks.length > 0);
+
+        if (hasSavedPumpReadings || hasSavedDraftData) {
           console.log("📦 Restoring from localStorage:", parsed);
-          setPumpReadings(parsed.pumpReadings);
+
+          // Restore draft data (debtSales, receipts, deposits, etc.)
           if (parsed.debtSales && parsed.debtSales.length > 0) {
             setDraftDebtSales(parsed.debtSales);
           }
@@ -453,8 +474,17 @@ const ShiftOperationsPage: React.FC = () => {
           if (parsed.declaredRetailQuantities) {
             setDeclaredRetailQuantities(parsed.declaredRetailQuantities);
           }
-          toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", { position: "top-right", autoClose: 3000 });
-          return;
+
+          // Nếu có saved pumpReadings thì restore, nếu không thì sẽ fetch từ ca trước
+          if (hasSavedPumpReadings) {
+            setPumpReadings(parsed.pumpReadings);
+            setHasInitializedData(true); // ✅ Đánh dấu đã init xong
+            toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", { position: "top-right", autoClose: 3000 });
+            return;
+          } else {
+            // Có draft data nhưng chưa có pumpReadings -> tiếp tục fetch từ ca trước
+            toast.info("Đã khôi phục dữ liệu nhập liệu, đang tải số đầu ca...", { position: "top-right", autoClose: 3000 });
+          }
         }
       } catch (e) {
         console.error("Failed to parse saved draft data", e);
@@ -485,6 +515,7 @@ const ShiftOperationsPage: React.FC = () => {
         });
 
         setPumpReadings(initialReadings);
+        setHasInitializedData(true); // ✅ Đánh dấu đã init xong
 
         if (previousData.hasPreviousShift) {
           toast.success(
@@ -507,6 +538,7 @@ const ShiftOperationsPage: React.FC = () => {
           };
         });
         setPumpReadings(initialReadings);
+        setHasInitializedData(true); // ✅ Đánh dấu đã init xong
       }
     };
 
@@ -660,6 +692,7 @@ const ShiftOperationsPage: React.FC = () => {
 
     // Đánh dấu đã load data từ report
     setHasLoadedReportData(true);
+    setHasInitializedData(true); // ✅ Đánh dấu đã init xong (cho view/edit mode)
 
     if (isEditMode) {
       toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
@@ -1525,7 +1558,7 @@ const ShiftOperationsPage: React.FC = () => {
         licensePlate: formData.licensePlate,
         driverName: formData.driverName,
         productId: formData.productId,
-        tankId: formData.tankId, // ✅ Thêm tankId
+        tankId: formData.tankId,
         quantity: formData.quantity,
         notes: formData.notes,
       };
@@ -3727,7 +3760,102 @@ const ShiftOperationsPage: React.FC = () => {
           {activeTab === "inventory" && (
             <div className="space-y-6">
               <div className="border border-purple-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📋 Biên Bản Kiểm Kê Tồn Kho Xăng Dầu</h3>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">📋 Biên Bản Kiểm Kê Tồn Kho Xăng Dầu</h3>
+                  {/* Nút Xuất Excel ở trên */}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      // Validate
+                      const filledTanks = Object.entries(inventoryCheckData).filter(([_, data]) =>
+                        data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0
+                      );
+
+                      if (filledTanks.length === 0) {
+                        toast.error("Vui lòng nhập ít nhất số liệu cho 1 bể");
+                        return;
+                      }
+
+                      // Build export data
+                      const rows: InventoryCheckRow[] = [];
+                      let stt = 0;
+
+                      products?.filter(p => p.isFuel).forEach(product => {
+                        const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
+                        if (productTanks.length === 0) return;
+
+                        stt++;
+                        let isFirstProductRow = true;
+
+                        productTanks.forEach((tank: any) => {
+                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
+                          const defaultBookStock = Number(tank.currentStock) || 0;
+                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
+                          const diff = (tankData.actualStock || 0) - bookStock;
+
+                          // Get pumps for this tank
+                          const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
+
+                          if (tankPumps.length === 0) {
+                            rows.push({
+                              stt: isFirstProductRow ? stt : '',
+                              productName: isFirstProductRow ? product.name : '',
+                              tankName: tank.tankCode || tank.name,
+                              heightTotal: tankData.heightTotal || '',
+                              heightWater: tankData.heightWater || '',
+                              actualStock: tankData.actualStock || '',
+                              bookStock: bookStock || '',
+                              difference: tankData.actualStock ? diff : '',
+                              pumpElectronic: '',
+                              pumpMechanical: ''
+                            });
+                            isFirstProductRow = false;
+                          } else {
+                            let isFirstTankRow = true;
+                            tankPumps.forEach((pump: any) => {
+                              rows.push({
+                                stt: isFirstProductRow ? stt : '',
+                                productName: isFirstProductRow ? product.name : '',
+                                tankName: isFirstTankRow ? (tank.tankCode || tank.name) : '',
+                                heightTotal: isFirstTankRow ? (tankData.heightTotal || '') : '',
+                                heightWater: isFirstTankRow ? (tankData.heightWater || '') : '',
+                                actualStock: isFirstTankRow ? (tankData.actualStock || '') : '',
+                                bookStock: isFirstTankRow ? (bookStock || '') : '',
+                                difference: isFirstTankRow && tankData.actualStock ? diff : '',
+                                pumpElectronic: `${pump.pumpCode}: ${(pumpMeterReadings[pump.id] || 0).toLocaleString("vi-VN")}`,
+                                pumpMechanical: ''
+                              });
+                              isFirstProductRow = false;
+                              isFirstTankRow = false;
+                            });
+                          }
+                        });
+                      });
+
+                      const exportData: InventoryCheckExportData = {
+                        companyName: "CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CN ĐỐNG ĐA",
+                        branchName: store?.name || "CỬA HÀNG XĂNG DẦU",
+                        storeName: store?.name || "",
+                        checkTime: dayjs().format("HH:mm [ngày] DD [tháng] MM [năm] YYYY"),
+                        members: [
+                          { name: inventoryMember1 || "", department: store?.name || "" },
+                          { name: inventoryMember2 || "", department: "" }
+                        ].filter(m => m.name),
+                        rows,
+                        reason: inventoryReason,
+                        conclusion: inventoryConclusion
+                      };
+
+                      const fileName = `Kiem_ke_${store?.code || 'store'}_${dayjs().format("YYYYMMDD_HHmm")}`;
+                      await exportInventoryCheckExcel(exportData, fileName);
+                      toast.success("Đã xuất file Excel kiểm kê!");
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  >
+                    <DocumentArrowDownIcon className="h-5 w-5" />
+                    📥 Xuất Excel
+                  </button>
+                </div>
 
                 {/* Thông tin tổ kiểm kê */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
@@ -3952,86 +4080,85 @@ const ShiftOperationsPage: React.FC = () => {
                         return;
                       }
 
-                      // Build export data
-                      const rows: InventoryCheckRow[] = [];
-                      let stt = 0;
+                      if (!report?.shift.storeId) {
+                        toast.error("Không xác định được cửa hàng");
+                        return;
+                      }
+
+                      // Build tank data for API
+                      const tankDataArray: TankDataDto[] = [];
+                      let totalDiff = 0;
 
                       products?.filter(p => p.isFuel).forEach(product => {
                         const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
-                        if (productTanks.length === 0) return;
-
-                        stt++;
-                        let isFirstProductRow = true;
-
                         productTanks.forEach((tank: any) => {
-                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
-                          const defaultBookStock = Number(tank.currentStock) || 0;
-                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
-                          const diff = (tankData.actualStock || 0) - bookStock;
+                          const data = inventoryCheckData[tank.id];
+                          if (data && (data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0)) {
+                            const defaultBookStock = Number(tank.currentStock) || 0;
+                            const bookStock = data.bookStock !== undefined ? data.bookStock : defaultBookStock;
+                            const diff = (data.actualStock || 0) - bookStock;
+                            totalDiff += diff;
 
-                          // Get pumps for this tank
-                          const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
-
-                          if (tankPumps.length === 0) {
-                            // Bể không có vòi - vẫn xuất 1 dòng
-                            rows.push({
-                              stt: isFirstProductRow ? stt : '',
-                              productName: isFirstProductRow ? product.name : '',
-                              tankName: tank.tankCode || tank.name,
-                              heightTotal: tankData.heightTotal || '',
-                              heightWater: tankData.heightWater || '',
-                              actualStock: tankData.actualStock || '',
-                              bookStock: bookStock || '',
-                              difference: tankData.actualStock ? diff : '',
-                              pumpElectronic: '',
-                              pumpMechanical: ''
-                            });
-                            isFirstProductRow = false;
-                          } else {
-                            // Mỗi vòi 1 dòng
-                            let isFirstTankRow = true;
-                            tankPumps.forEach((pump: any) => {
-                              rows.push({
-                                stt: isFirstProductRow ? stt : '',
-                                productName: isFirstProductRow ? product.name : '',
-                                tankName: isFirstTankRow ? (tank.tankCode || tank.name) : '',
-                                heightTotal: isFirstTankRow ? (tankData.heightTotal || '') : '',
-                                heightWater: isFirstTankRow ? (tankData.heightWater || '') : '',
-                                actualStock: isFirstTankRow ? (tankData.actualStock || '') : '',
-                                bookStock: isFirstTankRow ? (bookStock || '') : '',
-                                difference: isFirstTankRow && tankData.actualStock ? diff : '',
-                                pumpElectronic: `${pump.pumpCode}: ${(pumpMeterReadings[pump.id] || 0).toLocaleString("vi-VN")}`,
-                                pumpMechanical: ''
-                              });
-                              isFirstProductRow = false;
-                              isFirstTankRow = false;
+                            tankDataArray.push({
+                              tankId: tank.id,
+                              tankCode: tank.tankCode || tank.name,
+                              productName: product.name,
+                              heightTotal: data.heightTotal || 0,
+                              heightWater: data.heightWater || 0,
+                              actualStock: data.actualStock || 0,
+                              bookStock: bookStock,
+                              difference: diff,
                             });
                           }
                         });
                       });
 
-                      const exportData: InventoryCheckExportData = {
-                        companyName: "CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CN ĐỐNG ĐA",
-                        branchName: store?.name || "CỬA HÀNG XĂNG DẦU",
-                        storeName: store?.name || "",
-                        checkTime: dayjs().format("HH:mm [ngày] DD [tháng] MM [năm] YYYY"),
-                        members: [
-                          { name: inventoryMember1 || "", department: store?.name || "" },
-                          { name: inventoryMember2 || "", department: "" }
-                        ].filter(m => m.name),
-                        rows,
-                        reason: inventoryReason,
-                        conclusion: inventoryConclusion
-                      };
+                      // Build pump data for API
+                      const pumpDataArray: PumpDataDto[] = [];
+                      Object.entries(pumpMeterReadings).forEach(([pumpIdStr, meterReading]) => {
+                        const pumpId = Number(pumpIdStr);
+                        const pump = pumps?.find((p: any) => p.id === pumpId);
+                        if (pump && meterReading > 0) {
+                          pumpDataArray.push({
+                            pumpId: pump.id,
+                            pumpCode: pump.pumpCode,
+                            meterReading: meterReading,
+                          });
+                        }
+                      });
 
-                      const fileName = `Kiem_ke_${store?.code || 'store'}_${dayjs().format("YYYYMMDD_HHmm")}`;
-                      await exportInventoryCheckExcel(exportData, fileName);
-                      toast.success("Đã xuất file Excel kiểm kê!");
+                      try {
+                        await inventoryCheckApi.create({
+                          storeId: report.shift.storeId,
+                          shiftId: Number(shiftId),
+                          checkAt: dayjs().toISOString(),
+                          member1Name: inventoryMember1 || undefined,
+                          member2Name: inventoryMember2 || undefined,
+                          tankData: tankDataArray,
+                          pumpData: pumpDataArray,
+                          reason: inventoryReason || undefined,
+                          conclusion: inventoryConclusion || undefined,
+                          totalDifference: totalDiff,
+                          status: 'DRAFT',
+                        });
+
+                        toast.success("Đã lưu biên bản kiểm kê!");
+
+                        // Clear form after save
+                        setInventoryCheckData({});
+                        setPumpMeterReadings({});
+                        setInventoryReason("");
+                        setInventoryConclusion("");
+                        setInventoryMember1("");
+                        setInventoryMember2("");
+                      } catch (error: any) {
+                        toast.error(error?.response?.data?.message || "Không thể lưu biên bản kiểm kê");
+                      }
                     }}
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
                   >
-                    <DocumentArrowDownIcon className="h-5 w-5" />
-                    📥 Xuất Excel
+                    <CheckIcon className="h-5 w-5" />
+                    💾 Lưu biên bản
                   </button>
                 </div>
               </div>

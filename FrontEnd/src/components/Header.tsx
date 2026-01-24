@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRightOnRectangleIcon, UserCircleIcon, Bars3Icon } from '@heroicons/react/24/outline';
+import Swal from 'sweetalert2';
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -11,9 +12,22 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    const result = await Swal.fire({
+      title: 'Xác nhận đăng xuất',
+      text: 'Bạn có chắc chắn muốn đăng xuất?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Đăng xuất',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (result.isConfirmed) {
+      logout();
+      navigate('/login');
+    }
   };
 
   // Debug: Log user data to check store info

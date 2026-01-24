@@ -11,6 +11,7 @@ import {
 import { AccountCircle, ExitToApp } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Swal from 'sweetalert2';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
@@ -25,9 +26,23 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setAnchorEl(null);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    handleClose();
+    const result = await Swal.fire({
+      title: 'Xác nhận đăng xuất',
+      text: 'Bạn có chắc chắn muốn đăng xuất?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Đăng xuất',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (result.isConfirmed) {
+      logout();
+      navigate('/login');
+    }
   };
 
   return (

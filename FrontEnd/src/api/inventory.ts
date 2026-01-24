@@ -184,3 +184,91 @@ export const inventoryApi = {
     return response.data;
   },
 };
+
+// ==================== INVENTORY CHECK API ====================
+
+export interface TankDataDto {
+  tankId: number;
+  tankCode: string;
+  productName: string;
+  heightTotal?: number;
+  heightWater?: number;
+  actualStock?: number;
+  bookStock?: number;
+  difference?: number;
+}
+
+export interface PumpDataDto {
+  pumpId: number;
+  pumpCode: string;
+  meterReading?: number;
+}
+
+export interface CreateInventoryCheckDto {
+  storeId: number;
+  shiftId?: number;
+  checkAt?: string;
+  member1Name?: string;
+  member2Name?: string;
+  tankData?: TankDataDto[];
+  pumpData?: PumpDataDto[];
+  reason?: string;
+  conclusion?: string;
+  totalDifference?: number;
+  status?: string;
+}
+
+export interface InventoryCheckDto {
+  id: number;
+  storeId: number;
+  shiftId?: number;
+  checkAt: string;
+  member1Name?: string;
+  member2Name?: string;
+  tankData?: TankDataDto[];
+  pumpData?: PumpDataDto[];
+  reason?: string;
+  conclusion?: string;
+  totalDifference: number;
+  status: string;
+  createdBy?: number;
+  createdAt: string;
+  updatedAt: string;
+  store?: { id: number; name: string; code: string };
+  shift?: { id: number };
+  creator?: { id: number; fullName: string };
+}
+
+export interface InventoryCheckQueryDto {
+  storeId?: number;
+  fromDate?: string;
+  toDate?: string;
+  status?: string;
+}
+
+export const inventoryCheckApi = {
+  create: async (dto: CreateInventoryCheckDto) => {
+    const response = await client.post<InventoryCheckDto>('/inventory-checks', dto);
+    return response.data;
+  },
+  getAll: async (query?: InventoryCheckQueryDto) => {
+    const response = await client.get<InventoryCheckDto[]>('/inventory-checks', { params: query });
+    return response.data;
+  },
+  getById: async (id: number) => {
+    const response = await client.get<InventoryCheckDto>(`/inventory-checks/${id}`);
+    return response.data;
+  },
+  update: async (id: number, dto: Partial<CreateInventoryCheckDto>) => {
+    const response = await client.put<InventoryCheckDto>(`/inventory-checks/${id}`, dto);
+    return response.data;
+  },
+  delete: async (id: number) => {
+    const response = await client.delete(`/inventory-checks/${id}`);
+    return response.data;
+  },
+  confirm: async (id: number) => {
+    const response = await client.post<InventoryCheckDto>(`/inventory-checks/${id}/confirm`);
+    return response.data;
+  },
+};

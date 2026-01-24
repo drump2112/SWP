@@ -31,6 +31,7 @@ import ManageCashOpeningBalance from './pages/ManageCashOpeningBalance';
 import { OpeningBalancePage } from './pages/OpeningBalancePage';
 import LossConfigPage from './pages/LossConfigPage';
 import InventoryClosingPage from './pages/InventoryClosingPage';
+import InventoryCheckListPage from './pages/InventoryCheckListPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,6 +145,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <InventoryClosingPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inventory/checks"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <InventoryCheckListPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
