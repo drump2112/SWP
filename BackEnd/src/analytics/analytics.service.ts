@@ -409,35 +409,60 @@ export class AnalyticsService {
 
   /**
    * Top sản phẩm bán chạy nhất
+   * Sử dụng inventory_ledger để tính sản lượng chính xác (khớp với báo cáo NXT)
    */
   async getTopProducts(fromDate: Date, toDate: Date, limit: number = 10) {
-    const topProducts = await this.saleRepository
+    // Lấy sản lượng từ inventory_ledger (quantity_out với refType = EXPORT)
+    const quantityData = await this.inventoryLedgerRepository
+      .createQueryBuilder('il')
+      .innerJoin('il.shift', 'shift')
+      .select('il.product_id', 'productId')
+      .addSelect('SUM(il.quantity_out)', 'totalQuantity')
+      .where('il.ref_type = :refType', { refType: 'EXPORT' })
+      .andWhere('il.superseded_by_shift_id IS NULL')
+      .andWhere('shift.status = :status', { status: 'CLOSED' })
+      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .groupBy('il.product_id')
+      .orderBy('SUM(il.quantity_out)', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    // Lấy doanh thu từ sales
+    const revenueData = await this.saleRepository
       .createQueryBuilder('sale')
       .innerJoin('sale.shift', 'shift')
       .select('sale.product_id', 'productId')
-      .addSelect('SUM(sale.quantity)', 'totalQuantity')
       .addSelect('SUM(sale.amount)', 'totalRevenue')
       .addSelect('COUNT(sale.id)', 'salesCount')
       .where('shift.status = :status', { status: 'CLOSED' })
       .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', { fromDate, toDate })
       .groupBy('sale.product_id')
-      .orderBy('SUM(sale.amount)', 'DESC')
-      .limit(limit)
       .getRawMany();
 
+    // Tạo map để tra cứu doanh thu theo productId
+    const revenueMap = new Map<number, { totalRevenue: number; salesCount: number }>();
+    revenueData.forEach((item) => {
+      revenueMap.set(Number(item.productId), {
+        totalRevenue: Number(item.totalRevenue || 0),
+        salesCount: Number(item.salesCount || 0),
+      });
+    });
+
     const results = await Promise.all(
-      topProducts.map(async (item) => {
+      quantityData.map(async (item) => {
         const product = await this.productRepository.findOne({
           where: { id: item.productId },
         });
+
+        const revenueInfo = revenueMap.get(Number(item.productId)) || { totalRevenue: 0, salesCount: 0 };
 
         return {
           productId: item.productId,
           productName: product?.name || 'N/A',
           productCode: product?.code || 'N/A',
           totalQuantity: Number(item.totalQuantity),
-          totalRevenue: Number(item.totalRevenue),
-          salesCount: Number(item.salesCount),
+          totalRevenue: revenueInfo.totalRevenue,
+          salesCount: revenueInfo.salesCount,
         };
       }),
     );
@@ -568,25 +593,28 @@ export class AnalyticsService {
       order: { name: 'ASC' },
     });
 
-    // Get sales data grouped by store and product
-    const salesData = await this.saleRepository
-      .createQueryBuilder('sale')
-      .select('sale.store_id', 'storeId')
-      .addSelect('sale.product_id', 'productId')
-      .addSelect('SUM(sale.quantity)', 'totalQuantity')
-      .innerJoin('sale.shift', 'shift')
-      .where('shift.closed_at BETWEEN :fromDate AND :toDate', {
+    // Get quantity data from inventory_ledger (khớp với báo cáo NXT)
+    // Sử dụng quantity_out với refType = EXPORT, join với shift để lấy storeId
+    const quantityData = await this.inventoryLedgerRepository
+      .createQueryBuilder('il')
+      .innerJoin('il.shift', 'shift')
+      .select('shift.store_id', 'storeId')
+      .addSelect('il.product_id', 'productId')
+      .addSelect('SUM(il.quantity_out)', 'totalQuantity')
+      .where('il.ref_type = :refType', { refType: 'EXPORT' })
+      .andWhere('il.superseded_by_shift_id IS NULL')
+      .andWhere('shift.status = :status', { status: 'CLOSED' })
+      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', {
         fromDate,
         toDate,
       })
-      .andWhere('shift.status = :status', { status: 'CLOSED' })
-      .groupBy('sale.store_id')
-      .addGroupBy('sale.product_id')
+      .groupBy('shift.store_id')
+      .addGroupBy('il.product_id')
       .getRawMany();
 
     // Create lookup map for quick access
     const salesMap = new Map<string, number>();
-    salesData.forEach((item) => {
+    quantityData.forEach((item) => {
       const key = `${item.storeId}-${item.productId}`;
       salesMap.set(key, Number(item.totalQuantity || 0));
     });
