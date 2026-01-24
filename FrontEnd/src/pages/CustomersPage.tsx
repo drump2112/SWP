@@ -1326,7 +1326,7 @@ const CreditLimitRow: React.FC<{
           ) : (
             <span className="text-gray-700">
               {limit.creditLimit !== null ? (
-                `${limit.creditLimit.toLocaleString("vi-VN")} ₫`
+                `${Number(limit.creditLimit).toLocaleString("vi-VN")} ₫`
               ) : (
                 <span className="text-gray-400 text-xs">Dùng mặc định</span>
               )}
@@ -1334,10 +1334,10 @@ const CreditLimitRow: React.FC<{
           )}
         </td>
         <td className="px-4 py-3 text-sm text-right font-semibold text-blue-700">
-          {limit.effectiveLimit.toLocaleString("vi-VN")} ₫
+          {Number(limit.effectiveLimit).toLocaleString("vi-VN")} ₫
         </td>
         <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-          {limit.currentDebt.toLocaleString("vi-VN")} ₫
+          {Number(limit.currentDebt).toLocaleString("vi-VN")} ₫
         </td>
         <td className="px-4 py-3 text-sm text-right">
           <span
@@ -1347,7 +1347,7 @@ const CreditLimitRow: React.FC<{
                 : "text-green-600 font-semibold"
             }
           >
-            {limit.availableCredit.toLocaleString("vi-VN")} ₫
+            {Number(limit.availableCredit).toLocaleString("vi-VN")} ₫
           </span>
         </td>
         <td className="px-4 py-3 text-center">
