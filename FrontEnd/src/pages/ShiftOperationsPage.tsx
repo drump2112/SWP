@@ -320,6 +320,7 @@ const ShiftOperationsPage: React.FC = () => {
         exports: draftExports,
         inventoryChecks: draftInventoryChecks,
         declaredRetailQuantities,
+        hasPreviousShift, // Lưu trạng thái có ca trước hay không
         savedAt: new Date().toISOString(),
       };
       localStorage.setItem(draftKey, JSON.stringify(draftData));
@@ -335,6 +336,7 @@ const ShiftOperationsPage: React.FC = () => {
     draftExports,
     draftInventoryChecks,
     declaredRetailQuantities,
+    hasPreviousShift, // Thêm dependency để lưu trạng thái khóa số đầu
     shiftId,
   ]);
 
@@ -478,6 +480,10 @@ const ShiftOperationsPage: React.FC = () => {
           // Nếu có saved pumpReadings thì restore, nếu không thì sẽ fetch từ ca trước
           if (hasSavedPumpReadings) {
             setPumpReadings(parsed.pumpReadings);
+            // Restore hasPreviousShift để giữ nguyên trạng thái khóa input số đầu ca
+            if (parsed.hasPreviousShift !== undefined) {
+              setHasPreviousShift(parsed.hasPreviousShift);
+            }
             setHasInitializedData(true); // ✅ Đánh dấu đã init xong
             toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", { position: "top-right", autoClose: 3000 });
             return;
@@ -604,6 +610,12 @@ const ShiftOperationsPage: React.FC = () => {
       };
     });
     setPumpReadings(initialReadings);
+
+    // ✅ Ca đã từng chốt (wasClosedBefore) thì không cho sửa số đầu
+    // Vì số đầu đã được lấy từ ca trước tại thời điểm mở ca
+    if (wasClosedBefore) {
+      setHasPreviousShift(true);
+    }
 
     // 2. Debt Sales
     if (report.debtSales) {
