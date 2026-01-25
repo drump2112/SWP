@@ -10,4 +10,21 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   synchronize: process.env.NODE_ENV === 'development', // Only in development!
   logging: process.env.NODE_ENV === 'development',
+
+  // Connection Pool - tối ưu performance
+  extra: {
+    // Số connections tối đa trong pool
+    max: 20,
+    // Số connections tối thiểu giữ sẵn
+    min: 5,
+    // Thời gian chờ lấy connection (ms)
+    connectionTimeoutMillis: 10000,
+    // Thời gian idle trước khi đóng connection (ms)
+    idleTimeoutMillis: 30000,
+  },
+
+  // Cache query plans để tăng tốc
+  cache: {
+    duration: 60000, // Cache 60 giây
+  },
 });
