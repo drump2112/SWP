@@ -1432,11 +1432,12 @@ export class ShiftsService {
     };
   }
 
-  async findByStore(storeId: number, limit = 20) {
+  async findByStore(storeId: number, limit = 100) {
     return this.shiftRepository.find({
       where: { storeId },
       order: { shiftDate: 'DESC', shiftNo: 'DESC' },
       take: limit,
+      relations: ['store'],
     });
   }
 
