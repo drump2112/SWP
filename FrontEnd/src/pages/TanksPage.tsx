@@ -204,7 +204,9 @@ const TanksPage: React.FC = () => {
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Dung tích
                 </th>
-                {/* Cột Tồn kho đã ẩn - quản lý tồn riêng */}
+                <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Tồn kho
+                </th>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Trạng thái
                 </th>
@@ -231,7 +233,9 @@ const TanksPage: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-900">{Number(tank.capacity).toLocaleString()} L</div>
                   </td>
-                  {/* Cột Tồn kho đã ẩn - quản lý tồn riêng */}
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="text-sm font-semibold text-blue-600">{Number(tank.currentStock || 0).toLocaleString()} L</div>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
