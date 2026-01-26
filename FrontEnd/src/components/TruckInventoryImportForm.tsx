@@ -238,9 +238,9 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
               disabled={!productId}
             >
               <option value="0">-- Chọn bể --</option>
-              {filteredTanks?.map((tank: { id: number; tankCode: string; tankName: string; capacity: number }) => (
+              {filteredTanks?.map((tank: { id: number; tankCode: string; name: string; capacity: number }) => (
                 <option key={tank.id} value={tank.id}>
-                  {tank.tankCode} - {tank.tankName} (Dung tích: {tank.capacity?.toLocaleString()}L)
+                  {tank.tankCode} - {tank.name} (Dung tích: {tank.capacity?.toLocaleString()}L)
                 </option>
               ))}
             </select>

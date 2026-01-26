@@ -1070,6 +1070,7 @@ export class InventoryService {
         items: doc.items?.map((item) => ({
           productId: item.productId,
           productName: item.product?.name,
+          tankId: item.tankId, // ✅ Thêm tankId
           quantity: Number(item.quantity),
         })) || [],
         compartments: compartments.map((c) => ({

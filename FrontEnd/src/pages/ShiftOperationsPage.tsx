@@ -611,9 +611,23 @@ const ShiftOperationsPage: React.FC = () => {
     });
     setPumpReadings(initialReadings);
 
-    // ✅ Ca đã từng chốt (wasClosedBefore) thì không cho sửa số đầu
-    // Vì số đầu đã được lấy từ ca trước tại thời điểm mở ca
-    if (wasClosedBefore) {
+    // ✅ Kiểm tra xem có ca trước hay không để quyết định có cho sửa số đầu
+    // Nếu là bản ghi đầu tiên (không có ca trước) → cho sửa số đầu
+    // Nếu có ca trước → khóa số đầu (vì đã lấy từ ca trước)
+    if (wasClosedBefore && isEditMode) {
+      // Gọi API để kiểm tra có ca trước hay không
+      shiftsApi.getPreviousShiftReadings(Number(shiftId))
+        .then((previousData) => {
+          console.log("📊 Edit Mode - Previous shift check:", previousData);
+          setHasPreviousShift(previousData.hasPreviousShift);
+        })
+        .catch((error) => {
+          console.error("Failed to check previous shift:", error);
+          // Mặc định cho sửa nếu không kiểm tra được
+          setHasPreviousShift(false);
+        });
+    } else if (wasClosedBefore) {
+      // View mode - luôn khóa (chỉ xem, không cần biết có ca trước không)
       setHasPreviousShift(true);
     }
 
@@ -773,6 +787,7 @@ const ShiftOperationsPage: React.FC = () => {
               licensePlate: doc.licensePlate,
               driverName: doc.driverName,
               productId: firstItem?.productId || firstCompartment?.productId || doc.productId,
+              tankId: firstItem?.tankId || firstCompartment?.tankId || doc.tankId, // ✅ Thêm tankId
               quantity: firstItem?.quantity || doc.totalVolume || firstCompartment?.receivedVolume || 0,
               notes: doc.notes,
             };
