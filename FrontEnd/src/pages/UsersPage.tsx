@@ -15,6 +15,9 @@ import {
   EyeIcon,
   EyeSlashIcon,
   UserGroupIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 import SearchableSelect from '../components/SearchableSelect';
 
@@ -24,6 +27,9 @@ const UsersPage: React.FC = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [formData, setFormData] = useState<CreateUserDto>({
     username: '',
     password: '',
@@ -155,6 +161,29 @@ const UsersPage: React.FC = () => {
   const needsStore = ['STORE'].includes(roleCode);
   const cannotHaveStore = ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'].includes(roleCode);
 
+  // Filter users
+  const filteredUsers = users?.filter((user) => {
+    const matchesSearch =
+      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.fullName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.role?.code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.store?.name?.toLowerCase().includes(searchTerm.toLowerCase());
+    return matchesSearch;
+  });
+
+  // Reset page when filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Pagination logic
+  const totalItems = filteredUsers?.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedUsers = filteredUsers?.slice(startIndex, endIndex);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const submitData = { ...formData };
@@ -220,9 +249,26 @@ const UsersPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Search */}
+      <div className="mb-4">
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            placeholder="Tìm kiếm theo tên đăng nhập, họ tên, vai trò, cửa hàng..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent sm:text-sm transition-all"
+          />
+        </div>
+      </div>
+
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+          <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
             <tr>
               <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
                 Tên đăng nhập
@@ -245,7 +291,7 @@ const UsersPage: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {users?.map((user) => (
+            {paginatedUsers?.map((user) => (
               <tr key={user.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium text-gray-900">
                   {user.username}
@@ -291,8 +337,100 @@ const UsersPage: React.FC = () => {
                 </td>
               </tr>
             ))}
+            {filteredUsers?.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                  {searchTerm ? 'Không tìm thấy tài khoản nào' : 'Chưa có tài khoản nào'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
+        </div>
+
+        {/* Pagination */}
+        {totalItems > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700">
+                Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến{' '}
+                <span className="font-semibold">{Math.min(endIndex, totalItems)}</span> trong tổng số{' '}
+                <span className="font-semibold">{totalItems}</span> tài khoản
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value={5}>5 / trang</option>
+                <option value={10}>10 / trang</option>
+                <option value={20}>20 / trang</option>
+                <option value={50}>50 / trang</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Đầu
+              </button>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .map((page, index, arr) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && arr[index - 1] !== page - 1 && (
+                        <span className="px-2 text-gray-400">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          currentPage === page
+                            ? 'bg-indigo-600 text-white'
+                            : 'border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Dialog */}

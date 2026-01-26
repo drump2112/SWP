@@ -6,7 +6,7 @@ import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
 import { showSuccess, showError, showWarning, showConfirm } from "../utils/sweetalert";
 import { toast } from "react-toastify";
-import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
 
@@ -28,6 +28,8 @@ const ShiftManagementPage: React.FC = () => {
   const [newShiftTime, setNewShiftTime] = useState(dayjs().format("HH:mm"));
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStoreFilter, setSelectedStoreFilter] = useState<number | undefined>(undefined);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Check if user is admin
   const isAdmin = user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING";
@@ -231,6 +233,18 @@ const ShiftManagementPage: React.FC = () => {
     return matchesSearch && matchesStore;
   });
 
+  // Reset page when filter changes
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedStoreFilter]);
+
+  // Pagination logic
+  const totalItems = filteredShifts?.length || 0;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedShifts = filteredShifts?.slice(startIndex, endIndex);
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -297,9 +311,9 @@ const ShiftManagementPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
           <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Ngày
@@ -333,7 +347,7 @@ const ShiftManagementPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredShifts?.map((shift) => (
+              {paginatedShifts?.map((shift) => (
                 <tr key={shift.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     <div className="text-sm text-gray-900">{dayjs(shift.shiftDate).format("DD/MM/YYYY")}</div>
@@ -468,6 +482,91 @@ const ShiftManagementPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        {totalItems > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-700">
+                Hiển thị <span className="font-semibold">{startIndex + 1}</span> đến{" "}
+                <span className="font-semibold">{Math.min(endIndex, totalItems)}</span> trong tổng số{" "}
+                <span className="font-semibold">{totalItems}</span> ca
+              </span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value={5}>5 / trang</option>
+                <option value={10}>10 / trang</option>
+                <option value={20}>20 / trang</option>
+                <option value={50}>50 / trang</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Đầu
+              </button>
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeftIcon className="h-5 w-5" />
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    // Show first page, last page, current page, and pages around current
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .map((page, index, arr) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && arr[index - 1] !== page - 1 && (
+                        <span className="px-2 text-gray-400">...</span>
+                      )}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`px-3 py-1 text-sm rounded-md ${
+                          currentPage === page
+                            ? "bg-indigo-600 text-white"
+                            : "border border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="p-1 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRightIcon className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cuối
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Create Shift Modal */}
