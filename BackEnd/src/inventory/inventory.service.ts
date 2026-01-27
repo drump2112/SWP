@@ -481,29 +481,29 @@ export class InventoryService {
         .andWhere('il.tankId = :tankId', { tankId: tank.id });
 
       if (fromDate) {
-        periodQueryBuilder.andWhere('il.createdAt >= :fromDate', { fromDate: new Date(fromDate) });
+        const fromDateTime = new Date(fromDate + 'T00:00:00');
+        periodQueryBuilder.andWhere('il.createdAt >= :fromDate', { fromDate: fromDateTime });
       }
       if (toDate) {
-        const nextDay = new Date(toDate);
-        nextDay.setDate(nextDay.getDate() + 1);
-        periodQueryBuilder.andWhere('il.createdAt < :toDate', { toDate: nextDay });
+        const toDateTime = new Date(toDate + 'T23:59:59.999');
+        periodQueryBuilder.andWhere('il.createdAt <= :toDate', { toDate: toDateTime });
       }
 
       const periodResult = await periodQueryBuilder.getRawOne();
+      console.log(`📊 Tank ${tank.tankCode} period result:`, periodResult);
       const importQuantity = Number(periodResult?.totalIn || 0);
       const exportQuantity = Number(periodResult?.totalOut || 0);
 
       // 3. Closing Balance = current_stock + SUM(tất cả ledger đến hết toDate)
       let closingBalance = initialStock;
       if (toDate) {
-        const nextDay = new Date(toDate);
-        nextDay.setDate(nextDay.getDate() + 1);
+        const toDateTime = new Date(toDate + 'T23:59:59.999');
         const ledgerToDateResult = await this.inventoryLedgerRepository
           .createQueryBuilder('il')
           .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
           .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
           .andWhere('il.tankId = :tankId', { tankId: tank.id })
-          .andWhere('il.createdAt < :toDate', { toDate: nextDay })
+          .andWhere('il.createdAt <= :toDate', { toDate: toDateTime })
           .getRawOne();
         closingBalance = initialStock + Number(ledgerToDateResult?.balance || 0);
       } else {
@@ -562,11 +562,15 @@ export class InventoryService {
       return { periods: [], tanks: [] };
     }
 
-    // Parse dates
-    const fromDateTime = fromDate ? new Date(fromDate) : null;
-    const toDateTime = toDate ? new Date(toDate) : new Date();
-    if (fromDateTime) fromDateTime.setHours(0, 0, 0, 0);
-    toDateTime.setHours(23, 59, 59, 999);
+    // Parse dates - normalize về start/end of day
+    const fromDateTime = fromDate ? new Date(fromDate + 'T00:00:00') : null;
+    const toDateTime = toDate ? new Date(toDate + 'T23:59:59.999') : new Date();
+    console.log('📅 Date range:', {
+      fromDate,
+      toDate,
+      fromDateTime: fromDateTime?.toISOString(),
+      toDateTime: toDateTime?.toISOString()
+    });
 
     // Lấy tất cả kỳ chốt trong khoảng thời gian (dựa trên tank đầu tiên làm reference)
     const closingPeriods = await this.inventoryClosingRepository
@@ -758,10 +762,15 @@ export class InventoryService {
     } | null,
   ) {
     const items: any[] = [];
-    const fromDateTime = new Date(fromDate);
-    fromDateTime.setHours(0, 0, 0, 0);
-    const toDateTime = new Date(toDate);
-    toDateTime.setHours(23, 59, 59, 999);
+    // Parse dates - đảm bảo có timestamp
+    const fromDateTime = new Date(fromDate.includes('T') ? fromDate : fromDate + 'T00:00:00');
+    const toDateTime = new Date(toDate.includes('T') ? toDate : toDate + 'T23:59:59.999');
+    console.log('🔍 [calculatePeriodItems] Date range:', {
+      fromDate,
+      toDate,
+      fromDateTime: fromDateTime.toISOString(),
+      toDateTime: toDateTime.toISOString()
+    });
 
     // 🔥 Xác định thời điểm bắt đầu tính ledger
     // Nếu có kỳ chốt trước và closingDate trong ngày fromDate, dùng closingDate làm mốc
@@ -804,10 +813,6 @@ export class InventoryService {
       }
 
       // 🔥 Nhập/xuất trong kỳ - dùng ledgerStartTime làm mốc bắt đầu
-      const nextDay = new Date(toDateTime);
-      nextDay.setDate(nextDay.getDate() + 1);
-      nextDay.setHours(0, 0, 0, 0);
-
       const periodResult = await this.inventoryLedgerRepository
         .createQueryBuilder('il')
         .select('COALESCE(SUM(il.quantityIn), 0)', 'totalIn')
@@ -815,7 +820,7 @@ export class InventoryService {
         .where('il.warehouseId = :warehouseId', { warehouseId })
         .andWhere('il.tankId = :tankId', { tankId: tank.id })
         .andWhere('il.createdAt >= :ledgerStartTime', { ledgerStartTime })
-        .andWhere('il.createdAt < :toDate', { toDate: nextDay })
+        .andWhere('il.createdAt <= :toDate', { toDate: toDateTime })
         .getRawOne();
 
       const importQuantity = Number(periodResult?.totalIn || 0);

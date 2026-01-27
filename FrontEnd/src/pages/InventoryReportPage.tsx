@@ -951,7 +951,19 @@ const InventoryReportPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Report Type Toggle */}
+        {/* Active Filter Info */}
+        {reportType === 'summary' && (fromDate || toDate) && (
+          <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-blue-600" />
+              <span className="text-sm font-medium text-blue-900">
+                Đang lọc: {fromDate ? dayjs(fromDate).format('DD/MM/YYYY') : '...'} đến {toDate ? dayjs(toDate).format('DD/MM/YYYY') : '...'}
+              </span>
+            </div>
+          </div>
+        )}
+
+      {/* Report Type Toggle */}
         <div className="flex justify-center">
           <span className="relative z-0 inline-flex shadow-sm rounded-md">
             <button
