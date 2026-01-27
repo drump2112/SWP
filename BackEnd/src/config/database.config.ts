@@ -21,6 +21,8 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     connectionTimeoutMillis: 10000,
     // Thời gian idle trước khi đóng connection (ms)
     idleTimeoutMillis: 30000,
+    // Timezone configuration - Đảm bảo sử dụng múi giờ Việt Nam
+    timezone: 'Asia/Ho_Chi_Minh',
   },
 
   // Cache query plans để tăng tốc

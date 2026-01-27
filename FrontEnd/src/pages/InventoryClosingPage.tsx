@@ -37,7 +37,7 @@ const InventoryClosingPage: React.FC = () => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const isAdmin = user?.roleCode === 'ADMIN' || user?.roleCode === 'SUPERADMIN';
+  const isAdmin = user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN';
 
   // Kiểm tra quyền - chỉ Admin mới được phép sử dụng
   if (!isAdmin) {

@@ -32,7 +32,7 @@ const ShiftManagementPage: React.FC = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Check if user is admin
-  const isAdmin = user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING";
+  const isAdmin = user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING";
 
   // Fetch stores for admin filter
   const { data: stores } = useQuery({
@@ -45,8 +45,8 @@ const ShiftManagementPage: React.FC = () => {
   const { data: shifts, isLoading } = useQuery({
     queryKey: ["shifts", user?.roleCode, user?.storeId],
     queryFn: async () => {
-      // Admin/Director/Accounting xem tất cả ca
-      if (user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") {
+      // Super Admin/Admin/Director/Accounting xem tất cả ca
+      if (user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") {
         return shiftsApi.getAll();
       }
       // Store user chỉ xem ca của mình
@@ -321,7 +321,7 @@ const ShiftManagementPage: React.FC = () => {
                 <th className="px-6 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                   Ca
                 </th>
-                {(user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
+                {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
                   <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                     Cửa hàng
                   </th>
@@ -358,7 +358,7 @@ const ShiftManagementPage: React.FC = () => {
                       <span className="text-sm font-medium text-gray-900">Ca {shift.shiftNo}</span>
                     </div>
                   </td>
-                  {(user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
+                  {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") && (
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{shift.store?.name || `CH${shift.storeId}`}</div>
                       <div className="text-xs text-gray-500">{shift.store?.code || ""}</div>
@@ -420,7 +420,7 @@ const ShiftManagementPage: React.FC = () => {
                                 Sửa ca
                               </button>
                               {/* Nút Khóa - chỉ admin thấy, để đóng lại ca mà giữ nguyên dữ liệu */}
-                              {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
+                              {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
                                 <button
                                   onClick={() => handleLockShift(shift.id)}
                                   disabled={lockShiftMutation.isPending}
@@ -456,7 +456,7 @@ const ShiftManagementPage: React.FC = () => {
                             Chi tiết
                           </button>
                           {/* Nút Mở ca - chỉ admin mới thấy, dùng để cho phép cửa hàng sửa ca */}
-                          {(user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
+                          {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "SALES") && (
                             <button
                               onClick={() => handleEnableEdit(shift.id, `Ca ${shift.shiftNo} ngày ${dayjs(shift.shiftDate).format("DD/MM/YYYY")}`)}
                               disabled={enableEditMutation.isPending}

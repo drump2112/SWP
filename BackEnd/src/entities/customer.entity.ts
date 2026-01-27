@@ -32,6 +32,9 @@ export class Customer {
   @Column({ name: 'bypass_until', type: 'timestamp', nullable: true })
   bypassUntil: Date | null;
 
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive: boolean;
+
   @Column({ type: 'text', nullable: true })
   notes: string;
 

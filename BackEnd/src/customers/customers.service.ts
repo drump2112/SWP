@@ -147,9 +147,11 @@ export class CustomersService {
         .createQueryBuilder('c')
         .innerJoin('c.customerStores', 'cs')
         .where('cs.store_id = :storeId', { storeId })
+        .andWhere('c.is_active = :isActive', { isActive: true })
         .getMany();
     }
     return this.customerRepository.find({
+      where: { isActive: true },
       relations: ['customerStores', 'customerStores.store'],
     });
   }
@@ -186,7 +188,15 @@ export class CustomersService {
 
   async remove(id: number): Promise<void> {
     const customer = await this.findOne(id);
-    await this.customerRepository.remove(customer);
+    // Soft delete: set isActive to false
+    customer.isActive = false;
+    await this.customerRepository.save(customer);
+  }
+
+  async toggleActive(id: number): Promise<Customer> {
+    const customer = await this.findOne(id);
+    customer.isActive = !customer.isActive;
+    return this.customerRepository.save(customer);
   }
 
   async getDebtBalance(customerId: number, storeId?: number) {

@@ -9,6 +9,7 @@ export interface Customer {
   phone?: string;
   type?: 'EXTERNAL' | 'INTERNAL';
   creditLimit?: number;
+  isActive?: boolean;
   notes?: string;
   customerStores?: { storeId: number; store?: { name: string } }[];
 }
@@ -137,6 +138,11 @@ export const customersApi = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/customers/${id}`);
+  },
+
+  toggleActive: async (id: number): Promise<Customer> => {
+    const response = await api.put(`/customers/${id}/toggle-active`);
+    return response.data;
   },
 
   getDebtBalance: async (id: number, storeId?: number) => {

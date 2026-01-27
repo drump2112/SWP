@@ -81,6 +81,16 @@ export class CustomersController {
     return this.customersService.remove(numId);
   }
 
+  @Put(':id/toggle-active')
+  @Roles('ADMIN')
+  toggleActive(@Param('id') id: string) {
+    const numId = +id;
+    if (isNaN(numId)) {
+      throw new BadRequestException(`Invalid customer ID: ${id}`);
+    }
+    return this.customersService.toggleActive(numId);
+  }
+
   @Get(':id/balance')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getDebtBalance(

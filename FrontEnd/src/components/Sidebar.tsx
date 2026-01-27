@@ -143,6 +143,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
   const hasPermission = (item: NavItem): boolean => {
     if (!item.roles || item.roles.length === 0) return true; // Nếu không có roles thì mọi người đều truy cập được
     if (!user?.roleCode) return false;
+    // SUPER_ADMIN có quyền truy cập tất cả
+    if (user.roleCode === 'SUPER_ADMIN') return true;
     return item.roles.includes(user.roleCode);
   };
 

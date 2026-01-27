@@ -52,6 +52,7 @@ const CustomersPage: React.FC = () => {
   const [isCreditLimitModalOpen, setIsCreditLimitModalOpen] = useState(false);
   const [selectedCustomerForLimit, setSelectedCustomerForLimit] =
     useState<Customer | null>(null);
+  const [storeLimitPage, setStoreLimitPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -111,6 +112,17 @@ const CustomersPage: React.FC = () => {
     },
     onError: (error: any) => {
       showError(error.response?.data?.message || "Xóa khách hàng thất bại");
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: customersApi.toggleActive,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["customers"] });
+      showSuccess(data.isActive ? "Đã kích hoạt khách hàng!" : "Đã vô hiệu hóa khách hàng!");
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || "Thao tác thất bại");
     },
   });
 
@@ -197,6 +209,17 @@ const CustomersPage: React.FC = () => {
     );
     if (confirmed) {
       deleteMutation.mutate(id);
+    }
+  };
+
+  const handleToggleActive = async (customer: Customer) => {
+    const action = customer.isActive ? "vô hiệu hóa" : "kích hoạt";
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn ${action} khách hàng này?`,
+      `Xác nhận ${action}`,
+    );
+    if (confirmed) {
+      toggleActiveMutation.mutate(customer.id);
     }
   };
 
@@ -305,6 +328,7 @@ const CustomersPage: React.FC = () => {
 
   const handleManageCreditLimit = (customer: Customer) => {
     setSelectedCustomerForLimit(customer);
+    setStoreLimitPage(1);
     setIsCreditLimitModalOpen(true);
   };
 
@@ -469,6 +493,9 @@ const CustomersPage: React.FC = () => {
                 Địa chỉ
               </th>
               <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Trạng thái
+              </th>
+              <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Hạn mức
               </th>
               <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
@@ -507,6 +534,15 @@ const CustomersPage: React.FC = () => {
                   <td className="px-6 py-4 text-center text-sm text-gray-600 max-w-xs truncate">
                     {customer.address || "-"}
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      customer.isActive !== false
+                        ? 'bg-green-100 text-green-800 border border-green-200'
+                        : 'bg-gray-100 text-gray-600 border border-gray-300'
+                    }`}>
+                      {customer.isActive !== false ? '● Hoạt động' : '○ Vô hiệu hóa'}
+                    </span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-center text-sm">
                     {customer.creditLimit !== null &&
                     customer.creditLimit !== undefined ? (
@@ -519,40 +555,45 @@ const CustomersPage: React.FC = () => {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                    <button
-                      onClick={() => handleManageCreditLimit(customer)}
-                      className="inline-flex items-center px-3 py-1.5 border border-green-300 rounded-md text-green-700 bg-green-50 hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-all"
-                      title="Quản lý hạn mức công nợ"
-                    >
-                      <CreditCardIcon className="h-4 w-4 mr-1" />
-                      Hạn mức
-                    </button>
-                    {user?.roleCode !== "STORE" && (
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="flex items-center justify-center gap-1">
                       <button
-                        onClick={() => handleEdit(customer)}
-                        className="inline-flex items-center px-3 py-1.5 border border-indigo-300 rounded-md text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
+                        onClick={() => handleManageCreditLimit(customer)}
+                        className="inline-flex items-center px-2 py-1 text-xs border border-green-300 rounded text-green-700 bg-green-50 hover:bg-green-100 transition-all"
+                        title="Quản lý hạn mức công nợ"
                       >
-                        <PencilIcon className="h-4 w-4 mr-1" />
-                        Sửa
+                        <CreditCardIcon className="h-3.5 w-3.5" />
                       </button>
-                    )}
-                    {user?.roleCode === "ADMIN" && (
-                      <button
-                        onClick={() => handleDelete(customer.id)}
-                        className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-red-700 bg-red-50 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all"
-                      >
-                        <TrashIcon className="h-4 w-4 mr-1" />
-                        Xóa
-                      </button>
-                    )}
+                      {user?.roleCode !== "STORE" && (
+                        <button
+                          onClick={() => handleEdit(customer)}
+                          className="inline-flex items-center px-2 py-1 text-xs border border-indigo-300 rounded text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-all"
+                          title="Chỉnh sửa"
+                        >
+                          <PencilIcon className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN") && (
+                        <button
+                          onClick={() => handleToggleActive(customer)}
+                          className={`inline-flex items-center px-2 py-1 text-xs border rounded transition-all ${
+                            customer.isActive !== false
+                              ? 'border-red-300 text-red-700 bg-red-50 hover:bg-red-100'
+                              : 'border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100'
+                          }`}
+                          title={customer.isActive !== false ? 'Vô hiệu hóa' : 'Kích hoạt'}
+                        >
+                          <TrashIcon className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
             ) : (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-6 py-12 text-center text-sm text-gray-500"
                 >
                   {searchTerm
@@ -1078,7 +1119,7 @@ const CustomersPage: React.FC = () => {
               {creditLimits && (
                 <div className="space-y-4">
                   {/* Global Bypass Toggle - Chỉ Admin mới thấy */}
-                  {user?.roleCode === 'ADMIN' && (
+                  {(user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN') && (
                     <GlobalBypassToggle
                       isActive={creditLimits.bypassCreditLimit}
                       bypassUntil={creditLimits.bypassUntil}
@@ -1112,54 +1153,70 @@ const CustomersPage: React.FC = () => {
                       </span>
                     </h4>
 
-                    {creditLimits.storeLimits &&
-                    creditLimits.storeLimits.length > 0 ? (
+                    {creditLimits.storeLimits && creditLimits.storeLimits.length > 0 ? (
                       <div className="border border-gray-200 rounded-lg overflow-hidden overflow-x-auto">
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
-                                Cửa hàng
-                              </th>
-                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                                Hạn mức riêng
-                              </th>
-                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                                Hạn mức hiệu lực
-                              </th>
-                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                                Nợ hiện tại
-                              </th>
-                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
-                                Còn lại
-                              </th>
-                              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
-                                Sử dụng
-                              </th>
-                              {user?.roleCode === 'ADMIN' && (
-                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
-                                  Mở chặn
-                                </th>
+                              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Cửa hàng</th>
+                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Hạn mức riêng</th>
+                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Hạn mức hiệu lực</th>
+                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Nợ hiện tại</th>
+                              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Còn lại</th>
+                              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Sử dụng</th>
+                              {(user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN') && (
+                                <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Mở chặn</th>
                               )}
-                              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">
-                                Thao tác
-                              </th>
+                              <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Thao tác</th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
-                            {creditLimits.storeLimits.map((limit) => (
-                              <CreditLimitRow
-                                key={limit.storeId}
-                                limit={limit}
-                                defaultLimit={creditLimits.defaultCreditLimit}
-                                globalBypassActive={creditLimits.bypassCreditLimit}
-                                isAdmin={user?.roleCode === 'ADMIN'}
-                                onUpdate={handleUpdateCreditLimit}
-                                onToggleBypass={handleToggleStoreBypass}
-                              />
-                            ))}
+                            {(() => {
+                              // Pagination logic for store limits
+                              const itemsPerPage = 5;
+                              const total = creditLimits.storeLimits.length;
+                              const totalPages = Math.ceil(total / itemsPerPage);
+                              const start = (storeLimitPage - 1) * itemsPerPage;
+                              const end = start + itemsPerPage;
+                              const paginated = creditLimits.storeLimits.slice(start, end);
+                              return paginated.map((limit) => (
+                                <CreditLimitRow
+                                  key={limit.storeId}
+                                  limit={limit}
+                                  defaultLimit={creditLimits.defaultCreditLimit}
+                                  globalBypassActive={creditLimits.bypassCreditLimit}
+                                  isAdmin={user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN'}
+                                  onUpdate={handleUpdateCreditLimit}
+                                  onToggleBypass={handleToggleStoreBypass}
+                                />
+                              ));
+                            })()}
                           </tbody>
                         </table>
+                        {/* Pagination controls */}
+                        {creditLimits.storeLimits.length > 5 && (
+                          <div className="flex justify-between items-center px-4 py-3 border-t bg-gray-50">
+                            <button
+                              className="flex items-center gap-1 px-3 py-1.5 rounded bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              onClick={() => setStoreLimitPage(Math.max(1, storeLimitPage - 1))}
+                              disabled={storeLimitPage === 1}
+                            >
+                              <ChevronLeftIcon className="h-4 w-4" />
+                              Trước
+                            </button>
+                            <span className="text-sm text-gray-600">
+                              Trang {storeLimitPage} / {Math.ceil(creditLimits.storeLimits.length / 5)}
+                            </span>
+                            <button
+                              className="flex items-center gap-1 px-3 py-1.5 rounded bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              onClick={() => setStoreLimitPage(Math.min(Math.ceil(creditLimits.storeLimits.length / 5), storeLimitPage + 1))}
+                              disabled={storeLimitPage === Math.ceil(creditLimits.storeLimits.length / 5)}
+                            >
+                              Sau
+                              <ChevronRightIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-8 text-gray-500">

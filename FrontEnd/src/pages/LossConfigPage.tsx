@@ -140,7 +140,7 @@ const LossConfigPage: React.FC = () => {
   };
 
   // Kiểm tra quyền admin
-  const isAdmin = user?.roleCode === 'ADMIN' || user?.roleCode === 'SUPERADMIN';
+  const isAdmin = user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN';
 
   return (
     <div className="container mx-auto px-4 py-6">

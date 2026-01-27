@@ -19,7 +19,7 @@ const ShiftClosurePage: React.FC = () => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
 
-  const isAdmin = user?.roleCode === 'ADMIN';
+  const isAdmin = user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN';
 
   // Fetch shifts based on role
   const { data: shifts, isLoading } = useQuery({

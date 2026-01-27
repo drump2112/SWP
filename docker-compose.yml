@@ -14,6 +14,7 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - TZ=Asia/Ho_Chi_Minh
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USERNAME=postgres
@@ -54,6 +55,8 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=123456
       - POSTGRES_DB=fuel_management
+      - TZ=Asia/Ho_Chi_Minh
+      - PGTZ=Asia/Ho_Chi_Minh
     ports:
       - "5432:5432"
     volumes:
