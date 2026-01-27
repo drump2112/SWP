@@ -1235,13 +1235,16 @@ export class ReportsService {
     // 🔥 Filter theo shift.openedAt để gán doanh thu về ngày mở ca (đúng ngày làm việc)
     // Ví dụ: Ca mở 23h ngày 23, đóng 7h ngày 24 → doanh thu thuộc ngày 23
     if (fromDateTime) {
+      // Nếu chưa có timestamp (YYYY-MM-DD), thêm vào. Nếu đã có (ISO string) thì giữ nguyên
+      const fromDateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
       salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateTime + 'T00:00:00'),
+        fromDateTime: new Date(fromDateStr),
       });
     }
     if (toDateTime) {
+      const toDateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
       salesQuery.andWhere('shift.openedAt <= :toDateTime', {
-        toDateTime: new Date(toDateTime + 'T23:59:59.999'),
+        toDateTime: new Date(toDateStr),
       });
     }
 
