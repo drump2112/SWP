@@ -749,10 +749,13 @@ export class InventoryService {
   }
 
   /**
-   * Helper: Format date to YYYY-MM-DD
+   * Helper: Format date to YYYY-MM-DD (local timezone, không phải UTC!)
    */
   private formatDateStr(date: Date): string {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
   /**
@@ -824,9 +827,19 @@ export class InventoryService {
     // 🔥 Xác định thời điểm bắt đầu tính ledger
     // QUAN TRỌNG: ledgerStartTime KHÔNG ĐƯỢC LÙI VỀ TRƯỚC fromDateTime
     let ledgerStartTime = fromDateTime;
+    
+    console.log(`🔍 [calculatePeriodItems] Input dates - fromDate: ${fromDate}, toDate: ${toDate}`);
+    console.log(`🔍 [calculatePeriodItems] Parsed dates - fromDateTime: ${fromDateTime.toISOString()}, toDateTime: ${toDateTime.toISOString()}`);
+    console.log(`🔍 [calculatePeriodItems] previousClosing:`, previousClosing);
+    
     if (previousClosing?.closingDate) {
       const closingDateOnly = new Date(previousClosing.closingDate);
       closingDateOnly.setHours(0, 0, 0, 0);
+      
+      console.log(`🔍 [calculatePeriodItems] closingDate full: ${new Date(previousClosing.closingDate).toISOString()}`);
+      console.log(`🔍 [calculatePeriodItems] closingDateOnly (00:00): ${closingDateOnly.toISOString()}`);
+      console.log(`🔍 [calculatePeriodItems] fromDateTime (00:00): ${fromDateTime.toISOString()}`);
+      console.log(`🔍 [calculatePeriodItems] Comparison result: ${closingDateOnly.getTime()} === ${fromDateTime.getTime()} = ${closingDateOnly.getTime() === fromDateTime.getTime()}`);
 
       // Chỉ dùng closingDate nếu nó NẰM TRONG khoảng fromDate đến toDate
       // Ví dụ: chốt lúc 01/01 16:55, kỳ mở từ 01/01 00:00 → ledger phải từ SAU 16:55 (trong cùng ngày)
@@ -834,6 +847,8 @@ export class InventoryService {
         // closingDate cùng ngày với fromDate → dùng closingDate làm mốc
         ledgerStartTime = previousClosing.closingDate;
         console.log(`🔥 [calculatePeriodItems] Dùng closingDate làm mốc: ${ledgerStartTime.toISOString()}`);
+      } else {
+        console.log(`🔥 [calculatePeriodItems] KHÔNG dùng closingDate (khác ngày), giữ fromDateTime: ${ledgerStartTime.toISOString()}`);
       }
       // KHÔNG dùng closingDate nếu nó là ngày hôm trước (fromDate - 1)
       // Vì điều đó sẽ lấy cả dữ liệu ngày hôm trước
