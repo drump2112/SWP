@@ -477,34 +477,58 @@ export class InventoryService {
 
       // 2. Period movements (tổng nhập/xuất trong kỳ)
       // 🔥 Filter theo shift.openedAt thay vì il.createdAt để đúng ngày làm việc
-      const periodQueryBuilder = this.inventoryLedgerRepository
+      // Query NHẬP - CHỈ refType = 'IMPORT'
+      const importQueryBuilder = this.inventoryLedgerRepository
         .createQueryBuilder('il')
         .leftJoin('il.shift', 's')
         .select('COALESCE(SUM(il.quantityIn), 0)', 'totalIn')
-        .addSelect('COALESCE(SUM(il.quantityOut), 0)', 'totalOut')
         .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
-        .andWhere('il.tankId = :tankId', { tankId: tank.id });
+        .andWhere('il.tankId = :tankId', { tankId: tank.id })
+        .andWhere('il.refType = :refType', { refType: 'IMPORT' });
 
       if (fromDate) {
         const fromDateTime = new Date(fromDate + 'T00:00:00');
-        // Filter theo shift.openedAt cho records có shift, hoặc createdAt cho records không có shift
-        periodQueryBuilder.andWhere(
+        importQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt >= :fromDate) OR (s.openedAt IS NULL AND il.createdAt >= :fromDate)',
           { fromDate: fromDateTime }
         );
       }
       if (toDate) {
         const toDateTime = new Date(toDate + 'T23:59:59.999');
-        periodQueryBuilder.andWhere(
+        importQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt <= :toDate)',
           { toDate: toDateTime }
         );
       }
 
-      const periodResult = await periodQueryBuilder.getRawOne();
-      console.log(`📊 Tank ${tank.tankCode} period result:`, periodResult);
-      const importQuantity = Number(periodResult?.totalIn || 0);
-      const exportQuantity = Number(periodResult?.totalOut || 0);
+      // Query XUẤT - tất cả quantityOut > 0
+      const exportQueryBuilder = this.inventoryLedgerRepository
+        .createQueryBuilder('il')
+        .leftJoin('il.shift', 's')
+        .select('COALESCE(SUM(il.quantityOut), 0)', 'totalOut')
+        .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
+        .andWhere('il.tankId = :tankId', { tankId: tank.id });
+
+      if (fromDate) {
+        const fromDateTime = new Date(fromDate + 'T00:00:00');
+        exportQueryBuilder.andWhere(
+          '(s.openedAt IS NOT NULL AND s.openedAt >= :fromDate) OR (s.openedAt IS NULL AND il.createdAt >= :fromDate)',
+          { fromDate: fromDateTime }
+        );
+      }
+      if (toDate) {
+        const toDateTime = new Date(toDate + 'T23:59:59.999');
+        exportQueryBuilder.andWhere(
+          '(s.openedAt IS NOT NULL AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt <= :toDate)',
+          { toDate: toDateTime }
+        );
+      }
+
+      const importResult = await importQueryBuilder.getRawOne();
+      const exportResult = await exportQueryBuilder.getRawOne();
+      console.log(`📊 Tank ${tank.tankCode} - import (IMPORT only):`, importResult, 'export (all):', exportResult);
+      const importQuantity = Number(importResult?.totalIn || 0);
+      const exportQuantity = Number(exportResult?.totalOut || 0);
 
       // 3. Closing Balance = current_stock + SUM(tất cả ledger đến hết toDate)
       // 🔥 Filter theo shift.openedAt cho chính xác
@@ -844,12 +868,25 @@ export class InventoryService {
         console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: initialStock=${initialStock}, ledgerBefore=${ledgerBefore?.balance || 0}, openingBalance=${openingBalance}`);
       }
 
-      // 🔥 Nhập/xuất trong kỳ - filter theo shift.openedAt
-      const periodResult = await this.inventoryLedgerRepository
+      // 🔥 Nhập trong kỳ - CHỈ tính refType = 'IMPORT'
+      const importResult = await this.inventoryLedgerRepository
         .createQueryBuilder('il')
         .leftJoin('il.shift', 's')
         .select('COALESCE(SUM(il.quantityIn), 0)', 'totalIn')
-        .addSelect('COALESCE(SUM(il.quantityOut), 0)', 'totalOut')
+        .where('il.warehouseId = :warehouseId', { warehouseId })
+        .andWhere('il.tankId = :tankId', { tankId: tank.id })
+        .andWhere('il.refType = :refType', { refType: 'IMPORT' })
+        .andWhere(
+          '(s.openedAt IS NOT NULL AND s.openedAt >= :ledgerStartTime AND s.openedAt < :toDate) OR (s.openedAt IS NULL AND il.createdAt >= :ledgerStartTime AND il.createdAt < :toDate)',
+          { ledgerStartTime, toDate: toDateTime }
+        )
+        .getRawOne();
+
+      // 🔥 Xuất trong kỳ - tính refType IN ('EXPORT', 'SALE', 'TRANSFER_OUT')
+      const exportResult = await this.inventoryLedgerRepository
+        .createQueryBuilder('il')
+        .leftJoin('il.shift', 's')
+        .select('COALESCE(SUM(il.quantityOut), 0)', 'totalOut')
         .where('il.warehouseId = :warehouseId', { warehouseId })
         .andWhere('il.tankId = :tankId', { tankId: tank.id })
         .andWhere(
@@ -858,10 +895,10 @@ export class InventoryService {
         )
         .getRawOne();
 
-      console.log(`📊 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerStartTime=${ledgerStartTime.toISOString()}, toDate=${toDateTime.toISOString()}, import=${periodResult.totalIn}, export=${periodResult.totalOut}`);
+      console.log(`📊 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerStartTime=${ledgerStartTime.toISOString()}, toDate=${toDateTime.toISOString()}, import=${importResult.totalIn}, export=${exportResult.totalOut}`);
 
-      const importQuantity = Number(periodResult?.totalIn || 0);
-      const exportQuantity = Number(periodResult?.totalOut || 0);
+      const importQuantity = Number(importResult?.totalIn || 0);
+      const exportQuantity = Number(exportResult?.totalOut || 0);
       const closingBalance = openingBalance + importQuantity - exportQuantity;
 
       items.push({
