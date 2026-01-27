@@ -147,11 +147,9 @@ export class CustomersService {
         .createQueryBuilder('c')
         .innerJoin('c.customerStores', 'cs')
         .where('cs.store_id = :storeId', { storeId })
-        .andWhere('c.is_active = :isActive', { isActive: true })
         .getMany();
     }
     return this.customerRepository.find({
-      where: { isActive: true },
       relations: ['customerStores', 'customerStores.store'],
     });
   }
