@@ -408,6 +408,7 @@ const PricesPage: React.FC = () => {
                 </label>
                 <input
                   type="datetime-local"
+                  step="1"
                   value={validFrom}
                   onChange={(e) => setValidFrom(e.target.value)}
                   className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
@@ -553,6 +554,7 @@ const PricesPage: React.FC = () => {
                 </label>
                 <input
                   type="datetime-local"
+                  step="1"
                   value={editFormData.validFrom}
                   onChange={(e) => setEditFormData({ ...editFormData, validFrom: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"
@@ -566,6 +568,7 @@ const PricesPage: React.FC = () => {
                 </label>
                 <input
                   type="datetime-local"
+                  step="1"
                   value={editFormData.validTo}
                   onChange={(e) => setEditFormData({ ...editFormData, validTo: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 focus:border-transparent transition-all"

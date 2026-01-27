@@ -70,6 +70,11 @@ export interface UpdateOpeningInfoDto {
   receiverName?: string;
 }
 
+export interface UpdateShiftTimesDto {
+  openedAt: string; // ISO 8601 format
+  closedAt: string; // ISO 8601 format
+}
+
 export interface Shift {
   id: number;
   storeId: number;
@@ -165,6 +170,11 @@ export const shiftsApi = {
 
   updateOpeningInfo: async (id: number, data: UpdateOpeningInfoDto): Promise<Shift> => {
     const response = await api.put(`/shifts/${id}/opening-info`, data);
+    return response.data;
+  },
+
+  updateShiftTimes: async (id: number, data: UpdateShiftTimesDto): Promise<Shift> => {
+    const response = await api.put(`/shifts/${id}/times`, data);
     return response.data;
   },
 

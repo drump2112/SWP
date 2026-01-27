@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { shiftsApi, type CreateShiftDto, type UpdateOpeningInfoDto, type Shift } from "../api/shifts";
+import { shiftsApi, type CreateShiftDto, type UpdateOpeningInfoDto, type UpdateShiftTimesDto, type Shift } from "../api/shifts";
 import { storesApi } from "../api/stores";
 import { useAuth } from "../contexts/AuthContext";
 import { showSuccess, showError, showWarning, showConfirm } from "../utils/sweetalert";
@@ -9,6 +9,7 @@ import { toast } from "react-toastify";
 import { PlusIcon, XMarkIcon, ClockIcon, DocumentTextIcon, PencilIcon, BuildingStorefrontIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
 import SearchableSelect from "../components/SearchableSelect";
+import UpdateShiftTimesModal from "../components/UpdateShiftTimesModal";
 
 const ShiftManagementPage: React.FC = () => {
   const { user } = useAuth();
@@ -17,6 +18,7 @@ const ShiftManagementPage: React.FC = () => {
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditOpeningModalOpen, setIsEditOpeningModalOpen] = useState(false);
+  const [isUpdateTimesModalOpen, setIsUpdateTimesModalOpen] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
   const [editShiftDate, setEditShiftDate] = useState("");
   const [editShiftNo, setEditShiftNo] = useState(1);
@@ -110,6 +112,20 @@ const ShiftManagementPage: React.FC = () => {
     },
   });
 
+  // Update shift times mutation (Admin only)
+  const updateShiftTimesMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: UpdateShiftTimesDto }) => shiftsApi.updateShiftTimes(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["shifts"] });
+      setIsUpdateTimesModalOpen(false);
+      setEditingShift(null);
+      showSuccess("Đã cập nhật thời gian ca thành công!");
+    },
+    onError: (error: any) => {
+      showError(error.response?.data?.message || "Cập nhật thời gian thất bại");
+    },
+  });
+
   const handleEnableEdit = async (shiftId: number, shiftInfo: string) => {
     const confirmed = await showConfirm(
       `Bạn có chắc chắn muốn mở chế độ sửa cho ${shiftInfo}?\n\nSau khi mở, cửa hàng sẽ thấy nút Sửa và có thể chỉnh sửa ca này.`,
@@ -135,6 +151,16 @@ const ShiftManagementPage: React.FC = () => {
     setEditHandoverName(shift.handoverName || "");
     setEditReceiverName(shift.receiverName || "");
     setIsEditOpeningModalOpen(true);
+  };
+
+  const handleOpenUpdateTimesModal = (shift: Shift) => {
+    setEditingShift(shift);
+    setIsUpdateTimesModalOpen(true);
+  };
+
+  const handleUpdateShiftTimes = async (data: UpdateShiftTimesDto) => {
+    if (!editingShift) return;
+    await updateShiftTimesMutation.mutateAsync({ id: editingShift.id, data });
   };
 
   const handleUpdateOpeningInfo = () => {
@@ -467,6 +493,17 @@ const ShiftManagementPage: React.FC = () => {
                               Mở ca
                             </button>
                           )}
+                          {/* Nút Cập nhật thời gian - chỉ admin mới thấy */}
+                          {(user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN") && (
+                            <button
+                              onClick={() => handleOpenUpdateTimesModal(shift)}
+                              className="inline-flex items-center px-3 py-1.5 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                              title="Cập nhật thời gian mở ca và đóng ca"
+                            >
+                              <ClockIcon className="h-4 w-4 mr-1" />
+                              Cập nhật thời gian
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -621,6 +658,7 @@ const ShiftManagementPage: React.FC = () => {
                 </label>
                 <input
                   type="time"
+                  step="1"
                   value={newShiftTime}
                   onChange={(e) => setNewShiftTime(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
@@ -729,6 +767,7 @@ const ShiftManagementPage: React.FC = () => {
                 </label>
                 <input
                   type="time"
+                  step="1"
                   value={editShiftTime}
                   onChange={(e) => setEditShiftTime(e.target.value)}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 hover:border-indigo-300 transition-all"
@@ -808,6 +847,25 @@ const ShiftManagementPage: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal cập nhật thời gian ca */}
+      {editingShift && (
+        <UpdateShiftTimesModal
+          isOpen={isUpdateTimesModalOpen}
+          onClose={() => {
+            setIsUpdateTimesModalOpen(false);
+            setEditingShift(null);
+          }}
+          onSubmit={handleUpdateShiftTimes}
+          shift={{
+            id: editingShift.id,
+            shiftNo: editingShift.shiftNo,
+            shiftDate: editingShift.shiftDate,
+            openedAt: editingShift.openedAt,
+            closedAt: editingShift.closedAt,
+          }}
+        />
       )}
 
       {/* Info */}

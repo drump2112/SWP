@@ -32,6 +32,7 @@ import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { CreateCheckpointDto } from './dto/create-checkpoint.dto';
 import { UpdateOpeningInfoDto } from './dto/update-opening-info.dto';
+import { UpdateShiftTimesDto } from './dto/update-shift-times.dto';
 import {
   CreateShiftDebtSaleDto,
   CreateCashDepositDto,
@@ -1273,6 +1274,54 @@ export class ShiftsService {
     });
 
     console.log(`📝 Shift ${shiftId} opening info updated by user ${user?.id}`);
+    return updatedShift;
+  }
+
+  /**
+   * Cập nhật thời gian mở ca và đóng ca (chỉ dành cho Admin)
+   */
+  async updateShiftTimes(shiftId: number, dto: UpdateShiftTimesDto, user: any): Promise<Shift> {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: ['store'],
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Không tìm thấy ca làm việc');
+    }
+
+    const oldData = {
+      openedAt: shift.openedAt,
+      closedAt: shift.closedAt,
+    };
+
+    const openedAt = new Date(dto.openedAt);
+    const closedAt = new Date(dto.closedAt);
+
+    // Kiểm tra closedAt phải sau openedAt
+    if (closedAt <= openedAt) {
+      throw new BadRequestException('Thời gian đóng ca phải sau thời gian mở ca');
+    }
+
+    shift.openedAt = openedAt;
+    shift.closedAt = closedAt;
+
+    const updatedShift = await this.shiftRepository.save(shift);
+
+    // Ghi audit log
+    await this.auditLogRepository.save({
+      tableName: 'shifts',
+      recordId: shift.id,
+      action: 'UPDATE_SHIFT_TIMES',
+      oldData,
+      newData: {
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+      },
+      changedBy: user?.id,
+    });
+
+    console.log(`⏰ Shift ${shiftId} times updated by admin user ${user?.id}`);
     return updatedShift;
   }
 

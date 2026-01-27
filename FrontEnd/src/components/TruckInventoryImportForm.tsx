@@ -156,6 +156,7 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nhập *</label>
             <input
               type="datetime-local"
+              step="1"
               required
               value={docAt}
               onChange={(e) => setDocAt(e.target.value)}

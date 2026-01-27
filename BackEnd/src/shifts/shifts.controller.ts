@@ -13,6 +13,7 @@ import { ShiftsService } from './shifts.service';
 import { CreateShiftDto } from './dto/create-shift.dto';
 import { CloseShiftDto } from './dto/close-shift.dto';
 import { UpdateOpeningInfoDto } from './dto/update-opening-info.dto';
+import { UpdateShiftTimesDto } from './dto/update-shift-times.dto';
 import {
   CreateShiftDebtSaleDto,
   CreateCashDepositDto,
@@ -72,6 +73,16 @@ export class ShiftsController {
     @CurrentUser() user: any,
   ) {
     return this.shiftsService.updateOpeningInfo(+id, dto, user);
+  }
+
+  @Put(':id/times')
+  @Roles('ADMIN')
+  updateShiftTimes(
+    @Param('id') id: string,
+    @Body() dto: UpdateShiftTimesDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.shiftsService.updateShiftTimes(+id, dto, user);
   }
 
   @Put(':id/reopen')

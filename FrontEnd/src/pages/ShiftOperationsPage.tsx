@@ -1102,7 +1102,7 @@ const ShiftOperationsPage: React.FC = () => {
         ${confirmHtml}
         <div class="mt-4 text-left">
           <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian chốt ca</label>
-          <input type="datetime-local" id="closedAt" class="swal2-input" style="margin: 0; width: 100%;" value="${dayjs().format(
+          <input type="datetime-local" step="1" id="closedAt" class="swal2-input" style="margin: 0; width: 100%;" value="${dayjs().format(
         "YYYY-MM-DDTHH:mm"
       )}">
         </div>
@@ -3138,6 +3138,7 @@ const ShiftOperationsPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian thu *</label>
                       <input
                         type="datetime-local"
+                        step="1"
                         name="receiptAt"
                         required
                         defaultValue={
@@ -3341,6 +3342,7 @@ const ShiftOperationsPage: React.FC = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nộp *</label>
                       <input
                         type="datetime-local"
+                        step="1"
                         name="depositAt"
                         required
                         defaultValue={
