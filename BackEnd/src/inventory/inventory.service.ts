@@ -674,10 +674,12 @@ export class InventoryService {
       // Di chuyển currentStart đến ngày sau kỳ chốt
       currentStart = new Date(closingTo);
       currentStart.setDate(currentStart.getDate() + 1);
+      console.log(`📅 [getInventoryReportByTankWithPeriods] Moved currentStart after closing period: ${currentStart.toISOString()}`);
     }
 
     // Nếu còn khoảng thời gian SAU tất cả kỳ chốt (kỳ mở)
     if (currentStart <= endDate) {
+      console.log(`📅 [getInventoryReportByTankWithPeriods] Creating OPEN period AFTER closings: ${this.formatDateStr(currentStart)} to ${this.formatDateStr(endDate)}`);
       const items = await this.calculatePeriodItems(
         tanks, warehouse.id, storeId,
         this.formatDateStr(currentStart),
@@ -733,6 +735,7 @@ export class InventoryService {
    * Helper: Lấy dữ liệu kỳ đã chốt từ inventory_closing
    */
   private async getClosedPeriodItems(storeId: number, periodFrom: Date, periodTo: Date) {
+    console.log(`📊 [getClosedPeriodItems] Fetching closed period: ${periodFrom} to ${periodTo}`);
     const closings = await this.inventoryClosingRepository.find({
       where: {
         storeId,
@@ -742,6 +745,11 @@ export class InventoryService {
       relations: ['tank', 'tank.product'],
       order: { tankId: 'ASC' },
     });
+
+    console.log(`📊 [getClosedPeriodItems] Found ${closings.length} closing records`);
+    if (closings.length > 0) {
+      console.log(`📊 [getClosedPeriodItems] Sample - Tank ${closings[0].tank?.tankCode}: import=${closings[0].importQuantity}, export=${closings[0].exportQuantity}`);
+    }
 
     return closings.map(c => ({
       tankId: c.tankId,
@@ -790,19 +798,21 @@ export class InventoryService {
     });
 
     // 🔥 Xác định thời điểm bắt đầu tính ledger
-    // Nếu có kỳ chốt trước và closingDate trong ngày fromDate, dùng closingDate làm mốc
+    // QUAN TRỌNG: ledgerStartTime KHÔNG ĐƯỢC LÙI VỀ TRƯỚC fromDateTime
     let ledgerStartTime = fromDateTime;
     if (previousClosing?.closingDate) {
       const closingDateOnly = new Date(previousClosing.closingDate);
       closingDateOnly.setHours(0, 0, 0, 0);
 
-      // Nếu closingDate cùng ngày với fromDate - 1, dùng closingDate làm mốc
-      // Ví dụ: chốt lúc 22/01 16:55, kỳ mở từ 22/01, ledger phải từ SAU 16:55
-      if (closingDateOnly.getTime() === fromDateTime.getTime() ||
-          closingDateOnly.getTime() === fromDateTime.getTime() - 86400000) {
+      // Chỉ dùng closingDate nếu nó NẰM TRONG khoảng fromDate đến toDate
+      // Ví dụ: chốt lúc 01/01 16:55, kỳ mở từ 01/01 00:00 → ledger phải từ SAU 16:55 (trong cùng ngày)
+      if (closingDateOnly.getTime() === fromDateTime.getTime()) {
+        // closingDate cùng ngày với fromDate → dùng closingDate làm mốc
         ledgerStartTime = previousClosing.closingDate;
         console.log(`🔥 [calculatePeriodItems] Dùng closingDate làm mốc: ${ledgerStartTime.toISOString()}`);
       }
+      // KHÔNG dùng closingDate nếu nó là ngày hôm trước (fromDate - 1)
+      // Vì điều đó sẽ lấy cả dữ liệu ngày hôm trước
     }
 
     for (const tank of tanks) {
@@ -843,10 +853,12 @@ export class InventoryService {
         .where('il.warehouseId = :warehouseId', { warehouseId })
         .andWhere('il.tankId = :tankId', { tankId: tank.id })
         .andWhere(
-          '(s.openedAt IS NOT NULL AND s.openedAt >= :ledgerStartTime AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt >= :ledgerStartTime AND il.createdAt <= :toDate)',
+          '(s.openedAt IS NOT NULL AND s.openedAt >= :ledgerStartTime AND s.openedAt < :toDate) OR (s.openedAt IS NULL AND il.createdAt >= :ledgerStartTime AND il.createdAt < :toDate)',
           { ledgerStartTime, toDate: toDateTime }
         )
         .getRawOne();
+
+      console.log(`📊 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerStartTime=${ledgerStartTime.toISOString()}, toDate=${toDateTime.toISOString()}, import=${periodResult.totalIn}, export=${periodResult.totalOut}`);
 
       const importQuantity = Number(periodResult?.totalIn || 0);
       const exportQuantity = Number(periodResult?.totalOut || 0);
