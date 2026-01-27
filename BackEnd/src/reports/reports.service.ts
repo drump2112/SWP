@@ -1232,15 +1232,16 @@ export class ReportsService {
       salesQuery.andWhere('sale.productId = :productId', { productId });
     }
 
-    // Filter theo thời gian - Dùng closedAt thay vì openedAt để tính đúng doanh thu theo thời điểm đóng ca
+    // 🔥 Filter theo shift.openedAt để gán doanh thu về ngày mở ca (đúng ngày làm việc)
+    // Ví dụ: Ca mở 23h ngày 23, đóng 7h ngày 24 → doanh thu thuộc ngày 23
     if (fromDateTime) {
-      salesQuery.andWhere('shift.closedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateTime),
+      salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
+        fromDateTime: new Date(fromDateTime + 'T00:00:00'),
       });
     }
     if (toDateTime) {
-      salesQuery.andWhere('shift.closedAt <= :toDateTime', {
-        toDateTime: new Date(toDateTime),
+      salesQuery.andWhere('shift.openedAt <= :toDateTime', {
+        toDateTime: new Date(toDateTime + 'T23:59:59.999'),
       });
     }
 

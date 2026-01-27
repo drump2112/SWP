@@ -459,8 +459,6 @@ export class InventoryService {
         }
 
         if (!usedClosingPeriod) {
-          // ❌ Không có kỳ chốt phù hợp → Tính theo logic cũ
-          // 🔥 Filter theo shift.openedAt
           const ledgerBeforeResult = await this.inventoryLedgerRepository
             .createQueryBuilder('il')
             .leftJoin('il.shift', 's')
