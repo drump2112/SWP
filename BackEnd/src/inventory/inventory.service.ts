@@ -855,42 +855,31 @@ export class InventoryService {
     }
 
     for (const tank of tanks) {
-      const currentStock = Number(tank.currentStock || 0);
+      // 🔥 current_stock trong bảng tank là giá trị ban đầu khi tạo bể hoặc khi chốt kỳ gần nhất
+      const tankInitialStock = Number(tank.currentStock || 0);
       let openingBalance = 0;
 
       console.log(`\n🔷 [calculatePeriodItems] ========== Tank ${tank.tankCode} ==========`);
+      console.log(`🔷 tank.currentStock (giá trị ban đầu): ${tankInitialStock}`);
 
       // 🔥 Nếu có thông tin kỳ chốt trước, dùng closingBalance trực tiếp
       if (previousClosing && previousClosing.closingBalances[tank.id] !== undefined) {
         openingBalance = previousClosing.closingBalances[tank.id];
         console.log(`✅ [calculatePeriodItems] Tank ${tank.tankCode}: Lấy tồn đầu từ kỳ chốt trước = ${openingBalance}`);
       } else {
-        // Không có kỳ chốt trước → tính tồn đầu kỳ
-        console.log(`🔍 [calculatePeriodItems] Tank ${tank.tankCode}: Không có kỳ chốt trước, tính từ ledger`);
+        // Không có kỳ chốt trước → tính từ tank.currentStock + ledger
+        console.log(`🔍 [calculatePeriodItems] Tank ${tank.tankCode}: Không có kỳ chốt trước`);
         console.log(`🔍 [calculatePeriodItems] fromDateTime: ${fromDateTime.toISOString()}`);
 
-        // 🔥 Tồn đầu kỳ = ADJUSTMENT (tồn ban đầu) + SUM(ledger TRƯỚC fromDate, KHÔNG tính ADJUSTMENT)
-        // Bước 1: Lấy tồn ban đầu (ADJUSTMENT entries - không có shift)
-        const adjustmentResult = await this.inventoryLedgerRepository
-          .createQueryBuilder('il')
-          .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
-          .where('il.warehouseId = :warehouseId', { warehouseId })
-          .andWhere('il.tankId = :tankId', { tankId: tank.id })
-          .andWhere('il.refType = :refType', { refType: 'ADJUSTMENT' })
-          .andWhere('il.shiftId IS NULL')
-          .getRawOne();
-        
-        const initialAdjustment = Number(adjustmentResult?.balance || 0);
-        console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: initialAdjustment (tồn đầu hệ thống) = ${initialAdjustment}`);
-
-        // Bước 2: Lấy tổng ledger TRƯỚC fromDate (KHÔNG tính ADJUSTMENT)
+        // 🔥 Tồn đầu kỳ = tank.currentStock + SUM(ledger TRƯỚC fromDate)
+        // - tank.currentStock là tồn ban đầu khi tạo bể
+        // - Cộng thêm các giao dịch (nhập/xuất) đã xảy ra TRƯỚC ngày bắt đầu kỳ báo cáo
         const ledgerBeforeResult = await this.inventoryLedgerRepository
           .createQueryBuilder('il')
           .leftJoin('il.shift', 's')
           .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
           .where('il.warehouseId = :warehouseId', { warehouseId })
           .andWhere('il.tankId = :tankId', { tankId: tank.id })
-          .andWhere('il.refType != :adjustmentType', { adjustmentType: 'ADJUSTMENT' })
           .andWhere(
             '(s.openedAt IS NOT NULL AND s.openedAt < :fromDate) OR (s.openedAt IS NULL AND il.createdAt < :fromDate)',
             { fromDate: fromDateTime }
@@ -898,12 +887,11 @@ export class InventoryService {
           .getRawOne();
         
         const ledgerBeforeFrom = Number(ledgerBeforeResult?.balance || 0);
-        console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerBeforeFrom (giao dịch trước kỳ) = ${ledgerBeforeFrom}`);
         
-        // Tồn đầu kỳ = tồn ban đầu + giao dịch trước kỳ
-        openingBalance = initialAdjustment + ledgerBeforeFrom;
+        // Tồn đầu kỳ = Tồn ban đầu (khi tạo bể) + Giao dịch trước kỳ
+        openingBalance = tankInitialStock + ledgerBeforeFrom;
         
-        console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: openingBalance = ${initialAdjustment} + ${ledgerBeforeFrom} = ${openingBalance}`);
+        console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: tankInitialStock=${tankInitialStock}, ledgerBeforeFrom=${ledgerBeforeFrom}, openingBalance=${openingBalance}`);
       }
 
       // 🔥 Nhập trong kỳ - CHỈ tính refType = 'IMPORT'
