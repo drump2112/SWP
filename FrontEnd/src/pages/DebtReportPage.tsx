@@ -422,19 +422,19 @@ const DebtReportPage: React.FC = () => {
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
                   Mã KH
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase">
                   Tên khách hàng
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase">
                   Dư đầu kỳ
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase">
                   Phát sinh nợ
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase">
                   Phát sinh có
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase">
                   Dư cuối kỳ
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase">
@@ -450,28 +450,28 @@ const DebtReportPage: React.FC = () => {
                       <td className="px-6 py-4 text-center text-sm font-medium text-gray-900">
                         {item.customer.code}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm text-gray-900">
+                      <td className="px-6 py-4 text-left text-sm text-gray-900">
                         <div className="font-medium">{item.customer.name}</div>
                         {item.customer.phone && (
                           <div className="text-xs text-gray-500">{item.customer.phone}</div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         <span className={item.openingBalance > 0 ? 'text-red-600 font-semibold' : 'text-gray-600'}>
                           {item.openingBalance.toLocaleString('vi-VN')} ₫
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         <span className="text-red-600 font-semibold">
                           {item.totalDebit.toLocaleString('vi-VN')} ₫
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         <span className="text-green-600 font-semibold">
                           {item.totalCredit.toLocaleString('vi-VN')} ₫
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         <span className={item.closingBalance > 0 ? 'text-purple-600 font-bold' : 'text-gray-600'}>
                           {item.closingBalance.toLocaleString('vi-VN')} ₫
                         </span>

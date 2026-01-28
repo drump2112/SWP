@@ -529,6 +529,7 @@ export class ReportsService {
 
         return {
           id: l.id,
+          shiftId: l.shiftId,
           date: displayDate,
           refType: l.refType,
           refId: l.refId,
@@ -536,13 +537,70 @@ export class ReportsService {
           cashOut: Number(l.cashOut),
           storeName: l.store?.name || 'N/A',
           details,
+          notes: details?.notes || null,
         };
       }),
     );
 
+    // ✅ GỘP SHIFT_CLOSE và DEPOSIT cùng ca thành 1 dòng
+    // Nếu trong cùng 1 ca có SHIFT_CLOSE (cashIn) và DEPOSIT (cashOut) với số tiền bằng nhau
+    // thì gộp lại thành 1 dòng duy nhất với tồn quỹ = 0
+    const mergedLedgers: typeof ledgersWithDetails = [];
+    const processedShiftIds = new Set<number>();
+
+    for (let i = 0; i < ledgersWithDetails.length; i++) {
+      const ledger = ledgersWithDetails[i];
+
+      // Bỏ qua nếu đã xử lý trong ca khác
+      if (ledger.shiftId && processedShiftIds.has(ledger.shiftId)) {
+        continue;
+      }
+
+      // Nếu là SHIFT_CLOSE, tìm xem có DEPOSIT cùng ca không
+      if (ledger.refType === 'SHIFT_CLOSE' && ledger.shiftId) {
+        // Tìm tất cả DEPOSIT trong cùng ca
+        const depositsInSameShift = ledgersWithDetails.filter(
+          (l) => l.shiftId === ledger.shiftId && l.refType === 'DEPOSIT'
+        );
+
+        // Tính tổng cashOut từ tất cả DEPOSIT trong ca
+        const totalDeposit = depositsInSameShift.reduce((sum, d) => sum + d.cashOut, 0);
+
+        // Nếu tổng nộp = tiền bán lẻ (cashIn), gộp thành 1 dòng với balance = 0
+        if (depositsInSameShift.length > 0 && totalDeposit === ledger.cashIn) {
+          // Gộp thành 1 dòng: vừa thu vừa nộp, tồn quỹ trừ về 0
+          mergedLedgers.push({
+            ...ledger,
+            refType: 'SHIFT_CLOSE_DEPOSIT', // Loại mới: gộp chốt ca + nộp tiền
+            cashOut: totalDeposit,
+            notes: `Chốt ca & nộp tiền: ${ledger.cashIn.toLocaleString()}đ`,
+            details: {
+              type: 'SHIFT_CLOSE_DEPOSIT',
+              shiftClose: { cashIn: ledger.cashIn },
+              deposits: depositsInSameShift.map((d) => ({
+                amount: d.cashOut,
+                receiverName: d.details?.receiverName,
+                notes: d.details?.notes,
+              })),
+            },
+          });
+          processedShiftIds.add(ledger.shiftId);
+          continue;
+        }
+      }
+
+      // Nếu là DEPOSIT và đã được gộp với SHIFT_CLOSE, bỏ qua
+      if (ledger.refType === 'DEPOSIT' && ledger.shiftId && processedShiftIds.has(ledger.shiftId)) {
+        continue;
+      }
+
+      // Các trường hợp khác: giữ nguyên
+      mergedLedgers.push(ledger);
+    }
+
     // Tính toán số dư luỹ kế
     let runningBalance = openingBalance;
-    const ledgersWithBalance = ledgersWithDetails.map((l) => {
+    const ledgersWithBalance = mergedLedgers.map((l) => {
       runningBalance += l.cashIn - l.cashOut;
       return {
         ...l,
