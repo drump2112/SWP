@@ -465,14 +465,14 @@ const CashReportPage: React.FC = () => {
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Hình thức
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Số phát sinh
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Số Đã nộp
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
+                  Số đã nộp
                 </th>
-                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
-                  Tồn Quỹ TIền mặt
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
+                  Tồn quỹ tiền mặt
                 </th>
                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 uppercase border-b-2 border-gray-300">
                   Thao tác
@@ -495,7 +495,7 @@ const CashReportPage: React.FC = () => {
                           <span className="text-xs font-medium text-green-600">💵 TM</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         {ledger.cashIn > 0 ? (
                           <span className="text-green-600 font-semibold tabular-nums">
                             {ledger.cashIn.toLocaleString('vi-VN')}
@@ -504,7 +504,7 @@ const CashReportPage: React.FC = () => {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         {ledger.cashOut > 0 ? (
                           <span className="text-red-600 font-semibold tabular-nums">
                             {ledger.cashOut.toLocaleString('vi-VN')}
@@ -513,7 +513,7 @@ const CashReportPage: React.FC = () => {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-center text-sm">
+                      <td className="px-6 py-4 text-right text-sm">
                         <span className={`font-bold tabular-nums ${
                           ledger.balance >= 0 ? 'text-purple-600' : 'text-red-600'
                         }`}>
@@ -587,10 +587,10 @@ const CashReportPage: React.FC = () => {
 
                               {ledger.details.customers && ledger.details.customers.length > 0 && (
                                 <div>
-                                  <div className="text-xs font-semibold text-gray-600 mb-2">
+                                  <div className="text-sm font-semibold text-gray-600 mb-2">
                                     Danh sách khách hàng:
                                   </div>
-                                  <table className="w-full text-xs">
+                                  <table className="w-full text-sm">
                                     <thead className="bg-gray-100">
                                       <tr>
                                         <th className="px-3 py-2 text-left">Khách hàng</th>
@@ -646,10 +646,10 @@ const CashReportPage: React.FC = () => {
                             <div className="space-y-3">
                               {/* Thông tin chốt ca */}
                               <div className="bg-white rounded-lg p-4 border border-green-200">
-                                <div className="text-xs font-semibold text-green-700 mb-2">📥 Thu tiền bán lẻ</div>
+                                <div className="text-sm font-semibold text-green-700 mb-2">📥 Thu tiền bán lẻ</div>
                                 <div className="grid grid-cols-2 gap-3 text-sm">
                                   <div>
-                                    <span className="text-gray-600">Số tiền thu:</span>{' '}
+                                    <span className="text-gray-600">Số tiền thu: </span>{' '}
                                     <span className="font-bold text-green-600 tabular-nums">
                                       {ledger.details.shiftClose?.cashIn?.toLocaleString('vi-VN')}đ
                                     </span>
@@ -659,7 +659,7 @@ const CashReportPage: React.FC = () => {
 
                               {/* Thông tin nộp tiền */}
                               <div className="bg-white rounded-lg p-4 border border-red-200">
-                                <div className="text-xs font-semibold text-red-700 mb-2">📤 Nộp tiền về công ty</div>
+                                <div className="text-sm font-semibold text-red-700 mb-2">📤 Nộp tiền về công ty</div>
                                 {ledger.details.deposits && ledger.details.deposits.length > 0 && (
                                   <table className="w-full text-sm">
                                     <thead className="bg-gray-100">

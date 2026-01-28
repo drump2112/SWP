@@ -505,7 +505,7 @@ const DebtReportPage: React.FC = () => {
                       <tr>
                         <td colSpan={7} className="px-6 py-4 bg-gray-50">
                           <div className="text-sm font-semibold text-gray-700 mb-2">Chi tiết phát sinh:</div>
-                          <table className="w-full text-xs">
+                          <table className="w-full text-sm">
                             <thead className="bg-gray-200">
                               <tr>
                                 <th className="px-4 py-2 text-left">Ngày</th>
@@ -523,7 +523,7 @@ const DebtReportPage: React.FC = () => {
                                 <tr key={ledger.id} className="border-t hover:bg-gray-100">
                                   <td className="px-4 py-2 whitespace-nowrap">{dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}</td>
                                   <td className="px-4 py-2">
-                                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                    <span className={`px-2 py-1 rounded text-sm font-medium ${
                                       ledger.refType === 'DEBT_SALE'
                                         ? 'bg-red-100 text-red-700'
                                         : 'bg-green-100 text-green-700'
@@ -544,28 +544,28 @@ const DebtReportPage: React.FC = () => {
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </td>
-                                  <td className="px-4 py-2 text-right font-mono">
+                                  <td className="px-4 py-2 text-right tabular-nums">
                                     {ledger.productDetails ? (
                                       ledger.productDetails.quantity.toLocaleString('vi-VN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </td>
-                                  <td className="px-4 py-2 text-right font-mono">
+                                  <td className="px-4 py-2 text-right tabular-nums">
                                     {ledger.productDetails ? (
                                       ledger.productDetails.unitPrice.toLocaleString('vi-VN')
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </td>
-                                  <td className="px-4 py-2 text-right font-semibold">
+                                  <td className="px-4 py-2 text-right font-semibold tabular-nums">
                                     {ledger.debit > 0 ? (
                                       <span className="text-red-600">{ledger.debit.toLocaleString('vi-VN')}</span>
                                     ) : (
                                       <span className="text-gray-400">-</span>
                                     )}
                                   </td>
-                                  <td className="px-4 py-2 text-right font-semibold">
+                                  <td className="px-4 py-2 text-right font-semibold tabular-nums">
                                     {ledger.credit > 0 ? (
                                       <span className="text-green-600">{ledger.credit.toLocaleString('vi-VN')}</span>
                                     ) : (
