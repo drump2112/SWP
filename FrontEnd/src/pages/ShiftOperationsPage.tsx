@@ -22,6 +22,7 @@ import { showConfirm } from "../utils/sweetalert";
 import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import SearchableSelect from "../components/SearchableSelect";
+import MoneyInput from "../components/MoneyInput";
 import TruckInventoryImportForm, {
   type InventoryImportFormData,
 } from "../components/TruckInventoryImportForm";
@@ -3320,11 +3321,8 @@ const ShiftOperationsPage: React.FC = () => {
                   >
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền (₫) *</label>
-                      <input
-                        type="number"
+                      <MoneyInput
                         name="amount"
-                        step="1"
-                        min="0"
                         required
                         defaultValue={
                           editingDepositId
@@ -3334,7 +3332,7 @@ const ShiftOperationsPage: React.FC = () => {
                               : ""
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
-                        placeholder="VD: 50000000"
+                        placeholder="VD: 50.000.000"
                       />
                     </div>
 
