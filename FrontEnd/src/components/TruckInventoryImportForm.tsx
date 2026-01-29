@@ -152,8 +152,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
         <h3 className="text-lg font-bold text-gray-900 mb-4">📋 Biên Bản Giao Nhận Xăng Dầu</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nhập *</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Ngày giờ nhập *</label>
             <input
               type="datetime-local"
               step="1"
@@ -164,8 +164,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Nhà cung cấp</label>
             <input
               type="text"
               value={supplierName}
@@ -176,8 +176,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số hóa đơn</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Số hóa đơn</label>
             <input
               type="text"
               value={invoiceNumber}
@@ -188,8 +188,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Biển số xe *</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Biển số xe *</label>
             <input
               type="text"
               required
@@ -201,8 +201,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tài xế</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Tài xế</label>
             <input
               type="text"
               value={driverName}
@@ -213,8 +213,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm *</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Sản phẩm *</label>
             <select
               required
               value={productId}
@@ -229,8 +229,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
           </div>
 
           {/* ✅ Thêm dropdown chọn bể */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Bể chứa *</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Bể chứa *</label>
             <select
               required
               value={tankId}
@@ -250,8 +250,8 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng *</label>
+          <div className="flex flex-col">
+            <label className="block text-sm font-medium text-gray-700 mb-2 h-10 flex items-center">Số lượng *</label>
             <input
               type="number"
               step="1"

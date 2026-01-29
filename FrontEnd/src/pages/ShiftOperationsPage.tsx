@@ -3796,8 +3796,7 @@ const ShiftOperationsPage: React.FC = () => {
 
                         productTanks.forEach((tank: any) => {
                           const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
-                          const defaultBookStock = Number(tank.currentStock) || 0;
-                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
+                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : 0; // ✅ Không tự fill
                           const diff = (tankData.actualStock || 0) - bookStock;
 
                           // Get pumps for this tank
@@ -3926,7 +3925,7 @@ const ShiftOperationsPage: React.FC = () => {
                                 const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
                                 const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
                                 const defaultBookStock = Number(tank.currentStock) || 0;
-                                const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock;
+                                const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : 0;
                                 const diff = (tankData.actualStock || 0) - bookStock;
 
                                 return (
@@ -3981,13 +3980,13 @@ const ShiftOperationsPage: React.FC = () => {
                                         type="number"
                                         min="0"
                                         step="0.01"
-                                        value={tankData.bookStock !== undefined ? tankData.bookStock : defaultBookStock || ""}
+                                        value={tankData.bookStock !== undefined ? tankData.bookStock : ""}
                                         onChange={(e) => setInventoryCheckData(prev => ({
                                           ...prev,
                                           [tank.id]: { ...prev[tank.id], bookStock: e.target.value ? Number(e.target.value) : undefined }
                                         }))}
-                                        placeholder={defaultBookStock.toLocaleString("vi-VN")}
-                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right bg-gray-50"
+                                        placeholder="Nhập số từ sổ sách"
+                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
                                       />
                                     </td>
                                     <td className={`px-3 py-2 text-right font-medium ${diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500'}`}>
