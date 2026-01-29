@@ -149,7 +149,7 @@ Sau khi đăng nhập, bạn sẽ thấy:
 | 2 | Nhập **Số cuối ca** (đọc từ đồng hồ thực tế) |
 | 3 | Hệ thống tự tính **Lượng bán** = Cuối ca - Đầu ca |
 
-> ⚠️ **QUAN TRỌNG:** 
+> ⚠️ **QUAN TRỌNG:**
 > - Số cuối ca phải ≥ Số đầu ca
 > - Kiểm tra kỹ trước khi chốt, không sửa được sau khi khóa ca
 
@@ -756,7 +756,7 @@ Thực hiện chốt tồn kho định kỳ (tháng/quý).
 **A:** Khách hàng chưa được gán cho cửa hàng của bạn hoặc chưa được tạo. Liên hệ Admin.
 
 ## Q3: Số cuối ca sai, làm sao sửa?
-**A:** 
+**A:**
 - Nếu **chưa chốt ca**: Sửa trực tiếp trong tab "Cột bơm"
 - Nếu **đã chốt ca**: Liên hệ Admin
 

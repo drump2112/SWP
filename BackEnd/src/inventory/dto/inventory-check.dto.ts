@@ -41,6 +41,10 @@ export class PumpDataDto {
 
   @IsNumber()
   @IsOptional()
+  tankId?: number; // ✅ Tank mà vòi bơm này gắn vào
+
+  @IsNumber()
+  @IsOptional()
   meterReading?: number;
 }
 

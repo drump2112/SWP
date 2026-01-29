@@ -4129,6 +4129,7 @@ const ShiftOperationsPage: React.FC = () => {
                           pumpDataArray.push({
                             pumpId: pump.id,
                             pumpCode: pump.pumpCode,
+                            tankId: pump.tankId, // ✅ Thêm tankId để map vòi với bể
                             meterReading: meterReading,
                           });
                         }

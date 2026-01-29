@@ -120,6 +120,15 @@ const InventoryCheckListPage: React.FC = () => {
         stt++;
         currentProduct = tank.productName;
       }
+
+      // Get pumps for this tank
+      const tankPumps = (check.pumpData || []).filter(
+        (pump: any) => pump.tankId === tank.tankId
+      );
+      const pumpsDisplay = tankPumps
+        .map((pump: any) => `${pump.pumpCode}: ${pump.meterReading?.toLocaleString('vi-VN') || '0'}`)
+        .join(', ') || '';
+
       rows.push({
         stt: tank.productName !== currentProduct ? stt : '',
         productName: tank.productName !== currentProduct ? tank.productName : '',
@@ -129,7 +138,7 @@ const InventoryCheckListPage: React.FC = () => {
         actualStock: tank.actualStock || '',
         bookStock: tank.bookStock || '',
         difference: tank.difference || '',
-        pumpElectronic: '',
+        pumpElectronic: pumpsDisplay,
         pumpMechanical: '',
       });
     });
@@ -359,63 +368,64 @@ const InventoryCheckListPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tank Data */}
+              {/* Tank Data with Pumps */}
               <h3 className="font-medium text-gray-800 mb-2">Số liệu bể chứa</h3>
-              <table className="w-full text-sm mb-6 border">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-3 py-2 text-left border">Bể</th>
-                    <th className="px-3 py-2 text-left border">Mặt hàng</th>
-                    <th className="px-3 py-2 text-right border">Cao chung</th>
-                    <th className="px-3 py-2 text-right border">Cao nước</th>
-                    <th className="px-3 py-2 text-right border">Tồn thực tế</th>
-                    <th className="px-3 py-2 text-right border">Tồn sổ sách</th>
-                    <th className="px-3 py-2 text-right border">Chênh lệch</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(selectedCheck.tankData || []).map((tank: any, idx: number) => (
-                    <tr key={idx} className="border-b">
-                      <td className="px-3 py-2 border">{tank.tankCode}</td>
-                      <td className="px-3 py-2 border">{tank.productName}</td>
-                      <td className="px-3 py-2 text-right border">{tank.heightTotal || '-'}</td>
-                      <td className="px-3 py-2 text-right border">{tank.heightWater || '-'}</td>
-                      <td className="px-3 py-2 text-right border">
-                        {tank.actualStock?.toLocaleString('vi-VN') || '-'}
-                      </td>
-                      <td className="px-3 py-2 text-right border">
-                        {tank.bookStock?.toLocaleString('vi-VN') || '-'}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-right border font-medium ${
-                          tank.difference > 0
-                            ? 'text-green-600'
-                            : tank.difference < 0
-                            ? 'text-red-600'
-                            : ''
-                        }`}
-                      >
-                        {tank.difference ? (tank.difference > 0 ? '+' : '') + tank.difference.toLocaleString('vi-VN') : '-'}
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm mb-6 border">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 text-left border">Bể</th>
+                      <th className="px-3 py-2 text-left border">Mặt hàng</th>
+                      <th className="px-3 py-2 text-right border">Cao chung</th>
+                      <th className="px-3 py-2 text-right border">Cao nước</th>
+                      <th className="px-3 py-2 text-right border">Tồn thực tế</th>
+                      <th className="px-3 py-2 text-right border">Tồn sổ sách</th>
+                      <th className="px-3 py-2 text-right border">Chênh lệch</th>
+                      <th className="px-3 py-2 text-left border bg-blue-50">Vòi bơm</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {(selectedCheck.tankData || []).map((tank: any, idx: number) => {
+                      // Get pumps for this tank
+                      const tankPumps = (selectedCheck.pumpData || []).filter(
+                        (pump: any) => pump.tankId === tank.tankId
+                      );
+                      const pumpsDisplay = tankPumps
+                        .map((pump: any) => `${pump.pumpCode}: ${pump.meterReading?.toLocaleString('vi-VN') || '0'}`)
+                        .join(', ') || '-';
 
-              {/* Pump Data */}
-              {selectedCheck.pumpData && selectedCheck.pumpData.length > 0 && (
-                <>
-                  <h3 className="font-medium text-gray-800 mb-2">Số đồng hồ bơm</h3>
-                  <div className="flex flex-wrap gap-4 mb-6">
-                    {selectedCheck.pumpData.map((pump: any, idx: number) => (
-                      <div key={idx} className="bg-gray-50 px-3 py-2 rounded">
-                        <span className="text-gray-500">{pump.pumpCode}:</span>{' '}
-                        <span className="font-medium">{pump.meterReading?.toLocaleString('vi-VN')}</span>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
+                      return (
+                        <tr key={idx} className="border-b hover:bg-blue-50">
+                          <td className="px-3 py-2 border font-medium">{tank.tankCode}</td>
+                          <td className="px-3 py-2 border">{tank.productName}</td>
+                          <td className="px-3 py-2 text-right border">{tank.heightTotal || '-'}</td>
+                          <td className="px-3 py-2 text-right border">{tank.heightWater || '-'}</td>
+                          <td className="px-3 py-2 text-right border">
+                            {tank.actualStock?.toLocaleString('vi-VN') || '-'}
+                          </td>
+                          <td className="px-3 py-2 text-right border">
+                            {tank.bookStock?.toLocaleString('vi-VN') || '-'}
+                          </td>
+                          <td
+                            className={`px-3 py-2 text-right border font-medium ${
+                              tank.difference > 0
+                                ? 'text-green-600'
+                                : tank.difference < 0
+                                ? 'text-red-600'
+                                : ''
+                            }`}
+                          >
+                            {tank.difference ? (tank.difference > 0 ? '+' : '') + tank.difference.toLocaleString('vi-VN') : '-'}
+                          </td>
+                          <td className="px-3 py-2 border bg-blue-50 text-sm text-blue-900 font-medium">
+                            {pumpsDisplay}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
               {/* Reason & Conclusion */}
               {(selectedCheck.reason || selectedCheck.conclusion) && (

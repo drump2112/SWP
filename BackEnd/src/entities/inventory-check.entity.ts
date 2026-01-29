@@ -44,7 +44,7 @@ export class InventoryCheck {
   tankData: any; // [{tankId, tankCode, productName, heightTotal, heightWater, actualStock, bookStock, difference}]
 
   @Column({ name: 'pump_data', type: 'jsonb', nullable: true })
-  pumpData: any; // [{pumpId, pumpCode, meterReading}]
+  pumpData: any; // [{pumpId, pumpCode, tankId, meterReading}] ✅ tankId dùng để match vòi bơm với bể tương ứng
 
   // Kết luận
   @Column({ type: 'text', nullable: true })

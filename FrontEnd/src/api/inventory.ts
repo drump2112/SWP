@@ -201,6 +201,7 @@ export interface TankDataDto {
 export interface PumpDataDto {
   pumpId: number;
   pumpCode: string;
+  tankId?: number; // ✅ Tank mà vòi bơm này gắn vào
   meterReading?: number;
 }
 
