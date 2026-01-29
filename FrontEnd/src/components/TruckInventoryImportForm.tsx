@@ -254,7 +254,7 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
             <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng *</label>
             <input
               type="number"
-              step="0.01"
+              step="1"
               min="0"
               required
               value={quantity}
