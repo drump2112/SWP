@@ -1876,37 +1876,47 @@ const ShiftOperationsPage: React.FC = () => {
 
   // Tab Navigation Component
   const TabNavigation = () => (
-    <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-200">
-      <button
-        onClick={goToPreviousTab}
-        disabled={!hasPreviousTab}
-        className={`inline-flex items-center px-4 py-2.5 rounded-lg font-medium transition-all ${
-          hasPreviousTab
-            ? "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md"
-            : "bg-gray-50 text-gray-400 cursor-not-allowed"
-        }`}
-      >
-        <ArrowLeftIcon className="h-5 w-5 mr-2" />
-        {hasPreviousTab && <span className="text-sm">{tabLabels[tabs[currentTabIndex - 1]]}</span>}
-        {!hasPreviousTab && <span className="text-sm">Quay lại</span>}
-      </button>
-
-      <div className="text-sm text-gray-500 font-medium">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200">
+      {/* Mobile Breadcrumb */}
+      <div className="sm:hidden text-xs text-gray-600 font-medium order-3 w-full text-center pt-2 border-t border-gray-100">
         Bước {currentTabIndex + 1} / {tabs.length}
       </div>
 
+      {/* Previous Button */}
       <button
-        onClick={goToNextTab}
-        disabled={!hasNextTab}
-        className={`inline-flex items-center px-4 py-2.5 rounded-lg font-medium transition-all ${
-          hasNextTab
-            ? "bg-blue-100 text-blue-700 hover:bg-blue-200 hover:shadow-md"
+        onClick={goToPreviousTab}
+        disabled={!hasPreviousTab}
+        className={`inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
+        ${
+          hasPreviousTab
+            ? "bg-gray-100 text-gray-700 hover:bg-gray-200 hover:shadow-md active:bg-gray-300"
             : "bg-gray-50 text-gray-400 cursor-not-allowed"
         }`}
       >
-        {hasNextTab && <span className="text-sm">{tabLabels[tabs[currentTabIndex + 1]]}</span>}
-        {!hasNextTab && <span className="text-sm">Tiếp theo</span>}
-        <ArrowRightIcon className="h-5 w-5 ml-2" />
+        <ArrowLeftIcon className="h-4 sm:h-5 w-4 sm:w-5" />
+        <span className="hidden sm:inline text-sm">{hasPreviousTab && tabLabels[tabs[currentTabIndex - 1]]}</span>
+        <span className="sm:hidden text-xs">Trước</span>
+      </button>
+
+      {/* Desktop Breadcrumb */}
+      <div className="hidden sm:block text-sm text-gray-500 font-medium">
+        Bước {currentTabIndex + 1} / {tabs.length}
+      </div>
+
+      {/* Next Button */}
+      <button
+        onClick={goToNextTab}
+        disabled={!hasNextTab}
+        className={`inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg font-medium transition-all duration-200 whitespace-nowrap flex-shrink-0
+        ${
+          hasNextTab
+            ? "bg-blue-100 text-blue-700 hover:bg-blue-200 hover:shadow-md active:bg-blue-300"
+            : "bg-gray-50 text-gray-400 cursor-not-allowed"
+        }`}
+      >
+        <span className="hidden sm:inline text-sm">{hasNextTab && tabLabels[tabs[currentTabIndex + 1]]}</span>
+        <span className="sm:hidden text-xs">Tiếp</span>
+        <ArrowRightIcon className="h-4 sm:h-5 w-4 sm:w-5" />
       </button>
     </div>
   );
@@ -1914,108 +1924,121 @@ const ShiftOperationsPage: React.FC = () => {
   return (
     <div className="p-6 space-y-6 overflow-x-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-lg p-6 border border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigate("/shifts")} className="p-2 hover:bg-gray-200 rounded-lg transition-colors">
-              <ArrowLeftIcon className="h-6 w-6 text-gray-700" />
+      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-lg p-4 sm:p-6 border border-gray-200">
+        <div className="space-y-4 sm:space-y-0">
+          {/* Row 1: Back Button + Title */}
+          <div className="flex items-start sm:items-center gap-4">
+            <button onClick={() => navigate("/shifts")} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0">
+              <ArrowLeftIcon className="h-5 sm:h-6 w-5 sm:w-6 text-gray-700" />
             </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Ca #{report?.shift.shiftNo}</h1>
-              <div className="flex items-center gap-3 mt-2">
-                <p className="text-gray-600">Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}</p>
-                <span className="text-gray-400">•</span>
+            <div className="flex-grow">
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Ca #{report?.shift.shiftNo}</h1>
+              <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-2 flex-wrap">
+                <p className="text-xs sm:text-sm text-gray-600">Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}</p>
+                <span className="text-gray-400 hidden sm:inline">•</span>
                 {isEditMode ? (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-orange-500 text-white shadow-sm">
-                    <PencilIcon className="w-3 h-3 mr-1.5" />
-                    Đang sửa
+                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold bg-orange-500 text-white shadow-sm">
+                    <PencilIcon className="w-3 h-3 sm:mr-1.5" />
+                    <span className="hidden sm:inline ml-1">Đang sửa</span>
                   </span>
                 ) : isShiftOpen ? (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-500 text-white shadow-sm">
-                    <span className="w-2 h-2 bg-white rounded-full mr-1.5 animate-pulse"></span>
-                    Đang mở
+                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold bg-green-500 text-white shadow-sm">
+                    <span className="w-2 h-2 bg-white rounded-full mr-1 sm:mr-1.5 animate-pulse"></span>
+                    <span className="hidden sm:inline">Đang mở</span>
                   </span>
                 ) : (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-500 text-white shadow-sm">
-                    <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                  <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold bg-gray-500 text-white shadow-sm">
+                    <svg className="w-3 h-3 mr-1 sm:mr-1.5" fill="currentColor" viewBox="0 0 20 20">
                       <path
                         fillRule="evenodd"
                         d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                         clipRule="evenodd"
                       />
                     </svg>
-                    Đã chốt
+                    <span className="hidden sm:inline">Đã chốt</span>
                   </span>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Người Giao và Người Nhận */}
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-2 min-w-[200px]">
-              <label className="text-sm text-gray-700 font-medium">Người Giao</label>
+          {/* Row 2: Người Giao, Người Nhận, Nút Chốt */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-3">
+            {/* Người Giao */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs sm:text-sm text-gray-700 font-medium">Người Giao</label>
               <SearchableSelect
                 options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
                 value={handoverUserId}
                 onChange={(value) => setHandoverUserId(value as number | null)}
-                placeholder="-- Chọn người giao --"
+                placeholder="-- Chọn --"
                 isClearable
                 isDisabled={!canEdit}
               />
             </div>
 
-            <div className="flex flex-col gap-2 min-w-[200px]">
-              <label className="text-sm text-gray-700 font-medium">Người Nhận</label>
+            {/* Người Nhận */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs sm:text-sm text-gray-700 font-medium">Người Nhận</label>
               <SearchableSelect
                 options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
                 value={receiverUserId}
                 onChange={(value) => setReceiverUserId(value as number | null)}
-                placeholder="-- Chọn người nhận --"
+                placeholder="-- Chọn --"
                 isClearable
                 isDisabled={!canEdit}
               />
             </div>
-          </div>
 
-          {canEdit && (
-            <button
-              onClick={handleCloseShift}
-              disabled={closeShiftMutation.isPending || updateShiftMutation.isPending}
-              className="inline-flex items-center px-6 py-3 text-white rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all font-semibold shadow-lg"
-            >
-              {closeShiftMutation.isPending || updateShiftMutation.isPending ? (
-                <>
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-5 w-5"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"
-                    ></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
-                  </svg>
-                  {isEditMode ? "Đang cập nhật..." : "Đang chốt..."}
-                </>
-              ) : (
-                <>
-                  <CheckIcon className="h-5 w-5 mr-2" />
-                  {isEditMode ? "Cập nhật ca" : "Chốt ca"}
-                </>
-              )}
-            </button>
-          )}
+            {/* Nút Chốt Ca */}
+            {canEdit && (
+              <div className="flex items-end">
+                <button
+                  onClick={handleCloseShift}
+                  disabled={closeShiftMutation.isPending || updateShiftMutation.isPending}
+                  className="w-full sm:w-auto inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-white rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100
+                  bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 
+                  hover:from-green-600 hover:via-emerald-600 hover:to-teal-700
+                  shadow-lg hover:shadow-2xl
+                  disabled:from-gray-400 disabled:via-gray-400 disabled:to-gray-400 disabled:shadow-sm
+                  focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2"
+                >
+                  {closeShiftMutation.isPending || updateShiftMutation.isPending ? (
+                    <>
+                      <svg
+                        className="animate-spin h-3 sm:h-4 w-3 sm:w-4 mr-1 sm:mr-2"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                      <span className="hidden sm:inline">{isEditMode ? "Đang cập nhật..." : "Đang chốt..."}</span>
+                      <span className="sm:hidden">Xử lý...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckIcon className="h-3 sm:h-4 w-3 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">{isEditMode ? "Cập nhật ca" : "Chốt ca"}</span>
+                      <span className="sm:hidden">{isEditMode ? "Cập nhật" : "Chốt"}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -2055,7 +2078,13 @@ const ShiftOperationsPage: React.FC = () => {
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow">
         <div className="border-b border-gray-200">
-          <nav className="-mb-px flex overflow-x-auto">
+          {/* Mobile Indicator - Hiển thị trên mobile */}
+          <div className="hidden sm:flex md:hidden items-center justify-between px-4 py-2 bg-gray-50 text-xs text-gray-600 border-b border-gray-200">
+            <span>Bước {currentTabIndex + 1}/{tabs.length}</span>
+            <span className="font-medium">{tabLabels[activeTab]}</span>
+          </div>
+          
+          <nav className="-mb-px flex overflow-x-auto scrollbar-hide">
             <button
               onClick={async () => {
                 if (activeTab !== "pump" || !hasUnsavedChanges) {
@@ -2069,12 +2098,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("pump");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "pump"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "pump"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B1 - Số máy cột bơm
+              <span className="sm:hidden">B1</span>
+              <span className="hidden sm:inline">B1 - Số máy cột bơm</span>
             </button>
             <button
               onClick={async () => {
@@ -2119,12 +2150,14 @@ const ShiftOperationsPage: React.FC = () => {
                 // Validation pass → chuyển tab trực tiếp
                 setActiveTab("debt");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "debt"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "debt"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B2 - Bán hàng
+              <span className="sm:hidden">B2</span>
+              <span className="hidden sm:inline">B2 - Bán hàng</span>
             </button>
             <button
               onClick={async () => {
@@ -2139,12 +2172,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("receipt");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "receipt"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "receipt"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B3 - Thu tiền
+              <span className="sm:hidden">B3</span>
+              <span className="hidden sm:inline">B3 - Thu tiền</span>
             </button>
             <button
               onClick={async () => {
@@ -2159,12 +2194,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("deposit");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "deposit"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "deposit"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B4 - Nộp tiền
+              <span className="sm:hidden">B4</span>
+              <span className="hidden sm:inline">B4 - Nộp tiền</span>
             </button>
             <button
               onClick={async () => {
@@ -2179,12 +2216,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("import");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "import"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "import"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B5 - Nhập hàng
+              <span className="sm:hidden">B5</span>
+              <span className="hidden sm:inline">B5 - Nhập hàng</span>
             </button>
             <button
               onClick={async () => {
@@ -2199,12 +2238,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("export");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "export"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "export"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B6 - Xuất hàng
+              <span className="sm:hidden">B6</span>
+              <span className="hidden sm:inline">B6 - Xuất hàng</span>
             </button>
             <button
               onClick={async () => {
@@ -2219,12 +2260,14 @@ const ShiftOperationsPage: React.FC = () => {
                 );
                 if (confirmed) setActiveTab("inventory");
               }}
-              className={`py-4 px-6 text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative ${activeTab === "inventory"
+              className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
+              ${activeTab === "inventory"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                 }`}
             >
-              B7 - Kiểm kê
+              <span className="sm:hidden">B7</span>
+              <span className="hidden sm:inline">B7 - Kiểm kê</span>
             </button>
           </nav>
         </div>
