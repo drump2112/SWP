@@ -551,45 +551,67 @@ export class ReportsService {
     for (let i = 0; i < ledgersWithDetails.length; i++) {
       const ledger = ledgersWithDetails[i];
 
-      // Bỏ qua nếu đã xử lý trong ca khác
+      // Nếu ledger thuộc ca đã xử lý thì bỏ qua
       if (ledger.shiftId && processedShiftIds.has(ledger.shiftId)) {
         continue;
       }
 
-      // Nếu là SHIFT_CLOSE, tìm xem có DEPOSIT cùng ca không
-      if (ledger.refType === 'SHIFT_CLOSE' && ledger.shiftId) {
-        // Tìm tất cả DEPOSIT trong cùng ca
-        const depositsInSameShift = ledgersWithDetails.filter(
-          (l) => l.shiftId === ledger.shiftId && l.refType === 'DEPOSIT'
-        );
+      // Nếu có shiftId, kiểm tra toàn bộ phát sinh trong cùng ca
+      if (ledger.shiftId) {
+        const entriesInShift = ledgersWithDetails.filter((l) => l.shiftId === ledger.shiftId);
 
-        // Tính tổng cashOut từ tất cả DEPOSIT trong ca
-        const totalDeposit = depositsInSameShift.reduce((sum, d) => sum + d.cashOut, 0);
+        // Tổng tiền nộp (DEPOSIT)
+        const depositsInSameShift = entriesInShift.filter((l) => l.refType === 'DEPOSIT');
+        const totalDeposit = depositsInSameShift.reduce((sum, d) => sum + (d.cashOut || 0), 0);
 
-        // Nếu tổng nộp = tiền bán lẻ (cashIn), gộp thành 1 dòng với balance = 0
-        if (depositsInSameShift.length > 0 && totalDeposit === ledger.cashIn) {
-          // Gộp thành 1 dòng: vừa thu vừa nộp, tồn quỹ trừ về 0
+        // Tổng tiền thu trong ca = tổng cashIn của SHIFT_CLOSE + RECEIPT
+        const cashInEntries = entriesInShift.filter((l) => l.refType === 'SHIFT_CLOSE' || l.refType === 'RECEIPT');
+        const totalCashIn = cashInEntries.reduce((sum, c) => sum + (c.cashIn || 0), 0);
+
+        // Nếu tổng nộp = tổng thu (bao gồm cả SHIFT_CLOSE và RECEIPT) và có ít nhất 1 bản ghi nộp
+        if (depositsInSameShift.length > 0 && totalDeposit > 0 && totalDeposit === totalCashIn) {
+          const shiftCloseEntry = entriesInShift.find((l) => l.refType === 'SHIFT_CLOSE') || null;
+          const receiptEntries = entriesInShift.filter((l) => l.refType === 'RECEIPT');
+
+          const primaryId = shiftCloseEntry?.id || receiptEntries[0]?.id || depositsInSameShift[0]?.id || ledger.id;
+          const primaryDate = shiftCloseEntry?.date || receiptEntries[0]?.date || depositsInSameShift[0]?.date || ledger.date;
+
           mergedLedgers.push({
-            ...ledger,
-            refType: 'SHIFT_CLOSE_DEPOSIT', // Loại mới: gộp chốt ca + nộp tiền
+            id: primaryId,
+            shiftId: ledger.shiftId,
+            date: primaryDate,
+            refType: 'SHIFT_CLOSE_DEPOSIT',
+            refId: primaryId,
+            cashIn: totalCashIn,
             cashOut: totalDeposit,
-            notes: `Chốt ca & nộp tiền: ${ledger.cashIn.toLocaleString()}đ`,
+            storeName: ledger.storeName,
+            notes: `Chốt ca & nộp tiền: ${totalCashIn.toLocaleString()}đ`,
             details: {
               type: 'SHIFT_CLOSE_DEPOSIT',
-              shiftClose: { cashIn: ledger.cashIn },
+              shiftClose: shiftCloseEntry
+                ? { cashIn: shiftCloseEntry.cashIn, notes: shiftCloseEntry.details?.notes }
+                : null,
+              receipts: receiptEntries.map((r) => ({
+                id: r.id,
+                amount: r.cashIn,
+                customers: r.details?.customers,
+                notes: r.details?.notes,
+              })),
               deposits: depositsInSameShift.map((d) => ({
+                id: d.id,
                 amount: d.cashOut,
                 receiverName: d.details?.receiverName,
                 notes: d.details?.notes,
               })),
             },
           });
+
           processedShiftIds.add(ledger.shiftId);
           continue;
         }
       }
 
-      // Nếu là DEPOSIT và đã được gộp với SHIFT_CLOSE, bỏ qua
+      // Nếu ledger thuộc ca đã bị gộp thì bỏ qua
       if (ledger.refType === 'DEPOSIT' && ledger.shiftId && processedShiftIds.has(ledger.shiftId)) {
         continue;
       }
