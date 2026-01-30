@@ -1,0 +1,194 @@
+.debt-notification-banner {
+  position: relative;
+  z-index: 15;
+  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 50%, #3b82f6 100%);
+  border-bottom: 2px solid #1e40af;
+  padding: 0;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+}
+
+.banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  height: 56px;
+}
+
+/* Header section - left side */
+.banner-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-right: 12px;
+  border-right: 2px solid rgba(30, 64, 175, 0.2);
+}
+
+.debt-icon {
+  width: 20px;
+  height: 20px;
+  color: #ffffff;
+  flex-shrink: 0;
+  animation: pulse-icon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.header-text {
+  white-space: nowrap;
+  min-width: fit-content;
+}
+
+.header-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.header-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f1f5f9;
+  margin: 0;
+  white-space: nowrap;
+}
+
+/* Scrolling section - right side */
+.banner-scrolling {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  height: 100%;
+}
+
+.scrolling-text-container {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.scrolling-text {
+  display: flex;
+  white-space: nowrap;
+  animation: scroll-left 60s linear infinite;
+  font-size: 0.875rem;
+  color: #ffffff;
+  font-weight: 500;
+  align-items: center;
+}
+
+.separator {
+  margin: 0 16px;
+  opacity: 0.5;
+}
+
+@keyframes scroll-left {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes pulse-icon {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Pause on hover */
+.debt-notification-banner:hover .scrolling-text {
+  animation-play-state: paused;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .banner-content {
+    gap: 8px;
+    padding: 6px 8px;
+    height: 52px;
+  }
+
+  .scrolling-text {
+    font-size: 0.8rem;
+  }
+
+  .header-count {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .banner-content {
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    padding: 6px 8px;
+    height: auto;
+  }
+
+  .banner-header {
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 0 0 4px 0;
+    width: 100%;
+  }
+
+  .banner-scrolling {
+    width: 100%;
+    height: 20px;
+  }
+
+  .scrolling-text {
+    font-size: 0.7rem;
+  }
+
+  .header-label {
+    font-size: 0.7rem;
+  }
+
+  .header-count {
+    font-size: 0.75rem;
+  }
+
+  .debt-icon {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .banner-content {
+    gap: 3px;
+    padding: 4px 6px;
+  }
+
+  .banner-header {
+    gap: 4px;
+  }
+
+  .header-text {
+    display: none;
+  }
+
+  .scrolling-text {
+    font-size: 0.65rem;
+  }
+
+  .header-count {
+    display: none;
+  }
+
+  .header-label {
+    display: none;
+  }
+}
+

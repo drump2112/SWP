@@ -23,6 +23,7 @@ import Swal from "sweetalert2";
 import { toast } from "react-toastify";
 import SearchableSelect from "../components/SearchableSelect";
 import MoneyInput from "../components/MoneyInput";
+import CashCheckingModal from "../components/CashCheckingModal";
 import TruckInventoryImportForm, {
   type InventoryImportFormData,
 } from "../components/TruckInventoryImportForm";
@@ -108,6 +109,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [showImportForm, setShowImportForm] = useState(false);
   const [showExportForm, setShowExportForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
+  const [showCashCheckingModal, setShowCashCheckingModal] = useState(false);
   const [pumpReadings, setPumpReadings] = useState<Record<number, PumpReadingDto>>({});
   const [productPrices, setProductPrices] = useState<Record<number, number>>({});
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
@@ -1997,7 +1999,7 @@ const ShiftOperationsPage: React.FC = () => {
                   onClick={handleCloseShift}
                   disabled={closeShiftMutation.isPending || updateShiftMutation.isPending}
                   className="w-full sm:w-auto inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-white rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100
-                  bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600 
+                  bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600
                   hover:from-green-600 hover:via-emerald-600 hover:to-teal-700
                   shadow-lg hover:shadow-2xl
                   disabled:from-gray-400 disabled:via-gray-400 disabled:to-gray-400 disabled:shadow-sm
@@ -2083,7 +2085,7 @@ const ShiftOperationsPage: React.FC = () => {
             <span>Bước {currentTabIndex + 1}/{tabs.length}</span>
             <span className="font-medium">{tabLabels[activeTab]}</span>
           </div>
-          
+
           <nav className="-mb-px flex overflow-x-auto scrollbar-hide">
             <button
               onClick={async () => {
@@ -2674,16 +2676,25 @@ const ShiftOperationsPage: React.FC = () => {
                 <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm overflow-visible">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">⛽ Đối chiếu lượng hàng bán</h3>
-                    {retailCustomer ? (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-                        <span className="text-sm text-gray-600">Khách nội bộ:</span>
-                        <span className="text-sm font-medium text-green-700">{retailCustomer.code} - {retailCustomer.name}</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
-                        <span className="text-sm text-yellow-700">⚠️ Chưa có khách hàng nội bộ cho cửa hàng này</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setShowCashCheckingModal(true)}
+                        className="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                      >
+                        <BanknotesIcon className="h-5 w-5 mr-2" />
+                        Kiểm Tiền
+                      </button>
+                      {retailCustomer ? (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
+                          <span className="text-sm text-gray-600">Khách nội bộ:</span>
+                          <span className="text-sm font-medium text-green-700">{retailCustomer.code} - {retailCustomer.name}</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
+                          <span className="text-sm text-yellow-700">⚠️ Chưa có khách hàng nội bộ cho cửa hàng này</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
@@ -2693,6 +2704,7 @@ const ShiftOperationsPage: React.FC = () => {
                           <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
                           <th className="px-4 py-2 text-right">Bán nợ (2)</th>
                           <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (3) *</th>
+                          <th className="px-4 py-2 text-right">Thành tiền bán lẻ</th>
                           <th className="px-4 py-2 text-right">Tổng bán (2+3)</th>
                           <th className="px-4 py-2 text-right">Chênh lệch</th>
                         </tr>
@@ -2717,6 +2729,12 @@ const ShiftOperationsPage: React.FC = () => {
 
                             // 3. Declared Retail Quantity
                             const declaredQty = declaredRetailQuantities[productId] ?? 0;
+
+                            // Get price for this product from the shift's price list
+                            const price = productPrices[productId] || 0;
+
+                            // Calculate retail amount (declared quantity * price)
+                            const retailAmount = declaredQty * price;
 
                             // Total Declared
                             const totalDeclared = debtQty + declaredQty;
@@ -2751,6 +2769,9 @@ const ShiftOperationsPage: React.FC = () => {
                                     placeholder="0.000"
                                   />
                                 </td>
+                                <td className="px-4 py-3 text-right font-medium text-purple-600">
+                                  {Math.round(retailAmount).toLocaleString('vi-VN')} ₫
+                                </td>
                                 <td className="px-4 py-3 text-right font-medium">{totalDeclared.toFixed(3)}</td>
                                 <td
                                   className={`px-4 py-3 text-right font-bold ${isMatch ? "text-green-600" : "text-red-600"
@@ -2763,6 +2784,57 @@ const ShiftOperationsPage: React.FC = () => {
                           });
                         })()}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-gray-100 font-semibold text-gray-900 border-t-2 border-gray-300">
+                          <td className="px-4 py-3">Cộng</td>
+                          <td className="px-4 py-3 text-right">
+                            {(() => {
+                              const productIds = Array.from(new Set(Object.values(pumpReadings).map((r) => r.productId)));
+                              const total = productIds.reduce((sum, productId) => {
+                                const pumpQty = Object.values(pumpReadings)
+                                  .filter((r) => r.productId === productId)
+                                  .reduce((s, r) => s + calculateQuantity(r), 0);
+                                return sum + pumpQty;
+                              }, 0);
+                              return total.toFixed(3);
+                            })()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {draftDebtSales.reduce((sum, s) => sum + s.quantity, 0).toFixed(3)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0).toFixed(3)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {Math.round(
+                              Object.entries(declaredRetailQuantities).reduce((sum, [productId, qty]) => {
+                                const price = productPrices[Number(productId)] || 0;
+                                return sum + qty * price;
+                              }, 0)
+                            ).toLocaleString('vi-VN')} ₫
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {(draftDebtSales.reduce((sum, s) => sum + s.quantity, 0) +
+                              Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0)
+                            ).toFixed(3)}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            {(() => {
+                              const productIds = Array.from(new Set(Object.values(pumpReadings).map((r) => r.productId)));
+                              const totalPump = productIds.reduce((sum, productId) => {
+                                const pumpQty = Object.values(pumpReadings)
+                                  .filter((r) => r.productId === productId)
+                                  .reduce((s, r) => s + calculateQuantity(r), 0);
+                                return sum + pumpQty;
+                              }, 0);
+                              const totalDeclared = draftDebtSales.reduce((sum, s) => sum + s.quantity, 0) +
+                                Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0);
+                              const diff = totalPump - totalDeclared;
+                              return diff.toFixed(3);
+                            })()}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                   <p className="text-xs text-gray-500 mt-2 italic">
@@ -3101,6 +3173,11 @@ const ShiftOperationsPage: React.FC = () => {
                   )}
                 </table>
               </div>
+
+              <CashCheckingModal
+                isOpen={showCashCheckingModal}
+                onClose={() => setShowCashCheckingModal(false)}
+              />
 
               <TabNavigation />
             </div>
