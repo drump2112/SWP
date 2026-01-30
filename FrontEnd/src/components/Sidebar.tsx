@@ -62,7 +62,7 @@ const navigation: NavItem[] = [
       { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
 
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Hạn mức công nợ', href: '/customers/credit', icon: CreditCardIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Định mức công nợ', href: '/customers/credit', icon: CreditCardIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: CurrencyDollarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       // { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
@@ -334,12 +334,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                     <div
                       className={`
                         ml-4 mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out
-                        ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}
+                        ${isMenuOpen ? 'opacity-100' : 'max-h-0 opacity-0'}
                       `}
                       style={{
                         background: isMenuOpen ? 'rgba(241, 245, 249, 0.5)' : 'transparent',
                         borderRadius: '8px',
                         padding: isMenuOpen ? '8px' : '0',
+                        maxHeight: isMenuOpen ? 'fit-content' : '0',
+                        overflow: 'hidden',
                       }}
                     >
                       {item.children && item.children.map((child) => {
