@@ -916,6 +916,73 @@ export class ShiftsService {
       shift.receiverName = closeShiftDto.receiverName;
     }
 
+    // 7.1. ✅ Tính tồn đầu ca (opening_stock_json)
+    const products = await manager.find(Product);
+    const openingStockData: any[] = [];
+
+    for (const product of products) {
+      let openingStock = 0;
+
+      // Kiểm tra có shift trước cùng store không
+      const prevShift = await manager
+        .createQueryBuilder(Shift, 's')
+        .where('s.store_id = :storeId', { storeId: shift.storeId })
+        .andWhere('(s.shift_date < :shiftDate OR (s.shift_date = :shiftDate AND s.shift_no < :shiftNo))', {
+          shiftDate: shift.shiftDate,
+          shiftNo: shift.shiftNo,
+        })
+        .orderBy('s.shift_date', 'DESC')
+        .addOrderBy('s.shift_no', 'DESC')
+        .limit(1)
+        .getOne();
+
+      if (prevShift && prevShift.openingStockJson) {
+        // Lấy opening của shift trước
+        const prevOpening = (prevShift.openingStockJson as any[]).find(
+          (x) => x.productId === product.id,
+        );
+        const prevOpeningStock = prevOpening?.openingStock || 0;
+
+        // Lấy import/export của shift trước từ ledger
+        const prevLedger = await manager
+          .createQueryBuilder(InventoryLedger, 'il')
+          .select('SUM(il.quantity_in)', 'totalImport')
+          .addSelect('SUM(il.quantity_out)', 'totalExport')
+          .where('il.product_id = :productId', { productId: product.id })
+          .andWhere('il.warehouse_id = :warehouseId', { warehouseId: shift.storeId })
+          .andWhere('il.shift_id = :shiftId', { shiftId: prevShift.id })
+          .getRawOne();
+
+        const prevImport = Number(prevLedger?.totalImport) || 0;
+        const prevExport = Number(prevLedger?.totalExport) || 0;
+        const prevClosing = prevOpeningStock + prevImport - prevExport;
+
+        openingStock = prevClosing;
+      } else if (!prevShift) {
+        // Shift đầu tiên - lấy từ Tank
+        const tankResult = await manager
+          .createQueryBuilder()
+          .select('SUM(t.current_stock)', 'totalStock')
+          .from('tanks', 't')
+          .where('t.product_id = :productId', { productId: product.id })
+          .andWhere('t.store_id = :storeId', { storeId: shift.storeId })
+          .getRawOne();
+
+        openingStock = Number(tankResult?.totalStock) || 0;
+      }
+
+      if (openingStock !== 0) {
+        openingStockData.push({
+          productId: product.id,
+          productCode: product.code,
+          productName: product.name,
+          openingStock: Number(openingStock),
+        });
+      }
+    }
+
+    shift.openingStockJson = openingStockData.length > 0 ? openingStockData : null;
+
     shift.status = 'CLOSED';
     const updatedShift = await manager.save(shift);
 
@@ -1089,6 +1156,25 @@ export class ShiftsService {
       // Giữ lại closedAt để frontend biết đây là ca đã từng chốt (cho phép hiển thị nút Sửa)
       shift.status = 'OPEN';
       // shift.closedAt = null; // Không xóa closedAt
+
+      // ✅ Clear opening_stock_json của shift này và tất cả shift sau
+      shift.openingStockJson = null;
+
+      // Clear opening_stock_json của tất cả shift sau shift này (vì chúng phụ thuộc vào shift này)
+      await manager
+        .createQueryBuilder()
+        .update(Shift)
+        .set({ openingStockJson: null })
+        .where('store_id = :storeId', { storeId: shift.storeId })
+        .andWhere(
+          '(shift_date > :shiftDate OR (shift_date = :shiftDate AND shift_no > :shiftNo))',
+          {
+            shiftDate: shift.shiftDate,
+            shiftNo: shift.shiftNo,
+          },
+        )
+        .execute();
+
       const reopenedShift = await manager.save(Shift, shift);
 
       // Ghi audit log

@@ -46,6 +46,16 @@ export class ReportsController {
   }
 
   /**
+   * GET /reports/shift-handover/:shiftId
+   * Báo cáo sổ giao ca
+   */
+  @Get('shift-handover/:shiftId')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getShiftHandoverReport(@Param('shiftId') shiftId: string) {
+    return this.reportsService.getShiftHandoverReport(+shiftId);
+  }
+
+  /**
    * GET /reports/shift/:shiftId
    * Báo cáo chi tiết ca làm việc
    */

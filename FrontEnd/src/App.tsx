@@ -19,6 +19,7 @@ import CustomersPage from './pages/CustomersPage';
 import CustomerCreditPage from './pages/CustomerCreditPage';
 import DebtReportPage from './pages/DebtReportPage';
 import ShiftReportPage from './pages/ShiftReportPage';
+import ShiftHandoverReportPage from './pages/ShiftHandoverReportPage';
 import CashReportPage from './pages/CashReportPage';
 import RevenueSalesReportPage from './pages/RevenueSalesReportPage';
 import InventoryImportPage from './pages/InventoryImportPage';
@@ -305,6 +306,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <ShiftReportPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/reports/shift-handover"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <ShiftHandoverReportPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }

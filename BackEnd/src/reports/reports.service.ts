@@ -251,6 +251,246 @@ export class ReportsService {
   // ==================== BÁO CÁO CA ====================
 
   /**
+   * Báo cáo sổ giao ca - Dùng cho mục đích giao ca với đầy đủ dữ liệu từ 5 tab
+   * Bao gồm: Pump readings, Debt sales, Receipts, Deposits, Inventory documents
+   */
+  async getShiftHandoverReport(shiftId: number) {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+      relations: [
+        'store',
+        'store.region',
+        'pumpReadings',
+        'pumpReadings.pump',
+        'pumpReadings.product',
+      ],
+    });
+
+    if (!shift) {
+      throw new Error('Shift not found');
+    }
+
+    // 1. LẤY DỮ LIỆU TẬP TÍNH BƠM (Tab 1 - Pump Readings)
+    const pumpReadings = shift.pumpReadings.map((reading) => ({
+      pumpId: reading.pumpId,
+      pumpCode: reading.pumpCode || reading.pump?.pumpCode || '',
+      pumpName: reading.pump?.name || '',
+      productId: reading.productId,
+      productName: reading.product?.name || '',
+      startValue: Number(reading.startValue || 0),
+      endValue: Number(reading.endValue || 0),
+      testExport: Number(reading.testExport || 0),
+      quantity: Number(reading.quantity || 0),
+      unitPrice: Number(reading.unitPrice || 0),
+      amount: Math.round(Number(reading.quantity || 0) * Number(reading.unitPrice || 0)),
+    }));
+
+    // 2. LẤY DỮ LIỆU BÁN CÔNG NỢ (Tab 2 - Debt Sales)
+    const debtSales = await this.shiftDebtSaleRepository.find({
+      where: { shiftId },
+      relations: ['customer', 'product'],
+    });
+
+    const formattedDebtSales = debtSales.map((sale) => ({
+      id: sale.id,
+      customerId: sale.customerId,
+      customerCode: sale.customer?.code || '',
+      customerName: sale.customer?.name || '',
+      productId: sale.productId,
+      productName: sale.product?.name || '',
+      quantity: Number(sale.quantity),
+      unitPrice: Number(sale.unitPrice),
+      amount: Number(sale.amount),
+      notes: sale.notes || '',
+    }));
+
+    // 3. LẤY DỮ LIỆU PHIẾU THU NỢ (Tab 3 - Receipts)
+    const receipts = await this.receiptRepository.find({
+      where: { shiftId },
+      relations: ['receiptDetails', 'receiptDetails.customer'],
+    });
+
+    const formattedReceipts = receipts.map((receipt) => ({
+      id: receipt.id,
+      receiptType: receipt.receiptType || '',
+      amount: Number(receipt.amount || 0),
+      paymentMethod: receipt.paymentMethod || 'CASH',
+      receiptAt: receipt.receiptAt,
+      notes: receipt.notes || '',
+      details: receipt.receiptDetails?.map((rd) => ({
+        id: rd.id,
+        customerId: rd.customerId,
+        customerName: rd.customer?.name || '',
+        amount: Number(rd.amount),
+      })) || [],
+    }));
+
+    // 4. LẤY DỮ LIỆU PHIẾU NộP TIỀN (Tab 4 - Cash Deposits)
+    const deposits = await this.cashDepositRepository.find({
+      where: { shiftId },
+    });
+
+    const formattedDeposits = deposits.map((deposit) => ({
+      id: deposit.id,
+      amount: Number(deposit.amount),
+      depositAt: deposit.depositAt,
+      receiverName: deposit.receiverName || '',
+      paymentMethod: deposit.paymentMethod || 'CASH',
+      notes: deposit.notes || '',
+    }));
+
+    // 5. LẤY DỮ LIỆU KIỂM KÊ HÀNG (Tab 5 - Inventory Documents)
+    const inventoryDocs = await this.inventoryDocumentRepository.find({
+      where: { refShiftId: shiftId },
+      relations: ['items', 'items.product', 'items.tank'],
+    });
+
+    const formattedInventory = inventoryDocs.flatMap((doc) =>
+      doc.items.map((item) => ({
+        docId: doc.id,
+        docType: doc.docType || '',
+        docDate: doc.docDate,
+        productId: item.productId,
+        productCode: item.product?.code || '',
+        productName: item.product?.name || '',
+        tankId: item.tankId,
+        tankCode: item.tank?.tankCode || '',
+        tankName: item.tank?.name || '',
+        quantity: Number(item.quantity),
+        unitPrice: Number(item.unitPrice || 0),
+        amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)),
+      })),
+    );
+
+    // 6. LẤY DỮ LIỆU NHẬP XUẤT TỒN TRONG CÁ (Tab 5 - Inventory Summary by Product)
+    // Nhóm dữ liệu từ inventory ledger theo mặt hàng để tính nhập, xuất
+    const inventorySummaryByProduct = await this.inventoryLedgerRepository
+      .createQueryBuilder('il')
+      .where('il.shift_id = :shiftId', { shiftId })
+      .leftJoin('il.product', 'product')
+      .select('il.product_id', 'productId')
+      .addSelect('product.code', 'productCode')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(il.quantity_in)', 'totalImport')
+      .addSelect('SUM(il.quantity_out)', 'totalExport')
+      .groupBy('il.product_id')
+      .addGroupBy('product.code')
+      .addGroupBy('product.name')
+      .getRawMany();
+
+    // Lấy tồn đầu ca từ Shift.openingStockJson (ghi nhận lúc mở ca)
+    const inventoryOpeningByProduct = await Promise.all(
+      inventorySummaryByProduct.map(async (item) => {
+        // Kiểm tra openingStockJson đã được lưu lúc mở ca chưa
+        let openingStock = 0;
+
+        if (shift.openingStockJson && Array.isArray(shift.openingStockJson)) {
+          const found = shift.openingStockJson.find((x: any) => x.productId === item.productId);
+          if (found) {
+            openingStock = Number(found.openingStock);
+          }
+        }
+
+        // Nếu chưa có trong openingStockJson (ca đầu tiên chưa được ghi nhận), lấy từ Tank
+        if (openingStock === 0 && !shift.openingStockJson) {
+          const tankSum = await this.shiftRepository.manager
+            .getRepository('Tank')
+            .createQueryBuilder('t')
+            .select('SUM(t.current_stock)', 'totalCurrentStock')
+            .where('t.product_id = :productId', { productId: item.productId })
+            .andWhere('t.store_id = :storeId', { storeId: shift.storeId })
+            .getRawOne();
+
+          openingStock = tankSum?.totalCurrentStock ? Number(tankSum.totalCurrentStock) : 0;
+        }
+
+        const importQuantity = Number(item.totalImport || 0);
+        const exportQuantity = Number(item.totalExport || 0);
+        const closingStock = openingStock + importQuantity - exportQuantity;
+
+        console.log(`DEBUG Inventory - Product: ${item.productName}, Opening: ${openingStock}, Import: ${importQuantity}, Export: ${exportQuantity}, Closing: ${closingStock}`);
+
+        return {
+          productId: item.productId,
+          productCode: item.productCode,
+          productName: item.productName,
+          openingStock,
+          importQuantity,
+          exportQuantity,
+          closingStock,
+        };
+      }),
+    );
+
+    // 7. TÍNH TOÁN TỔNG HỢP
+    const totalPumpAmount = pumpReadings.reduce((sum, r) => sum + r.amount, 0);
+    const totalDebtAmount = formattedDebtSales.reduce((sum, s) => sum + s.amount, 0);
+    const totalRetailAmount = totalPumpAmount - totalDebtAmount;
+    const totalReceiptAmount = formattedReceipts.reduce((sum, r) => sum + r.amount, 0);
+    const totalDepositAmount = formattedDeposits.reduce((sum, d) => sum + d.amount, 0);
+    const cashBalance = totalRetailAmount + totalReceiptAmount - totalDepositAmount;
+
+    // 7.1. ✅ Lấy tiền ca trước chuyển sang (bán lẻ ca trước chưa nộp)
+    let carryOverCash = 0;
+    const prevShift = await this.shiftRepository
+      .createQueryBuilder('s')
+      .where('s.store_id = :storeId', { storeId: shift.storeId })
+      .andWhere('(s.shift_date < :shiftDate OR (s.shift_date = :shiftDate AND s.shift_no < :shiftNo))', {
+        shiftDate: shift.shiftDate,
+        shiftNo: shift.shiftNo,
+      })
+      .orderBy('s.shift_date', 'DESC')
+      .addOrderBy('s.shift_no', 'DESC')
+      .limit(1)
+      .getOne();
+
+    if (prevShift) {
+      // Lấy cash_balance của shift trước từ cash_ledger
+      const prevCashLedger = await this.cashLedgerRepository
+        .createQueryBuilder('cl')
+        .select('SUM(cl.cash_in - cl.cash_out)', 'totalBalance')
+        .where('cl.shift_id = :shiftId', { shiftId: prevShift.id })
+        .getRawOne();
+
+      carryOverCash = Number(prevCashLedger?.totalBalance) || 0;
+    }
+
+    return {
+      shift: {
+        id: shift.id,
+        shiftNo: shift.shiftNo,
+        shiftDate: shift.shiftDate,
+        status: shift.status,
+        openedAt: shift.openedAt,
+        closedAt: shift.closedAt,
+        handoverName: shift.handoverName,
+        receiverName: shift.receiverName,
+        store: {
+          id: shift.store.id,
+          code: shift.store.code,
+          name: shift.store.name,
+          region: shift.store.region?.name || '',
+        },
+      },
+      pumpReadings,
+      debtSales: formattedDebtSales,
+      receipts: formattedReceipts,
+      deposits: formattedDeposits,
+      inventory: formattedInventory,
+      inventoryByProduct: inventoryOpeningByProduct,
+      carryOverCash,
+      summary: {
+        totalPumpAmount,
+        totalDebtAmount,
+        totalRetailAmount,
+        totalReceiptAmount,
+        totalDepositAmount,
+        cashBalance,
+      },
+    };
+  }
+
+  /**
    * Báo cáo chi tiết ca làm việc
    */
   async getShiftDetailReport(shiftId: number) {

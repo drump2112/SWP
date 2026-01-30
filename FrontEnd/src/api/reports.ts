@@ -73,6 +73,104 @@ export interface ShiftDetailReport {
   };
 }
 
+export interface ShiftHandoverReport {
+  shift: {
+    id: number;
+    shiftNo: number;
+    shiftDate: string;
+    status: string;
+    openedAt: string;
+    closedAt?: string;
+    handoverName?: string;
+    receiverName?: string;
+    store: {
+      id: number;
+      code: string;
+      name: string;
+      region: string;
+    };
+  };
+  pumpReadings: Array<{
+    pumpId: number;
+    pumpCode: string;
+    pumpName: string;
+    productId: number;
+    productName: string;
+    startValue: number;
+    endValue: number;
+    testExport: number;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+  }>;
+  debtSales: Array<{
+    id: number;
+    customerId: number;
+    customerCode: string;
+    customerName: string;
+    productId: number;
+    productName: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+    notes?: string;
+  }>;
+  receipts: Array<{
+    id: number;
+    receiptType: string;
+    amount: number;
+    paymentMethod: string;
+    receiptAt: string;
+    notes?: string;
+    details: Array<{
+      id: number;
+      customerId: number;
+      customerName: string;
+      amount: number;
+    }>;
+  }>;
+  deposits: Array<{
+    id: number;
+    amount: number;
+    depositAt: string;
+    receiverName: string;
+    paymentMethod: string;
+    notes?: string;
+  }>;
+  inventory: Array<{
+    docId: number;
+    docType: string;
+    docDate: string;
+    productId: number;
+    productCode: string;
+    productName: string;
+    tankId: number;
+    tankCode: string;
+    tankName: string;
+    quantity: number;
+    unitPrice: number;
+    amount: number;
+  }>;
+  inventoryByProduct: Array<{
+    productId: number;
+    productCode: string;
+    productName: string;
+    openingStock: number;
+    importQuantity: number;
+    exportQuantity: number;
+    closingStock: number;
+  }>;
+  carryOverCash: number;
+  summary: {
+    totalPumpAmount: number;
+    totalDebtAmount: number;
+    totalRetailAmount: number;
+    totalReceiptAmount: number;
+    totalDepositAmount: number;
+    cashBalance: number;
+  };
+}
+
 export interface CashReportParams {
   storeId?: number;
   fromDate?: string;
@@ -123,6 +221,12 @@ export const reportsApi = {
   // Báo cáo chi tiết ca
   getShiftDetailReport: async (shiftId: number): Promise<ShiftDetailReport> => {
     const { data } = await api.get(`/reports/shift/${shiftId}`);
+    return data;
+  },
+
+  // Báo cáo sổ giao ca
+  getShiftHandoverReport: async (shiftId: number): Promise<ShiftHandoverReport> => {
+    const { data } = await api.get(`/reports/shift-handover/${shiftId}`);
     return data;
   },
 

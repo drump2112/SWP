@@ -51,6 +51,14 @@ export class Shift {
   @Column({ name: 'receiver_name', type: 'varchar', length: 255, nullable: true })
   receiverName: string | null; // Tên người nhận ca
 
+  @Column({
+    name: 'opening_stock_json',
+    type: 'json',
+    nullable: true,
+    comment: 'JSON lưu tồn đầu ca theo sản phẩm: [{productId, productName, openingStock}]'
+  })
+  openingStockJson: any; // Tồn đầu ca ghi nhận cố định
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 
