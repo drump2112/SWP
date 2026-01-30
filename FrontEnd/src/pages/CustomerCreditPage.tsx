@@ -149,6 +149,17 @@ const CustomerCreditPage: React.FC = () => {
   const handleExport = () => {
     if (!filteredCustomers) return;
 
+    const getStatusText = (level: string) => {
+      switch (level) {
+        case 'safe': return 'An toàn';
+        case 'warning': return 'Cảnh báo';
+        case 'danger': return 'Nguy hiểm';
+        case 'overlimit': return 'Vượt hạn';
+        case 'unlocked': return 'Được mở chặn';
+        default: return level;
+      }
+    };
+
     const data = filteredCustomers.map(item => ({
       'Mã KH': item.customerCode,
       'Tên khách hàng': item.customerName,
@@ -159,7 +170,7 @@ const CustomerCreditPage: React.FC = () => {
       'Còn lại': item.availableCredit,
       'Vượt hạn': item.overLimitAmount || 0,
       'Sử dụng (%)': item.creditUsagePercent,
-      'Trạng thái': item.warningLevel
+      'Trạng thái': getStatusText(item.warningLevel)
     }));
 
     exportToExcel(data, `Han_muc_cong_no_${dayjs().format('YYYY-MM-DD')}`);
@@ -490,6 +501,7 @@ const CustomerCreditPage: React.FC = () => {
                                       <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Còn lại</th>
                                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Sử dụng</th>
                                       <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Vượt hạn</th>
+                                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase">Trạng thái</th>
                                     </tr>
                                   </thead>
                                   <tbody className="divide-y divide-gray-200 bg-white">
@@ -502,8 +514,8 @@ const CustomerCreditPage: React.FC = () => {
                                         <tr key={idx} className="hover:bg-gray-50">
                                           <td className="px-4 py-3 text-sm font-medium text-gray-900">{store.storeName}</td>
                                           <td className="px-4 py-3 text-sm text-right font-semibold text-blue-600">
-                                            {store.creditLimit !== null 
-                                              ? `${store.creditLimit.toLocaleString('vi-VN')} ₫` 
+                                            {store.creditLimit !== null
+                                              ? `${store.creditLimit.toLocaleString('vi-VN')} ₫`
                                               : <span className="text-gray-400">Không cài đặt</span>
                                             }
                                           </td>
@@ -532,6 +544,15 @@ const CustomerCreditPage: React.FC = () => {
                                               <span className="text-red-600">{overAmount.toLocaleString('vi-VN')} ₫</span>
                                             ) : (
                                               <span className="text-gray-400">-</span>
+                                            )}
+                                          </td>
+                                          <td className="px-4 py-3 text-sm text-center">
+                                            {store.isBypassed ? (
+                                              <span className="px-2 py-1 text-xs font-semibold rounded-full bg-orange-100 text-orange-800">
+                                                🔓 Mở chặn
+                                              </span>
+                                            ) : (
+                                              <span className="text-gray-400 text-xs">-</span>
                                             )}
                                           </td>
                                         </tr>

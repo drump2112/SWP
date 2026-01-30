@@ -284,8 +284,7 @@ export class CustomersService {
   }
 
   async getAllCreditStatus(storeId?: number) {
-    // 1. Lấy danh sách khách hàng
-    // Nếu có storeId, chỉ lấy khách hàng của store đó (qua customer_stores)
+    // 1. Lấy danh sách khách hàng với credit status
     let query = this.customerRepository.createQueryBuilder('c')
       .select([
         'c.id as "customerId"',
@@ -304,7 +303,7 @@ export class CustomersService {
           .andWhere(storeId ? 'dl.store_id = :storeId' : '1=1', { storeId });
       }, 'currentDebt');
 
-    // Nếu có storeId, join với customer_stores để lấy creditLimit riêng
+    // Nếu có storeId, join với customer_stores để lấy creditLimit riêng và bypass status của cửa hàng đó
     if (storeId) {
       query = query
         .leftJoin('customer_stores', 'cs', 'cs.customer_id = c.id AND cs.store_id = :storeId', { storeId })
@@ -312,6 +311,19 @@ export class CustomersService {
         .addSelect('cs.bypass_credit_limit', 'storeBypassCreditLimit')
         .addSelect('cs.bypass_until', 'storeBypassUntil')
         .where('cs.store_id = :storeId', { storeId });
+    } else {
+      // Admin (không có storeId) - lấy tất cả khách hàng
+      // Dùng subquery để check nếu có BẤT KỲ store nào được bypass
+      query = query
+        .addSelect(subQuery => {
+          return subQuery
+            .select('MAX(CASE WHEN cs.bypass_credit_limit = true AND (cs.bypass_until IS NULL OR cs.bypass_until > NOW()) THEN 1 ELSE 0 END)')
+            .from('customer_stores', 'cs')
+            .where('cs.customer_id = c.id');
+        }, 'anyStoreBypassActive')
+        .addSelect('NULL', 'storeCreditLimit')
+        .addSelect('NULL', 'storeBypassCreditLimit')
+        .addSelect('NULL', 'storeBypassUntil');
     }
 
     const results = await query.getRawMany();
@@ -329,9 +341,36 @@ export class CustomersService {
       const creditUsagePercent = creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
 
       // Check bypass status
-      const globalBypassActive = row.globalBypassCreditLimit && (!row.globalBypassUntil || new Date(row.globalBypassUntil) > new Date());
-      const storeBypassActive = storeId && row.storeBypassCreditLimit && (!row.storeBypassUntil || new Date(row.storeBypassUntil) > new Date());
+      const isBypassSet = (value: any) => {
+        if (value === null || value === undefined || value === 0 || value === '0' || value === false) return false;
+        return true;
+      };
+
+      const isDateExpired = (dateStr: any) => {
+        if (!dateStr) return false; // Null/undefined = vô thời hạn
+        try {
+          return new Date(dateStr).getTime() <= Date.now();
+        } catch {
+          return false;
+        }
+      };
+
+      // Nếu có storeId, check bypass của store đó; nếu không, check nếu có ANY store nào được bypass
+      let storeBypassActive = false;
+      if (storeId) {
+        storeBypassActive = !!(isBypassSet(row.storeBypassCreditLimit) && !isDateExpired(row.storeBypassUntil));
+      } else {
+        // Admin - check nếu có ANY store được bypass
+        storeBypassActive = !!(Number(row.anyStoreBypassActive) === 1);
+      }
+
+      const globalBypassActive = isBypassSet(row.globalBypassCreditLimit) && !isDateExpired(row.globalBypassUntil);
       const isBypassed = globalBypassActive || storeBypassActive;
+
+      // Debug log
+      if (isBypassed || creditLimit === 0) {
+        console.log(`[Credit Status] ${row.customerName}: bypass=${isBypassed}, creditLimit=${creditLimit}, globalBypass=${row.globalBypassCreditLimit}, globalUntil=${row.globalBypassUntil}, anyStoreBypass=${row.anyStoreBypassActive}`);
+      }
 
       return {
         customerId: row.customerId,
@@ -344,9 +383,9 @@ export class CustomersService {
         availableCredit,
         creditUsagePercent: Math.round(creditUsagePercent * 100) / 100,
         isOverLimit: currentDebt > creditLimit,
-        bypassCreditLimit: storeId ? (row.storeBypassCreditLimit || row.globalBypassCreditLimit) : row.globalBypassCreditLimit,
+        bypassCreditLimit: storeId ? isBypassSet(row.storeBypassCreditLimit) : isBypassSet(row.globalBypassCreditLimit),
         isBypassed,
-        warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed),
+        warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed, row.customerType),
       };
     });
   }
@@ -363,15 +402,29 @@ export class CustomersService {
     const availableCredit = creditLimit - balance;
     const creditUsagePercent = creditLimit > 0 ? (balance / creditLimit) * 100 : 0;
 
-    // Check bypass status
-    const globalBypassActive = customer.bypassCreditLimit && (!customer.bypassUntil || new Date(customer.bypassUntil) > new Date());
-    
+    // Check bypass status - xét cả global và store-level bypass
+    const isBypassSet = (value: any) => {
+      if (value === null || value === undefined || value === 0 || value === '0' || value === false) return false;
+      return true;
+    };
+
+    const isDateExpired = (date: any) => {
+      if (!date) return false; // Null/undefined = vô thời hạn
+      try {
+        return date.getTime ? date.getTime() <= Date.now() : new Date(date).getTime() <= Date.now();
+      } catch {
+        return false;
+      }
+    };
+
+    const globalBypassActive = isBypassSet(customer.bypassCreditLimit) && !isDateExpired(customer.bypassUntil);
+
     let storeBypassActive = false;
     if (storeId && customer.customerStores?.length > 0) {
       const cs = customer.customerStores.find(cs => cs.storeId === storeId);
-      storeBypassActive = cs?.bypassCreditLimit && (!cs.bypassUntil || new Date(cs.bypassUntil) > new Date());
+      storeBypassActive = !!(cs && isBypassSet(cs.bypassCreditLimit) && !isDateExpired(cs.bypassUntil));
     }
-    
+
     const isBypassed = globalBypassActive || storeBypassActive;
 
     return {
@@ -387,16 +440,27 @@ export class CustomersService {
       isOverLimit: balance > creditLimit,
       bypassCreditLimit: customer.bypassCreditLimit || false,
       isBypassed,
-      warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed),
+      warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed, customer.type),
     };
   }
 
-  private getCreditWarningLevel(usagePercent: number, creditLimit: number = 0, isBypassed: boolean = false): 'safe' | 'warning' | 'danger' | 'overlimit' | 'unlocked' {
-    // Nếu được mở chặn hoặc không có hạn mức → trạng thái "được mở chặn"
-    if (isBypassed || creditLimit === 0) {
+  private getCreditWarningLevel(usagePercent: number, creditLimit: number = 0, isBypassed: boolean = false, customerType?: string): 'safe' | 'warning' | 'danger' | 'overlimit' | 'unlocked' {
+    // Khách nội bộ không hiển thị cảnh báo
+    if (customerType === 'INTERNAL') {
+      return 'safe';
+    }
+
+    // Khách thường (EXTERNAL) - nếu bypass thì "được mở chặn"
+    if (isBypassed) {
       return 'unlocked';
     }
-    
+
+    // Khách thường - không có hạn mức mà không bypass → vượt hạn
+    if (creditLimit === 0) {
+      return 'overlimit';
+    }
+
+    // Logic bình thường
     if (usagePercent >= 100) return 'overlimit';
     if (usagePercent >= 90) return 'danger';
     if (usagePercent >= 75) return 'warning';

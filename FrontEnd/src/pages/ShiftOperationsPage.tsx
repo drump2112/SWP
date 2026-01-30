@@ -1868,8 +1868,8 @@ const ShiftOperationsPage: React.FC = () => {
 
   const tabLabels: Record<typeof tabs[number], string> = {
     pump: "B1 - Số máy cột bơm",
-    debt: "B2 - Bán hàng",
-    receipt: "B3 - Thu tiền",
+    debt: "B2 - Ghi Nợ/Công Nợ",
+    receipt: "B3 - Thu Nợ",
     deposit: "B4 - Nộp tiền",
     import: "B5 - Nhập hàng",
     export: "B6 - Xuất hàng",
@@ -2159,7 +2159,7 @@ const ShiftOperationsPage: React.FC = () => {
                 }`}
             >
               <span className="sm:hidden">B2</span>
-              <span className="hidden sm:inline">B2 - Bán hàng</span>
+              <span className="hidden sm:inline">B2 - Ghi Nợ</span>
             </button>
             <button
               onClick={async () => {
@@ -2181,7 +2181,7 @@ const ShiftOperationsPage: React.FC = () => {
                 }`}
             >
               <span className="sm:hidden">B3</span>
-              <span className="hidden sm:inline">B3 - Thu tiền</span>
+              <span className="hidden sm:inline">B3 - Thu Nợ</span>
             </button>
             <button
               onClick={async () => {
