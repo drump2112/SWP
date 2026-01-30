@@ -263,7 +263,7 @@ const LoginPage: React.FC = () => {
             <div className="hidden lg:flex items-center justify-center bg-gradient-to-br from-white via-blue-50 to-blue-100 p-12">
               <div className="text-center max-w-xl w-full px-8">
                 <div className="mb-16">
-                  <h2 className="font-black tracking-wider leading-tight uppercase" style={{ fontFamily: "'Montserrat', 'Inter', sans-serif", letterSpacing: '0.05em', fontSize: 'clamp(4rem, 12vw, 16rem)' }}>
+                  <h2 className="font-black tracking-wider leading-tight uppercase" style={{ fontFamily: "'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif", letterSpacing: '0.05em', fontSize: 'clamp(4rem, 12vw, 16rem)', WebkitFontSmoothing: 'antialiased', MozOsxFontSmoothing: 'grayscale' }}>
                     <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">S.W.P</span>
                     <span className="text-gray-400 mx-2">-</span>
                     <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent">CHI NHÁNH MIỀN BẮC</span>
@@ -277,7 +277,7 @@ Chào mừng bạn đã đến-inset-2 bg-gradient-to-r from-orange-300 to-blue-
                     <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-200/30 to-blue-200/30 opacity-50"></div>
                     <div className="relative">
                       <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#f26722] to-[#31b3e7] mb-4">
-                        Chào mừng bạn đã đến với S.W.P
+                        Chào mừng bạn đã đến với S.W.P - CN Miền Bắc!
                       </h3>
                       <div className="h-px w-24 bg-gradient-to-r from-[#f26722] to-[#31b3e7] mx-auto mb-6"></div>
                       <p className="text-xl font-semibold text-gray-800 leading-relaxed mb-2">
