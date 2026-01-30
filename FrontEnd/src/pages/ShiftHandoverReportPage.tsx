@@ -494,6 +494,9 @@ const ShiftHandoverReportPage: React.FC = () => {
     printWindow.print();
   };
 
+  // Check if user is a store account (not ADMIN, DIRECTOR, etc.)
+  const isStoreAccount = user?.roleCode === 'STORE' || (user?.storeId && !['ADMIN', 'DIRECTOR', 'ACCOUNTING'].includes(user?.roleCode || ''));
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="bg-white rounded-lg shadow-md p-4 border border-gray-200 mb-6">
@@ -511,6 +514,7 @@ const ShiftHandoverReportPage: React.FC = () => {
               }}
               options={storeOptions}
               placeholder="Chọn cửa hàng..."
+              isDisabled={isStoreAccount}
             />
           </div>
 
