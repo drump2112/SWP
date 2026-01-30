@@ -122,6 +122,8 @@ const CustomerCreditPage: React.FC = () => {
         return 'text-orange-600';
       case 'overlimit':
         return 'text-red-600';
+      case 'unlocked':
+        return 'text-orange-600';
       default:
         return 'text-gray-600';
     }
@@ -137,6 +139,8 @@ const CustomerCreditPage: React.FC = () => {
         return 'bg-orange-50';
       case 'overlimit':
         return 'bg-red-50';
+      case 'unlocked':
+        return 'bg-orange-50';
       default:
         return 'bg-gray-50';
     }
@@ -389,11 +393,13 @@ const CustomerCreditPage: React.FC = () => {
                           customer.warningLevel === 'safe' ? 'bg-green-100 text-green-800' :
                           customer.warningLevel === 'warning' ? 'bg-yellow-100 text-yellow-800' :
                           customer.warningLevel === 'danger' ? 'bg-orange-100 text-orange-800' :
+                          customer.warningLevel === 'unlocked' ? 'bg-orange-100 text-orange-800' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {customer.warningLevel === 'safe' ? 'An toàn' :
                            customer.warningLevel === 'warning' ? 'Cảnh báo' :
                            customer.warningLevel === 'danger' ? 'Nguy hiểm' :
+                           customer.warningLevel === 'unlocked' ? 'Được mở chặn' :
                            'Vượt hạn'}
                         </span>
                       </td>

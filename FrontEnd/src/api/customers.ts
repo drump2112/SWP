@@ -49,7 +49,9 @@ export interface CreditStatus {
   availableCredit: number;
   creditUsagePercent: number;
   isOverLimit: boolean;
-  warningLevel: 'safe' | 'warning' | 'danger' | 'overlimit';
+  warningLevel: 'safe' | 'warning' | 'danger' | 'overlimit' | 'unlocked';
+  bypassCreditLimit?: boolean;
+  isBypassed?: boolean;
 }
 
 export interface StoreCreditLimit {
