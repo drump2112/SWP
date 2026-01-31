@@ -624,6 +624,17 @@ const ShiftHandoverReportPage: React.FC = () => {
           `
               : ''
           }
+
+          <div style="margin-top: 60px; display: flex; justify-content: space-around; page-break-inside: avoid;">
+            <div style="text-align: center; width: 40%;">
+              <p style="font-weight: bold; margin-bottom: 10px;">NGƯỜI GIAO CA</p>
+              <p style="font-style: italic; font-size: 12px; margin-bottom: 80px;">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div style="text-align: center; width: 40%;">
+              <p style="font-weight: bold; margin-bottom: 10px;">NGƯỜI NHẬN CA</p>
+              <p style="font-style: italic; font-size: 12px; margin-bottom: 80px;">(Ký, ghi rõ họ tên)</p>
+            </div>
+          </div>
         </body>
       </html>
     `;

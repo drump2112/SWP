@@ -21,7 +21,16 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   useEffect(() => {
     const fetchDebtData = async () => {
       try {
-        const creditStatuses = await customersApi.getAllCreditStatus();
+        // Nếu user là tài khoản cửa hàng, chỉ lấy khách hàng của cửa hàng đó
+        const storeId = user?.store?.id;
+        const creditStatuses = await customersApi.getAllCreditStatus(storeId);
+
+        // Ensure creditStatuses is an array (API might return HTML on error)
+        if (!Array.isArray(creditStatuses)) {
+          console.error('API returned invalid data. Backend may not be running or endpoint not found.');
+          return;
+        }
+
         let overLimitCounter = 0;
         let warningCounter = 0;
         const overLimitCustomers: any[] = [];

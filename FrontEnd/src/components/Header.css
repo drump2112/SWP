@@ -117,17 +117,27 @@
   height: 28px;
   display: flex;
   align-items: center;
-  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(239, 68, 68, 0.02) 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(239, 68, 68, 0.05) 0%,
+    rgba(239, 68, 68, 0.08) 25%,
+    rgba(239, 68, 68, 0.05) 50%,
+    rgba(239, 68, 68, 0.08) 75%,
+    rgba(239, 68, 68, 0.05) 100%
+  );
+  background-size: 200% 100%;
+  animation: background-slide 8s ease-in-out infinite;
   border-radius: 6px;
   border: 1px solid rgba(239, 68, 68, 0.15);
   box-shadow: 0 2px 8px rgba(239, 68, 68, 0.08);
   padding: 0 12px;
+  position: relative;
 }
 
 .header-scrolling-text {
   display: flex;
   white-space: nowrap;
-  animation: scroll-left 45s linear infinite;
+  animation: scroll-left 80s linear infinite;
   font-size: 0.85rem;
   background: linear-gradient(90deg, #dc2626 0%, #ef4444 50%, #dc2626 100%);
   -webkit-background-clip: text;
@@ -148,10 +158,19 @@
 
 @keyframes scroll-left {
   0% {
-    transform: translateX(100%);
+    transform: translateX(0%);
   }
   100% {
-    transform: translateX(-100%);
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes background-slide {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
   }
 }
 
@@ -162,6 +181,10 @@
 }
 
 .header-scrolling-container:hover .header-scrolling-text {
+  animation-play-state: paused;
+}
+
+.header-scrolling-container:hover {
   animation-play-state: paused;
 }
 
@@ -202,7 +225,16 @@
 /* Mobile notification banner */
 .mobile-notification-banner {
   display: none;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+  background: linear-gradient(
+    90deg,
+    #1e1b4b 0%,
+    #312e81 25%,
+    #1e1b4b 50%,
+    #312e81 75%,
+    #1e1b4b 100%
+  );
+  background-size: 200% 100%;
+  animation: background-slide 8s ease-in-out infinite;
   border-bottom: 3px solid #dc2626;
   padding: 8px 12px;
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
@@ -225,7 +257,7 @@
 .mobile-scrolling-text {
   display: flex;
   white-space: nowrap;
-  animation: scroll-left 45s linear infinite;
+  animation: scroll-left 80s linear infinite;
   font-size: 0.75rem;
   background: linear-gradient(90deg, #fca5a5 0%, #f87171 50%, #fca5a5 100%);
   -webkit-background-clip: text;
@@ -245,6 +277,10 @@
 }
 
 .mobile-notification-banner:hover .mobile-scrolling-text {
+  animation-play-state: paused;
+}
+
+.mobile-notification-banner:hover {
   animation-play-state: paused;
 }
 

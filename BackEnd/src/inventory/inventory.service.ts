@@ -827,15 +827,15 @@ export class InventoryService {
     // 🔥 Xác định thời điểm bắt đầu tính ledger
     // QUAN TRỌNG: ledgerStartTime KHÔNG ĐƯỢC LÙI VỀ TRƯỚC fromDateTime
     let ledgerStartTime = fromDateTime;
-    
+
     console.log(`🔍 [calculatePeriodItems] Input dates - fromDate: ${fromDate}, toDate: ${toDate}`);
     console.log(`🔍 [calculatePeriodItems] Parsed dates - fromDateTime: ${fromDateTime.toISOString()}, toDateTime: ${toDateTime.toISOString()}`);
     console.log(`🔍 [calculatePeriodItems] previousClosing:`, previousClosing);
-    
+
     if (previousClosing?.closingDate) {
       const closingDateOnly = new Date(previousClosing.closingDate);
       closingDateOnly.setHours(0, 0, 0, 0);
-      
+
       console.log(`🔍 [calculatePeriodItems] closingDate full: ${new Date(previousClosing.closingDate).toISOString()}`);
       console.log(`🔍 [calculatePeriodItems] closingDateOnly (00:00): ${closingDateOnly.toISOString()}`);
       console.log(`🔍 [calculatePeriodItems] fromDateTime (00:00): ${fromDateTime.toISOString()}`);
@@ -885,12 +885,12 @@ export class InventoryService {
             { fromDate: fromDateTime }
           )
           .getRawOne();
-        
+
         const ledgerBeforeFrom = Number(ledgerBeforeResult?.balance || 0);
-        
+
         // Tồn đầu kỳ = Tồn ban đầu (khi tạo bể) + Giao dịch trước kỳ
         openingBalance = tankInitialStock + ledgerBeforeFrom;
-        
+
         console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: tankInitialStock=${tankInitialStock}, ledgerBeforeFrom=${ledgerBeforeFrom}, openingBalance=${openingBalance}`);
       }
 

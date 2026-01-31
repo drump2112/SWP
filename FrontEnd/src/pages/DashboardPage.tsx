@@ -175,10 +175,10 @@ const ManagementDashboard: React.FC<{
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Tổng doanh thu</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(overviewData?.revenue.current || 0)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(overviewData?.revenue?.current || 0)}</p>
                 </div>
               </div>
-              {overviewData?.revenue.change !== undefined && (
+              {overviewData?.revenue?.change !== undefined && (
                 <div className={`text-sm font-semibold ${overviewData.revenue.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {overviewData.revenue.change >= 0 ? '↑' : '↓'} {Math.abs(overviewData.revenue.change).toFixed(1)}%
                 </div>
@@ -193,7 +193,7 @@ const ManagementDashboard: React.FC<{
                 </div>
                 <div className="ml-4">
                   <p className="text-sm font-medium text-gray-600">Khách hàng công nợ</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatNumber(overviewData?.debt.customersCount || 0)}</p>
+                  <p className="text-2xl font-bold text-gray-900">{formatNumber(overviewData?.debt?.customersCount || 0)}</p>
                 </div>
               </div>
             </div>
@@ -218,7 +218,7 @@ const ManagementDashboard: React.FC<{
             </h3>
           </div>
           <div className="space-y-3">
-            {topProducts?.map((product, index) => (
+            {Array.isArray(topProducts) && topProducts.map((product, index) => (
               <div key={product.productId} className="flex items-center justify-between border-b border-gray-200 pb-3 hover:bg-gray-50 px-2 rounded">
                 <div className="flex items-center gap-3 flex-1">
                   <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm">
@@ -238,6 +238,9 @@ const ManagementDashboard: React.FC<{
                 </div>
               </div>
             ))}
+            {!Array.isArray(topProducts) && (
+              <p className="text-gray-500 text-sm text-center py-4">Không có dữ liệu</p>
+            )}
           </div>
         </div>
 
@@ -256,7 +259,7 @@ const ManagementDashboard: React.FC<{
                   <th className="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
                     Cửa hàng
                   </th>
-                  {quantityByStore?.products.map((product) => (
+                  {Array.isArray(quantityByStore?.products) && quantityByStore.products.map((product) => (
                     <th key={product.id} className="px-3 py-2 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
                       {product.name}
                     </th>
@@ -267,12 +270,12 @@ const ManagementDashboard: React.FC<{
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {quantityByStore?.storeData.map((store) => (
+                {Array.isArray(quantityByStore?.storeData) && quantityByStore.storeData.map((store) => (
                   <tr key={store.storeId} className="hover:bg-gray-50">
                     <td className="px-3 py-2 text-sm font-semibold text-gray-900 border-r border-gray-100">
                       {store.storeName}
                     </td>
-                    {quantityByStore.products.map((product) => (
+                    {Array.isArray(quantityByStore?.products) && quantityByStore.products.map((product) => (
                       <td key={product.id} className="px-3 py-2 text-sm text-right font-medium text-gray-700 border-r border-gray-100">
                         {formatNumber(store.productQuantities[product.name] || 0)}
                       </td>
@@ -305,7 +308,7 @@ const ManagementDashboard: React.FC<{
             </h3>
           </div>
           <div className="space-y-2 max-h-80 overflow-y-auto">
-            {inventoryData?.byProduct.slice(0, 10).map((item) => (
+            {Array.isArray(inventoryData?.byProduct) && inventoryData.byProduct.slice(0, 10).map((item) => (
               <div key={item.productId} className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
                 <div className="flex-1">
                   <span className="text-gray-900 font-medium">{item.productName}</span>
@@ -335,7 +338,7 @@ const ManagementDashboard: React.FC<{
             {debtSummary?.customersCount || 0} khách hàng đang có công nợ
           </div>
           <div className="space-y-2 max-h-40 overflow-y-auto">
-            {debtSummary?.topDebtors.slice(0, 5).map((debtor) => (
+            {Array.isArray(debtSummary?.topDebtors) && debtSummary.topDebtors.slice(0, 5).map((debtor) => (
               <div key={debtor.customerId} className="flex justify-between text-sm">
                 <span className="text-gray-600 truncate">{debtor.customerName}</span>
                 <span className="font-medium text-red-600 ml-2">

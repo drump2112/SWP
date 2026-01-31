@@ -22,7 +22,14 @@ api.interceptors.request.use(
 
 // Response interceptor to handle errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Check if response is HTML instead of JSON (indicates backend is not running or 404)
+    if (typeof response.data === 'string' && (response.data.trim().startsWith('<!doctype') || response.data.trim().startsWith('<html'))) {
+      console.error('API returned HTML instead of JSON. Backend server may not be running or endpoint not found.');
+      return Promise.reject(new Error('Backend API not available'));
+    }
+    return response;
+  },
   async (error) => {
     const originalRequest = error.config;
 
