@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { reportsApi, type ShiftHandoverReport } from '../api/reports';
 import { shiftsApi } from '../api/shifts';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -87,216 +87,331 @@ const ShiftHandoverReportPage: React.FC = () => {
     }).format(value);
   };
 
-  // Helper function to add borders to cells - XLSX.js format
-  const getBorderStyle = (position: 'all' | 'top' | 'bottom' | 'header' = 'all') => {
-    const borderLine = { style: 'thin', color: 'FF000000' };
-    const thickBorder = { style: 'medium', color: 'FF000000' };
-
-    if (position === 'header') {
-      return {
-        left: borderLine,
-        right: borderLine,
-        top: borderLine,
-        bottom: thickBorder,
-      };
-    } else if (position === 'top') {
-      return {
-        left: borderLine,
-        right: borderLine,
-        top: borderLine,
-      };
-    } else if (position === 'bottom') {
-      return {
-        left: borderLine,
-        right: borderLine,
-        bottom: borderLine,
-      };
-    }
-    // 'all' - all borders
-    return {
-      left: borderLine,
-      right: borderLine,
-      top: borderLine,
-      bottom: borderLine,
-    };
+  const formatPaymentMethod = (method: string) => {
+    if (method === 'CASH') return 'Tiền mặt';
+    if (method === 'BANK_TRANSFER') return 'Chuyển khoản';
+    return method;
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     if (!report) return;
 
     try {
-      const ws: any = {};
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Sổ Giao Ca', {
+        pageSetup: {
+          paperSize: 9,
+          orientation: 'portrait',
+          fitToPage: true,
+          fitToWidth: 1,
+          fitToHeight: 0,
+          margins: { left: 0.7, right: 0.7, top: 0.75, bottom: 0.75, header: 0.3, footer: 0.3 },
+        },
+      });
 
-      // Header
-      ws['!cols'] = [
-        { wch: 15 },
-        { wch: 12 },
-        { wch: 25 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 12 },
-        { wch: 15 },
+      // Set column widths
+      worksheet.columns = [
+        { width: 8 },
+        { width: 12 },
+        { width: 18 },
+        { width: 12 },
+        { width: 12 },
+        { width: 12 },
+        { width: 15 },
+        { width: 12 },
+        { width: 15 },
       ];
 
+      const borderStyle: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin' },
+        bottom: { style: 'thin' },
+        left: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+
+      const headerBorder: Partial<ExcelJS.Borders> = {
+        top: { style: 'thin' },
+        bottom: { style: 'medium' },
+        left: { style: 'thin' },
+        right: { style: 'thin' },
+      };
+
       let row = 1;
-      // Add logo - note: XLSX doesn't support embedded images directly, so we'll add text alternative
-      // For a proper logo, you'd need to manually insert it or use a different library
 
-      ws[`A${row}`] = { v: '[LOGO]', t: 's', s: { font: { bold: true, size: 10, color: { rgb: 'CCCCCC' } } } };
+      // Company header
+      worksheet.mergeCells(`A${row}:I${row}`);
+      let cell = worksheet.getCell(`A${row}`);
+      cell.value = 'CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CHI NHÁNH ĐỐNG ĐA';
+      cell.font = { bold: true, size: 12 };
+      cell.alignment = { horizontal: 'center' };
+      row++;
+
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = `CỬA HÀNG XĂNG DẦU: ${report.shift.store.name}`;
+      cell.font = { bold: true, size: 11 };
+      cell.alignment = { horizontal: 'center' };
+      row++;
+
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'SỔ GIAO CA BÁN HÀNG';
+      cell.font = { bold: true, size: 11 };
+      cell.alignment = { horizontal: 'center' };
+      row++;
+
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = `Từ ${dayjs(report.shift.openedAt).format('DD/MM/YYYY HH:mm')} - Đến ${dayjs(report.shift.closedAt).format('DD/MM/YYYY HH:mm')}`;
+      cell.alignment = { horizontal: 'center' };
       row += 2;
 
-      ws[`A${row}`] = { v: 'CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CHI NHÁNH ĐỐNG ĐA', t: 's', s: { font: { bold: true, size: 12 } } };
+      // Employee info
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'Nhân viên bán hàng:';
+      cell = worksheet.getCell(`C${row}`);
+      cell.value = report.shift.handoverName || '';
       row++;
 
-      ws[`A${row}`] = { v: 'CỬA HÀNG XĂNG DẦU: ' + report.shift.store.name, t: 's', s: { font: { bold: true, size: 11 } } };
-      row++;
-
-      ws[`A${row}`] = { v: 'SỔ GIAO CA BÁN HÀNG', t: 's', s: { font: { bold: true, size: 11 } } };
-      row++;
-
-      ws[`A${row}`] = { v: `Từ ${dayjs(report.shift.openedAt).format('DD/MM/YYYY HH:mm')} - Đến ${dayjs(report.shift.closedAt).format('DD/MM/YYYY HH:mm')}`, t: 's' };
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'Nhân viên nhận ca:';
+      cell = worksheet.getCell(`C${row}`);
+      cell.value = report.shift.receiverName || '';
       row += 2;
 
-      // Nhân viên giao/nhận
-      ws[`A${row}`] = { v: 'Nhân viên bán hàng:', t: 's' };
-      ws[`C${row}`] = { v: report.shift.handoverName || '', t: 's' };
-      row++;
-      ws[`A${row}`] = { v: 'Nhân viên nhận ca:', t: 's' };
-      ws[`C${row}`] = { v: report.shift.receiverName || '', t: 's' };
-      row += 2;
-
-      // PHẦN I: BẢNG GIAO
-      ws[`A${row}`] = { v: 'I. PHẦN BÁN HÀNG', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } } } };
+      // Section I: Sales
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'I. PHẦN BÁN HÀNG';
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+      cell.alignment = { horizontal: 'left' };
       row++;
 
-      ws[`A${row}`] = { v: 'Với', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`B${row}`] = { v: 'Mặt hàng', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`C${row}`] = { v: 'Diễn giải', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`D${row}`] = { v: 'Số đầu ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`E${row}`] = { v: 'Số cuối ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`F${row}`] = { v: 'Lượng qua vòi', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`G${row}`] = { v: 'Lượng xuất bán', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`H${row}`] = { v: 'Đơn giá', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-      ws[`I${row}`] = { v: 'Thành tiền', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
+      // Headers for Section I
+      const headerRow = row;
+      const headers = ['TT', 'Mặt hàng', 'Diễn giải', 'Số đầu ca', 'Số cuối ca', 'Lượng qua vòi', 'Lượng xuất bán', 'Đơn giá', 'Thành tiền'];
+      headers.forEach((h, idx) => {
+        const col = String.fromCharCode(65 + idx);
+        cell = worksheet.getCell(`${col}${row}`);
+        cell.value = h;
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+        cell.border = headerBorder;
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
       row++;
 
-      // Pump readings
+      // Data rows for Section I
       let stt = 1;
       report.pumpReadings.forEach((reading) => {
-        ws[`A${row}`] = { v: stt, t: 'n', s: { border: getBorderStyle() } };
-        ws[`B${row}`] = { v: reading.productName, t: 's', s: { border: getBorderStyle() } };
-        ws[`C${row}`] = { v: `Số điện tử / Số cơ`, t: 's', s: { border: getBorderStyle() } };
-        ws[`D${row}`] = { v: reading.startValue, t: 'n', s: { border: getBorderStyle() } };
-        ws[`E${row}`] = { v: reading.endValue, t: 'n', s: { border: getBorderStyle() } };
-        ws[`F${row}`] = { v: reading.quantity, t: 'n', s: { border: getBorderStyle() } };
-        ws[`G${row}`] = { v: reading.quantity - reading.testExport, t: 'n', s: { border: getBorderStyle() } };
-        ws[`H${row}`] = { v: reading.unitPrice, t: 'n', s: { border: getBorderStyle() } };
-        ws[`I${row}`] = { v: reading.amount, t: 'n', s: { border: getBorderStyle() } };
+        worksheet.getCell(`A${row}`).value = stt;
+        worksheet.getCell(`B${row}`).value = reading.productName;
+        worksheet.getCell(`C${row}`).value = 'Số điện tử / Số cơ';
+        worksheet.getCell(`D${row}`).value = reading.startValue;
+        worksheet.getCell(`E${row}`).value = reading.endValue;
+        worksheet.getCell(`F${row}`).value = reading.quantity;
+        worksheet.getCell(`G${row}`).value = reading.quantity - reading.testExport;
+        worksheet.getCell(`H${row}`).value = reading.unitPrice;
+        worksheet.getCell(`I${row}`).value = reading.amount;
+
+        for (let i = 0; i < 9; i++) {
+          const col = String.fromCharCode(65 + i);
+          const c = worksheet.getCell(`${col}${row}`);
+          c.border = borderStyle;
+          if (i > 2) c.numFmt = '#,##0';
+        }
         row++;
 
-        ws[`A${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`B${row}`] = { v: reading.productName, t: 's', s: { border: getBorderStyle() } };
-        ws[`C${row}`] = { v: `Số cơ`, t: 's', s: { border: getBorderStyle() } };
-        ws[`D${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`E${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`F${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`G${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`H${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
-        ws[`I${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
+        worksheet.getCell(`B${row}`).value = reading.productName;
+        worksheet.getCell(`C${row}`).value = 'Số cơ';
+        for (let i = 0; i < 9; i++) {
+          const col = String.fromCharCode(65 + i);
+          worksheet.getCell(`${col}${row}`).border = borderStyle;
+        }
         row++;
 
         stt++;
       });
 
-      // Total retail
-      ws[`A${row}`] = { v: 'TỔNG BÁN LẺ', t: 's', s: { font: { bold: true }, border: getBorderStyle('bottom') } };
-      ws[`I${row}`] = { v: report.summary.totalRetailAmount, t: 'n', s: { font: { bold: true }, border: getBorderStyle('bottom') } };
-      row++;
+      // Total row
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'TỔNG BÁN LẺ';
+      cell.font = { bold: true };
+      cell.border = borderStyle;
 
-      // Debt sales
-      ws[`A${row}`] = { v: 'II. CÔNG NỢ KHÁCH HÀNG', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } } } };
+      cell = worksheet.getCell(`I${row}`);
+      cell.value = report.summary.totalRetailAmount;
+      cell.font = { bold: true };
+      cell.border = borderStyle;
+      cell.numFmt = '#,##0';
+      row += 2;
+
+      // Section II: Debt
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'II. CÔNG NỢ KHÁCH HÀNG';
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+      cell.alignment = { horizontal: 'left' };
       row++;
 
       if (report.debtSales.length > 0) {
-        ws[`A${row}`] = { v: 'TT', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-        ws[`B${row}`] = { v: 'Khách hàng ', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-        ws[`C${row}`] = { v: 'Số tiền', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
-        ws[`D${row}`] = { v: 'Xuất Hóm', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFFF00' } }, border: getBorderStyle('header') } };
+        // Headers for Section II
+        const debtHeaders = ['TT', 'Khách hàng', 'Số tiền', 'Xuất hóa đơn'];
+        debtHeaders.forEach((h, idx) => {
+          const col = String.fromCharCode(65 + idx);
+          cell = worksheet.getCell(`${col}${row}`);
+          cell.value = h;
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+          cell.border = headerBorder;
+          cell.alignment = { horizontal: 'center' };
+        });
         row++;
 
+        // Data rows for Section II
         report.debtSales.forEach((debt, idx) => {
-          ws[`A${row}`] = { v: idx + 1, t: 'n', s: { border: getBorderStyle() } };
-          ws[`B${row}`] = { v: debt.customerName, t: 's', s: { border: getBorderStyle() } };
-          ws[`C${row}`] = { v: debt.amount, t: 'n', s: { border: getBorderStyle() } };
-          ws[`D${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
+          worksheet.getCell(`A${row}`).value = idx + 1;
+          worksheet.getCell(`B${row}`).value = debt.customerName;
+          worksheet.getCell(`C${row}`).value = debt.amount;
+          worksheet.getCell(`D${row}`).value = '';
+
+          for (let i = 0; i < 4; i++) {
+            const col = String.fromCharCode(65 + i);
+            const c = worksheet.getCell(`${col}${row}`);
+            c.border = borderStyle;
+            if (i === 2) c.numFmt = '#,##0';
+          }
           row++;
         });
 
-        ws[`A${row}`] = { v: 'CÔNG NỢ TRONG CA', t: 's', s: { font: { bold: true }, border: getBorderStyle('bottom') } };
-        ws[`C${row}`] = { v: report.summary.totalDebtAmount, t: 'n', s: { font: { bold: true }, border: getBorderStyle('bottom') } };
+        // Total debt row
+        cell = worksheet.getCell(`A${row}`);
+        cell.value = 'CÔNG NỢ TRONG CA';
+        cell.font = { bold: true };
+        cell.border = borderStyle;
+
+        cell = worksheet.getCell(`C${row}`);
+        cell.value = report.summary.totalDebtAmount;
+        cell.font = { bold: true };
+        cell.border = borderStyle;
+        cell.numFmt = '#,##0';
         row += 2;
       }
 
-      // Summary (III. TIỀN HÀNG TRONG NGÀY)
-      ws[`A${row}`] = { v: 'III. TIỀN HÀNG TRONG NGÀY', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'FFCCCC' } } } };
+      // Section III: Summary
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'IV. TIỀN HÀNG TRONG NGÀY';
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+      cell.alignment = { horizontal: 'left' };
       row++;
 
-      ws[`A${row}`] = { v: `Tiền ca trước chuyển sang: ${report.carryOverCash.toLocaleString('vi-VN')}`, t: 's' };
+      worksheet.mergeCells(`A${row}:I${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = `Tiền ca trước chuyển sang: ${report.carryOverCash.toLocaleString('vi-VN')}`;
+      row += 2;
+
+      // Summary items with table borders
+      const summaryItems = [
+        { label: 'Tổng bán lẻ', value: report.summary.totalRetailAmount },
+        { label: 'Tổng công nợ', value: report.summary.totalDebtAmount },
+        { label: 'Thu tiền nợ', value: report.summary.totalReceiptAmount },
+        { label: 'Tiền mặt thu trong ca', value: report.summary.totalRetailAmount - report.summary.totalDebtAmount },
+        { label: 'Tồn quỹ', value: report.summary.cashBalance },
+      ];
+
+      summaryItems.forEach((item, idx) => {
+        // Add header row for the table
+        if (idx === 0) {
+          cell = worksheet.getCell(`A${row}`);
+          cell.value = 'Chỉ tiêu';
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+          cell.border = headerBorder;
+          cell.alignment = { horizontal: 'center' };
+
+          cell = worksheet.getCell(`B${row}`);
+          cell.value = 'Số tiền';
+          cell.font = { bold: true };
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFCCCC' } };
+          cell.border = headerBorder;
+          cell.alignment = { horizontal: 'center' };
+          row++;
+        }
+
+        cell = worksheet.getCell(`A${row}`);
+        cell.value = item.label;
+        cell.font = { bold: true };
+        cell.border = borderStyle;
+
+        cell = worksheet.getCell(`B${row}`);
+        cell.value = item.value;
+        cell.font = { bold: true };
+        cell.numFmt = '#,##0';
+        cell.border = borderStyle;
+        row++;
+      });
+
+      row += 2;
+
+      // Section V: Inventory
+      worksheet.mergeCells(`A${row}:F${row}`);
+      cell = worksheet.getCell(`A${row}`);
+      cell.value = 'V. NHẬP XUẤT TỒN TRONG CA';
+      cell.font = { bold: true };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCFFCC' } };
+      cell.alignment = { horizontal: 'left' };
       row++;
 
-      ws[`A${row}`] = { v: '', t: 's' };
+      // Headers for Section IV
+      const inventoryHeaders = ['Mặt hàng', 'Tồn đầu ca', 'Nhập trong ca', 'Xuất trong ca', 'Tồn cuối ca', 'Ghi chú'];
+      inventoryHeaders.forEach((h, idx) => {
+        const col = String.fromCharCode(65 + idx);
+        cell = worksheet.getCell(`${col}${row}`);
+        cell.value = h;
+        cell.font = { bold: true };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCFFCC' } };
+        cell.border = headerBorder;
+        cell.alignment = { horizontal: 'center' };
+      });
       row++;
 
-      // Summary grid
-      ws[`A${row}`] = { v: 'Tổng bán lẻ', t: 's', s: { font: { bold: true } } };
-      ws[`B${row}`] = { v: report.summary.totalRetailAmount, t: 'n', s: { font: { bold: true }, numFmt: '#,##0' } };
-      row++;
-
-      ws[`A${row}`] = { v: 'Tổng công nợ', t: 's', s: { font: { bold: true } } };
-      ws[`B${row}`] = { v: report.summary.totalDebtAmount, t: 'n', s: { font: { bold: true }, numFmt: '#,##0' } };
-      row++;
-
-      ws[`A${row}`] = { v: 'Thu tiền nợ', t: 's', s: { font: { bold: true } } };
-      ws[`B${row}`] = { v: report.summary.totalReceiptAmount, t: 'n', s: { font: { bold: true }, numFmt: '#,##0' } };
-      row++;
-
-      ws[`A${row}`] = { v: 'Tồn quỹ', t: 's', s: { font: { bold: true } } };
-      ws[`B${row}`] = { v: report.summary.cashBalance, t: 'n', s: { font: { bold: true }, numFmt: '#,##0' } };
-      row++;
-
-      ws[`A${row}`] = { v: '', t: 's' };
-      row++;
-
-      ws[`A${row}`] = { v: 'IV. NHẬP XUẤT TỒN TRONG CA', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } } } };
-      row++;
-
-      ws[`A${row}`] = { v: 'Mặt hàng', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      ws[`B${row}`] = { v: 'Tồn đầu ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      ws[`C${row}`] = { v: 'Nhập trong ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      ws[`D${row}`] = { v: 'Xuất trong ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      ws[`E${row}`] = { v: 'Tồn cuối ca', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      ws[`F${row}`] = { v: 'Ghi chú', t: 's', s: { font: { bold: true }, fill: { fgColor: { rgb: 'CCFFCC' } }, border: getBorderStyle('header') } };
-      row++;
-
-      // Inventory data
+      // Data rows for Section IV
       if (report.inventoryByProduct && report.inventoryByProduct.length > 0) {
-        report.inventoryByProduct.forEach((item, idx) => {
-          ws[`A${row}`] = { v: item.productName, t: 's', s: { border: getBorderStyle() } };
-          ws[`B${row}`] = { v: item.openingStock || 0, t: 'n', s: { border: getBorderStyle() } };
-          ws[`C${row}`] = { v: item.importQuantity || 0, t: 'n', s: { border: getBorderStyle() } };
-          ws[`D${row}`] = { v: item.exportQuantity || 0, t: 'n', s: { border: getBorderStyle() } };
-          ws[`E${row}`] = { v: item.closingStock || 0, t: 'n', s: { border: getBorderStyle() } };
-          ws[`F${row}`] = { v: '', t: 's', s: { border: getBorderStyle() } };
+        report.inventoryByProduct.forEach((item) => {
+          worksheet.getCell(`A${row}`).value = item.productName;
+          worksheet.getCell(`B${row}`).value = item.openingStock || 0;
+          worksheet.getCell(`C${row}`).value = item.importQuantity || 0;
+          worksheet.getCell(`D${row}`).value = item.exportQuantity || 0;
+          worksheet.getCell(`E${row}`).value = item.closingStock || 0;
+          worksheet.getCell(`F${row}`).value = '';
+
+          for (let i = 0; i < 6; i++) {
+            const col = String.fromCharCode(65 + i);
+            const c = worksheet.getCell(`${col}${row}`);
+            c.border = borderStyle;
+            if (i > 0 && i < 5) c.numFmt = '#,##0';
+          }
           row++;
         });
       }
 
-      // Set the used range for the worksheet
-      ws['!ref'] = `A1:I${row}`;
-
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, ws, 'Sổ Giao Ca');
-      XLSX.writeFile(workbook, `SoGiaoCa_${report.shift.shiftNo}_${dayjs(report.shift.shiftDate).format('DDMMYYYY')}.xlsx`);
+      // Save file using browser-compatible method
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `SoGiaoCa_${report.shift.shiftNo}_${dayjs(report.shift.shiftDate).format('DDMMYYYY')}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error exporting Excel:', error);
       alert('Lỗi khi xuất Excel. Vui lòng thử lại!');
@@ -394,7 +509,7 @@ const ShiftHandoverReportPage: React.FC = () => {
               <th>TT</th>
               <th>Khách hàng</th>
               <th>Số tiền</th>
-              <th>Xuất Hóm</th>
+              <th>Xuất hóa đơn</th>
             </tr>
             ${report.debtSales
               .map(
@@ -427,24 +542,29 @@ const ShiftHandoverReportPage: React.FC = () => {
               <th>TT</th>
               <th>Khách hàng</th>
               <th>Số tiền</th>
-              <th>Xuất Hóm</th>
+              <th>Hình thức</th>
+              <th>Xuất hóa đơn</th>
             </tr>
             ${report.receipts
               .map(
-                (receipt, idx) => `
+                (receipt, idx) => {
+                  const paymentMethodLabel = receipt.paymentMethod === 'CASH' ? 'Tiền mặt' : receipt.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : receipt.paymentMethod;
+                  return `
               <tr>
                 <td>${idx + 1}</td>
                 <td>${receipt.details.map((d) => d.customerName).join(', ')}</td>
                 <td class="text-right">${receipt.amount.toLocaleString('vi-VN')}</td>
+                <td>${paymentMethodLabel}</td>
                 <td></td>
               </tr>
-            `
+            `;
+                }
               )
               .join('')}
             <tr class="font-bold">
               <td colspan="2">CỘNG THU CÓ NGÀY</td>
               <td class="text-right">${report.summary.totalReceiptAmount.toLocaleString('vi-VN')}</td>
-              <td></td>
+              <td colspan="2"></td>
             </tr>
           </table>
           `
@@ -454,7 +574,7 @@ const ShiftHandoverReportPage: React.FC = () => {
           ${
             report.inventoryByProduct && report.inventoryByProduct.length > 0
               ? `
-          <h3 class="pink-bg">III. TIỀN HÀNG TRONG NGÀY</h3>
+          <h3 class="pink-bg">IV. TIỀN HÀNG TRONG NGÀY</h3>
           <p style="padding: 8px; font-weight: bold;">Tiền ca trước chuyển sang: ${formatCurrency(report.carryOverCash)}</p>
 
           <table style="margin-bottom: 20px;">
@@ -476,7 +596,7 @@ const ShiftHandoverReportPage: React.FC = () => {
             </tr>
           </table>
 
-          <h3 class="green-bg">IV. NHẬP XUẤT TỒN TRONG CA</h3>
+          <h3 class="green-bg">V. NHẬP XUẤT TỒN TRONG CA</h3>
           <table>
             <tr class="green-bg">
               <th>Mặt hàng</th>
@@ -658,7 +778,7 @@ const ShiftHandoverReportPage: React.FC = () => {
                       <th className="border p-2 text-left">TT</th>
                       <th className="border p-2 text-left">Khách hàng</th>
                       <th className="border p-2 text-right">Số tiền</th>
-                      <th className="border p-2 text-left">Xuất Hóm</th>
+                      <th className="border p-2 text-left">Xuất Hóa Đơn </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -683,11 +803,51 @@ const ShiftHandoverReportPage: React.FC = () => {
             </div>
           )}
 
-          {/* Tab 3: Cash within shift */}
+          {/* Tab 3: Receipts (Thu nợ khách hàng) */}
+          {report.receipts.length > 0 && (
+            <div className="mb-8">
+              <h3 className="text-lg font-bold mb-4 p-2 bg-yellow-100 border-l-4 border-yellow-400">
+                III. THU NỢ KHÁCH HÀNG
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead className="bg-yellow-100">
+                    <tr>
+                      <th className="border p-2 text-left">TT</th>
+                      <th className="border p-2 text-left">Khách hàng</th>
+                      <th className="border p-2 text-right">Số tiền</th>
+                      <th className="border p-2 text-left">Hình thức</th>
+                      <th className="border p-2 text-left">Xuất hóa đơn</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.receipts.map((receipt, idx) => (
+                      <tr key={receipt.id}>
+                        <td className="border p-2">{idx + 1}</td>
+                        <td className="border p-2">{receipt.details.map((d) => d.customerName).join(', ')}</td>
+                        <td className="border p-2 text-right">{receipt.amount.toLocaleString('vi-VN')}</td>
+                        <td className="border p-2">{formatPaymentMethod(receipt.paymentMethod)}</td>
+                        <td className="border p-2"></td>
+                      </tr>
+                    ))}
+                    <tr className="font-bold bg-yellow-50">
+                      <td colSpan={2} className="border p-2 text-right">
+                        CỘNG THU CÓ NGÀY
+                      </td>
+                      <td className="border p-2 text-right">{report.summary.totalReceiptAmount.toLocaleString('vi-VN')}</td>
+                      <td colSpan={2} className="border p-2"></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 4: Cash within shift */}
           {(
             <div className="mb-8">
               <h3 className="text-lg font-bold mb-4 p-2 bg-red-100 border-l-4 border-red-400">
-                III. TIỀN HÀNG TRONG NGÀY
+                IV. TIỀN HÀNG TRONG NGÀY
               </h3>
               <div className="p-3 bg-red-50 border border-red-200 rounded mb-4">
                 <p className="text-sm text-gray-600 font-semibold">Tiền ca trước chuyển sang</p>
@@ -710,6 +870,10 @@ const ShiftHandoverReportPage: React.FC = () => {
                   <p className="text-xl font-bold text-green-600">{formatCurrency(report.summary.totalReceiptAmount)}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-gray-600">Tiền mặt thu trong ca</p>
+                  <p className="text-xl font-bold text-orange-600">{formatCurrency(report.summary.totalRetailAmount - report.summary.totalDebtAmount)}</p>
+                </div>
+                <div>
                   <p className="text-sm text-gray-600">Tồn quỹ</p>
                   <p className="text-xl font-bold text-purple-600">{formatCurrency(report.summary.cashBalance)}</p>
                 </div>
@@ -717,11 +881,11 @@ const ShiftHandoverReportPage: React.FC = () => {
             </div>
           )}
 
-          {/* Tab 4: Inventory Summary */}
+          {/* Tab 5: Inventory Summary */}
           {report.inventoryByProduct && report.inventoryByProduct.length > 0 && (
             <div className="mb-8">
               <h3 className="text-lg font-bold mb-4 p-2 bg-green-100 border-l-4 border-green-400">
-                IV. NHẬP XUẤT TỒN TRONG CA
+                V. NHẬP XUẤT TỒN TRONG CA
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm border-collapse">

@@ -3239,7 +3239,7 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Hình thức thanh toán *</label>
                       <select
                         name="paymentMethod"
                         defaultValue={
@@ -3310,6 +3310,7 @@ const ShiftOperationsPage: React.FC = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hình thức thanh toán</th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
                     </tr>
                   </thead>
@@ -3337,6 +3338,9 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
                                 {Number(receipt.amount).toLocaleString("vi-VN")} ₫
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {receipt.paymentMethod === 'CASH' ? 'Tiền mặt' : receipt.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : receipt.paymentMethod || '-'}
                               </td>
                               <td className="px-6 py-4 text-right text-sm font-medium">
                                 <button
@@ -3392,6 +3396,9 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
                                 {Number(receipt.amount).toLocaleString("vi-VN")} ₫
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {receipt.paymentMethod === 'CASH' ? 'Tiền mặt' : receipt.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : receipt.paymentMethod || '-'}
                               </td>
                               <td className="px-6 py-4 text-sm text-gray-500"></td>
                             </tr>
