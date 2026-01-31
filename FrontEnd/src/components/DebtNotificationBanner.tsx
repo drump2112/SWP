@@ -1,44 +1,74 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { customersApi } from '../api/customers';
-import { BanknotesIcon } from '@heroicons/react/24/outline';
+import { customersApi, type CreditStatus } from '../api/customers';
+import { BanknotesIcon, ExclamationTriangleIcon, XCircleIcon } from '@heroicons/react/24/outline';
 import './DebtNotificationBanner.css';
 
 interface DebtNotification {
   customerId: number;
   customerName: string;
   currentDebt: number;
+  creditLimit: number;
+  status: 'overlimit' | 'warning'; // overlimit: vượt hạn | warning: gần vượt (70-90%)
 }
 
 const DebtNotificationBanner: React.FC = () => {
   const { user } = useAuth();
   const [debtNotifications, setDebtNotifications] = useState<DebtNotification[]>([]);
   const [totalDebt, setTotalDebt] = useState(0);
+  const [overLimitCount, setOverLimitCount] = useState(0);
+  const [warningCount, setWarningCount] = useState(0);
 
   useEffect(() => {
     const fetchDebtData = async () => {
       try {
-        if (!user?.store?.id) return;
+        // Lấy thông tin tín dụng của tất cả khách hàng trong hệ thống (toàn hệ thống)
+        const creditStatuses = await customersApi.getAllCreditStatus();
 
-        // Lấy thông tin tín dụng của khách hàng tại store hiện tại
-        const creditStatuses = await customersApi.getAllCreditStatus(user.store.id);
+        // Phân loại khách hàng: vượt hạn + gần vượt hạn
+        const overLimitCustomers: DebtNotification[] = [];
+        const warningCustomers: DebtNotification[] = [];
 
-        // Lọc khách hàng có nợ (currentDebt > 0) của store hiện tại - sắp xếp theo nợ cao nhất
-        const debtCustomers = creditStatuses
-          .filter((status) => status.currentDebt > 0)
-          .sort((a, b) => b.currentDebt - a.currentDebt)
-          .slice(0, 15) // Lấy 15 khách hàng nợ nhiều nhất
-          .map((status) => ({
-            customerId: status.customerId,
-            customerName: status.customerName,
-            currentDebt: status.currentDebt,
-          }));
+        creditStatuses.forEach((status: CreditStatus) => {
+          if (status.currentDebt > 0) {
+            if (status.isOverLimit) {
+              // Vượt hạn mức
+              overLimitCustomers.push({
+                customerId: status.customerId,
+                customerName: status.customerName,
+                currentDebt: status.currentDebt,
+                creditLimit: status.creditLimit,
+                status: 'overlimit',
+              });
+            } else if (status.creditUsagePercent >= 70) {
+              // Gần vượt hạn (70-90%)
+              warningCustomers.push({
+                customerId: status.customerId,
+                customerName: status.customerName,
+                currentDebt: status.currentDebt,
+                creditLimit: status.creditLimit,
+                status: 'warning',
+              });
+            }
+          }
+        });
 
-        // Tính tổng công nợ
-        const total = debtCustomers.reduce((sum, debt) => sum + debt.currentDebt, 0);
+        // Sắp xếp theo nợ cao nhất
+        overLimitCustomers.sort((a, b) => b.currentDebt - a.currentDebt);
+        warningCustomers.sort((a, b) => b.currentDebt - a.currentDebt);
 
-        setDebtNotifications(debtCustomers);
+        // Lấy top 10 vượt hạn + top 5 cảnh báo
+        const topOverLimit = overLimitCustomers.slice(0, 10);
+        const topWarning = warningCustomers.slice(0, 5);
+
+        // Kết hợp và tính tổng nợ
+        const allNotifications = [...topOverLimit, ...topWarning];
+        const total = allNotifications.reduce((sum, debt) => sum + debt.currentDebt, 0);
+
+        setDebtNotifications(allNotifications);
         setTotalDebt(total);
+        setOverLimitCount(overLimitCustomers.length);
+        setWarningCount(warningCustomers.length);
       } catch (error) {
         console.error('Error fetching debt data:', error);
       }
@@ -49,29 +79,54 @@ const DebtNotificationBanner: React.FC = () => {
     // Refresh every 5 minutes
     const interval = setInterval(fetchDebtData, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, [user?.store?.id]);
+  }, []);
 
   if (debtNotifications.length === 0) {
     return null;
   }
 
-  // Tạo chuỗi thông báo chạy
-  const notificationText = debtNotifications
-    .map(
-      (debt) =>
-        `${debt.customerName}: ${debt.currentDebt.toLocaleString('vi-VN')}đ`
-    )
+  // Tạo chuỗi thông báo chạy - tách biệt vượt hạn và cảnh báo
+  const overLimitText = debtNotifications
+    .filter(d => d.status === 'overlimit')
+    .map((debt) => `🔴 VƯỢT HẠN: ${debt.customerName}: ${debt.currentDebt.toLocaleString('vi-VN')}đ`)
     .join(' • ');
+
+  const warningText = debtNotifications
+    .filter(d => d.status === 'warning')
+    .map((debt) => `⚠️ CẢnh báo: ${debt.customerName}: ${debt.currentDebt.toLocaleString('vi-VN')}đ`)
+    .join(' • ');
+
+  const notificationText = [overLimitText, warningText].filter(Boolean).join(' • ');
 
   return (
     <div className="debt-notification-banner">
       <div className="banner-content">
         {/* Left section - Header info */}
         <div className="banner-header">
-          <BanknotesIcon className="debt-icon" />
-          <div className="header-text">
-            <p className="header-label">Thu hồi công nợ</p>
-            <p className="header-count">{debtNotifications.length} khách - Tổng: <span className="font-bold">{totalDebt.toLocaleString('vi-VN')}đ</span></p>
+          <div className="flex items-center gap-2">
+            {overLimitCount > 0 && (
+              <>
+                <XCircleIcon className="debt-icon text-red-400" />
+                <div className="header-text">
+                  <p className="header-label">VƯỢT HẠN</p>
+                  <p className="header-count text-red-200">{overLimitCount} khách</p>
+                </div>
+              </>
+            )}
+            {warningCount > 0 && (
+              <>
+                <ExclamationTriangleIcon className="debt-icon text-yellow-300" />
+                <div className="header-text">
+                  <p className="header-label">CẢNH BÁO</p>
+                  <p className="header-count text-yellow-100">{warningCount} khách</p>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="header-divider">
+            <BanknotesIcon className="debt-icon" />
+            <p className="header-label">TỔNG NỢ</p>
+            <p className="header-count">{totalDebt.toLocaleString('vi-VN')}đ</p>
           </div>
         </div>
 

@@ -320,10 +320,10 @@ const ShiftHandoverReportPage: React.FC = () => {
         { label: 'Tổng công nợ', value: report.summary.totalDebtAmount },
         { label: 'Thu tiền nợ', value: report.summary.totalReceiptAmount },
         { label: 'Tiền mặt thu trong ca', value: report.summary.totalRetailAmount - report.summary.totalDebtAmount },
-        { label: 'Tồn quỹ', value: report.summary.cashBalance },
+        { label: 'Tồn quỹ tiền mặt', value: report.summary.cashBalance },
       ];
 
-      summaryItems.forEach((item, idx) => {
+        summaryItems.forEach((item, idx) => {
         // Add header row for the table
         if (idx === 0) {
           cell = worksheet.getCell(`A${row}`);

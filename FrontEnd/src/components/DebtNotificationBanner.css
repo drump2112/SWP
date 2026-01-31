@@ -1,10 +1,10 @@
 .debt-notification-banner {
   position: relative;
   z-index: 15;
-  background: linear-gradient(135deg, #93c5fd 0%, #60a5fa 50%, #3b82f6 100%);
-  border-bottom: 2px solid #1e40af;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%);
+  border-bottom: 3px solid #dc2626;
   padding: 0;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
 }
 
 .banner-content {
@@ -12,17 +12,31 @@
   align-items: center;
   gap: 12px;
   padding: 8px 12px;
-  height: 56px;
+  height: auto;
+  min-height: 56px;
 }
 
 /* Header section - left side */
 .banner-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
   padding-right: 12px;
-  border-right: 2px solid rgba(30, 64, 175, 0.2);
+  border-right: 2px solid rgba(220, 38, 38, 0.3);
+}
+
+.banner-header > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
 }
 
 .debt-icon {
@@ -33,6 +47,14 @@
   animation: pulse-icon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+.debt-icon.text-red-400 {
+  color: #f87171;
+}
+
+.debt-icon.text-yellow-300 {
+  color: #fcd34d;
+}
+
 .header-text {
   white-space: nowrap;
   min-width: fit-content;
@@ -40,7 +62,7 @@
 
 .header-label {
   font-size: 0.75rem;
-  font-weight: 600;
+  font-weight: 700;
   color: #ffffff;
   margin: 0;
   letter-spacing: 0.5px;
@@ -48,11 +70,21 @@
 }
 
 .header-count {
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #f1f5f9;
   margin: 0;
   white-space: nowrap;
+}
+
+.header-count.text-red-200 {
+  color: #fecaca;
+  font-weight: 700;
+}
+
+.header-count.text-yellow-100 {
+  color: #fef3c7;
+  font-weight: 700;
 }
 
 /* Scrolling section - right side */
