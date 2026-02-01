@@ -120,29 +120,17 @@ COMMENT ON TABLE commercial_customers IS 'Khách hàng thương mại: Đại l�
 COMMENT ON COLUMN commercial_customers.current_debt IS 'Công nợ hiện tại - cập nhật real-time';
 
 -- ============================================================================
--- 5. KÌ GIÁ - PRICE PERIODS
+-- 5. KÌ GIÁ - SỬ DỤNG LẠI BẢNG product_prices TỪ HỆ THỐNG BÁN LẺ
 -- ============================================================================
+-- KHÔNG TẠO BẢNG MỚI - Tận dụng bảng product_prices đã có
+-- Cấu trúc bảng product_prices:
+--   - id, product_id, region_id
+--   - price (giá bán)
+--   - valid_from, valid_to (khoảng thời gian hiệu lực)
+--   - created_at
+-- => Kì giá CHUNG cho cả bán lẻ và thương mại
 
-CREATE TABLE IF NOT EXISTS price_periods (
-    id SERIAL PRIMARY KEY,
-    code VARCHAR(50) UNIQUE NOT NULL,
-    name VARCHAR(200) NOT NULL,
-    product_id INTEGER REFERENCES products(id),
-    region_id INTEGER REFERENCES regions(id),
-    base_price NUMERIC(18,2) NOT NULL, -- Giá gốc
-    effective_from TIMESTAMP NOT NULL,
-    effective_to TIMESTAMP,
-    notes TEXT,
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
-CREATE INDEX idx_price_periods_code ON price_periods(code);
-CREATE INDEX idx_price_periods_product ON price_periods(product_id);
-CREATE INDEX idx_price_periods_region ON price_periods(region_id);
-CREATE INDEX idx_price_periods_dates ON price_periods(effective_from, effective_to);
-
-COMMENT ON TABLE price_periods IS 'Kì giá sản phẩm theo thời gian';
-COMMENT ON COLUMN price_periods.code IS 'VD: E5-01-2026, RON95-08-01-2026';
+COMMENT ON TABLE product_prices IS 'Kì giá sản phẩm - DÙNG CHUNG cho bán lẻ và thương mại';
 
 -- ============================================================================
 -- 6. LÔ HÀNG NHẬP - IMPORT BATCHES (CORE TABLE)
@@ -154,7 +142,7 @@ CREATE TABLE IF NOT EXISTS import_batches (
     warehouse_id INTEGER NOT NULL REFERENCES commercial_warehouses(id),
     supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
     product_id INTEGER NOT NULL REFERENCES products(id),
-    price_period_id INTEGER REFERENCES price_periods(id),
+    price_at_import NUMERIC(18,2), -- Giá thị trường tại thời điểm nhập (tham khảo)
 
     -- Số lượng
     import_quantity NUMERIC(18,3) NOT NULL, -- Số lượng nhập
@@ -188,14 +176,17 @@ CREATE TABLE IF NOT EXISTS import_batches (
     notes TEXT,
     created_by INTEGER REFERENCES users(id),
     created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
+    updated_at TIMESTAMP DEFAULT NOW(),
+    
+    -- Constraints
+    CONSTRAINT chk_remaining_not_negative CHECK (remaining_quantity >= 0),
+    CONSTRAINT chk_quantities_valid CHECK (exported_quantity >= 0 AND import_quantity >= 0)
 );
 
 -- Indexes cho hiệu suất cao
 CREATE INDEX idx_import_batches_warehouse ON import_batches(warehouse_id);
 CREATE INDEX idx_import_batches_supplier ON import_batches(supplier_id);
 CREATE INDEX idx_import_batches_product ON import_batches(product_id);
-CREATE INDEX idx_import_batches_price_period ON import_batches(price_period_id);
 CREATE INDEX idx_import_batches_date ON import_batches(import_date);
 CREATE INDEX idx_import_batches_status ON import_batches(status);
 CREATE INDEX idx_import_batches_remaining ON import_batches(warehouse_id, product_id, supplier_id, remaining_quantity)
@@ -203,9 +194,9 @@ CREATE INDEX idx_import_batches_remaining ON import_batches(warehouse_id, produc
 CREATE INDEX idx_import_batches_lookup ON import_batches(warehouse_id, product_id, supplier_id, status)
     WHERE status = 'ACTIVE' AND remaining_quantity > 0;
 
-COMMENT ON TABLE import_batches IS 'Lô hàng nhập - quản lý tồn kho theo batch (FIFO/FEFO)';
-COMMENT ON COLUMN import_batches.remaining_quantity IS 'Số lượng còn lại - cập nhật khi xuất hàng';
-COMMENT ON COLUMN import_batches.status IS 'ACTIVE: còn hàng, DEPLETED: hết hàng, CANCELLED: hủy';
+COMMENT ON TABLE import_batches IS 'Lô hàng nhập - quản lý tồn kho theo batch (FIFO/FEFO). SERVICE LAYER tính toán các trường: discount_amount, final_unit_price, subtotal, vat_amount, environmental_tax_amount, total_amount';
+COMMENT ON COLUMN import_batches.remaining_quantity IS 'Số lượng còn lại - TỰ ĐỘNG cập nhật bởi trigger khi xuất hàng';
+COMMENT ON COLUMN import_batches.status IS 'ACTIVE: còn hàng, DEPLETED: hết hàng, CANCELLED: hủy - TỰ ĐỘNG cập nhật bởi trigger';
 
 -- ============================================================================
 -- 7. ĐơN XUẤT HÀNG - EXPORT ORDERS
@@ -299,7 +290,7 @@ CREATE INDEX idx_export_items_order ON export_order_items(export_order_id);
 CREATE INDEX idx_export_items_batch ON export_order_items(import_batch_id);
 CREATE INDEX idx_export_items_product ON export_order_items(product_id);
 
-COMMENT ON TABLE export_order_items IS 'Chi tiết đơn xuất - mỗi dòng link đến 1 lô nhập cụ thể';
+COMMENT ON TABLE export_order_items IS 'Chi tiết đơn xuất - mỗi dòng link đến 1 lô nhập cụ thể. SERVICE LAYER tính toán: subtotal, discount_amount, vat_amount, environmental_tax_amount, total_amount, profit_amount';
 COMMENT ON COLUMN export_order_items.import_batch_id IS 'QUAN TRỌNG: Liên kết đến lô hàng nhập để truy xuất nguồn gốc';
 COMMENT ON COLUMN export_order_items.discount_percent IS 'Chiết khấu do NGƯỜI DÙNG NHẬP khi tạo đơn xuất, không tự động';
 COMMENT ON COLUMN export_order_items.environmental_tax_rate IS 'Thuế BVMT theo đơn vị (VD: 2000đ/lít xăng)';
@@ -401,45 +392,9 @@ COMMENT ON COLUMN commercial_inventory_summary.average_cost IS 'Giá vốn bình
 -- ============================================================================
 -- 12. TRIGGERS - TỰ ĐỘNG CẬP NHẬT DỮ LIỆU
 -- ============================================================================
-
--- Trigger: Tự động tính toán tổng tiền khi nhập lô hàng
-CREATE OR REPLACE FUNCTION calculate_import_batch_totals()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Tính chiết khấu
-    NEW.discount_amount := NEW.unit_price * NEW.import_quantity * NEW.discount_percent / 100;
-
-    -- Giá sau chiết khấu
-    NEW.final_unit_price := NEW.unit_price - (NEW.unit_price * NEW.discount_percent / 100);
-
-    -- Thành tiền trước thuế
-    NEW.subtotal := NEW.final_unit_price * NEW.import_quantity;
-
-    -- Tính VAT
-    NEW.vat_amount := NEW.subtotal * NEW.vat_percent / 100;
-
-    -- Tính thuế BVMT
-    NEW.environmental_tax_amount := NEW.import_quantity * NEW.environmental_tax_rate;
-
-    -- Tổng tiền
-    NEW.total_amount := NEW.subtotal + NEW.vat_amount + NEW.environmental_tax_amount;
-
-    -- Khởi tạo remaining_quantity
-    IF NEW.remaining_quantity IS NULL OR NEW.remaining_quantity = 0 THEN
-        NEW.remaining_quantity := NEW.import_quantity;
-    END IF;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_import_batch_calculate
-    BEFORE INSERT OR UPDATE ON import_batches
-    FOR EACH ROW
-    EXECUTE FUNCTION calculate_import_batch_totals();
-
--- Trigger: Cập nhật tồn kho khi nhập lô hàng
-CREATE OR REPLACE FUNCTION update_inventory_on_import()
+-- LƯU Ý: Logic tính toán (subtotal, discount, VAT...) LÀM Ở SERVICE LAYER
+-- Triggers chỉ xử lý DATA INTEGRITY: tồn kho, công nợ, status
+-- ============================================================================
 RETURNS TRIGGER AS $$
 BEGIN
     -- Upsert vào bảng tổng hợp tồn kho
@@ -470,42 +425,12 @@ END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trg_update_inventory_import
-    AFTER INSERT ON import_batches
+    BEFORE INSERT ON import_batches
     FOR EACH ROW
     EXECUTE FUNCTION update_inventory_on_import();
 
--- Trigger: Tự động tính toán chi tiết đơn xuất
-CREATE OR REPLACE FUNCTION calculate_export_item_totals()
-RETURNS TRIGGER AS $$
-BEGIN
-    -- Thành tiền trước chiết khấu
-    NEW.subtotal := NEW.selling_price * NEW.quantity;
-
-    -- Chiết khấu
-    NEW.discount_amount := NEW.subtotal * NEW.discount_percent / 100;
-
-    -- VAT
-    NEW.vat_amount := (NEW.subtotal - NEW.discount_amount) * NEW.vat_percent / 100;
-
-    -- Thuế BVMT
-    NEW.environmental_tax_amount := NEW.quantity * NEW.environmental_tax_rate;
-
-    -- Tổng tiền
-    NEW.total_amount := NEW.subtotal - NEW.discount_amount + NEW.vat_amount + NEW.environmental_tax_amount;
-
-    -- Lợi nhuận gộp
-    NEW.profit_amount := (NEW.selling_price - NEW.batch_unit_price) * NEW.quantity;
-
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_export_item_calculate
-    BEFORE INSERT OR UPDATE ON export_order_items
-    FOR EACH ROW
-    EXECUTE FUNCTION calculate_export_item_totals();
-
--- Trigger: Cập nhật tổng đơn xuất khi thêm/sửa/xóa chi tiết
+-- Trigger 2: Cập nhật tổng đơn xuất khi thêm/sửa/xóa chi tiết (GIỮ)
+-- LưU ý: Service đã tính total_amount của từng item, trigger này chỉ tổng hợp
 CREATE OR REPLACE FUNCTION update_export_order_totals()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -527,25 +452,68 @@ CREATE TRIGGER trg_update_export_totals
     FOR EACH ROW
     EXECUTE FUNCTION update_export_order_totals();
 
--- Trigger: Cập nhật remaining_quantity khi xuất hàng
+-- Trigger 3: Cập nhật remaining_quantity và status khi xuất hàng (GIỮ - QUAN TRỌNG)
 CREATE OR REPLACE FUNCTION update_batch_on_export()
 RETURNS TRIGGER AS $$
+DECLARE
+    qty_diff NUMERIC(18,3);
 BEGIN
-    IF TG_OP = 'INSERT' OR TG_OP = 'UPDATE' THEN
+    IF TG_OP = 'INSERT' THEN
+        -- Thêm mới: Trừ tồn kho
         UPDATE import_batches SET
             remaining_quantity = remaining_quantity - NEW.quantity,
             exported_quantity = exported_quantity + NEW.quantity,
-            status = CASE
+            status = CASE 
                 WHEN remaining_quantity - NEW.quantity <= 0 THEN 'DEPLETED'
                 ELSE 'ACTIVE'
             END,
             updated_at = NOW()
         WHERE id = NEW.import_batch_id;
+        
+        -- Kiểm tra có đủ hàng không
+        IF NOT FOUND THEN
+            RAISE EXCEPTION 'Lô hàng không tồn tại: %', NEW.import_batch_id;
+        END IF;
+        
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Sửa: Hoàn trả số cũ, trừ số mới
+        qty_diff := NEW.quantity - OLD.quantity;
+        
+        -- Nếu đổi lô hàng
+        IF NEW.import_batch_id != OLD.import_batch_id THEN
+            -- Hoàn trả lô cũ
+            UPDATE import_batches SET
+                remaining_quantity = remaining_quantity + OLD.quantity,
+                exported_quantity = exported_quantity - OLD.quantity,
+                status = 'ACTIVE',
+                updated_at = NOW()
+            WHERE id = OLD.import_batch_id;
+            
+            -- Trừ từ lô mới
+            UPDATE import_batches SET
+                remaining_quantity = remaining_quantity - NEW.quantity,
+                exported_quantity = exported_quantity + NEW.quantity,
+                status = CASE 
+                    WHEN remaining_quantity - NEW.quantity <= 0 THEN 'DEPLETED'
+                    ELSE 'ACTIVE'
+                END,
+                updated_at = NOW()
+            WHERE id = NEW.import_batch_id;
+        ELSE
+            -- Cùng lô: Chỉ điều chỉnh số lượng
+            UPDATE import_batches SET
+                remaining_quantity = remaining_quantity - qty_diff,
+                exported_quantity = exported_quantity + qty_diff,
+                status = CASE 
+                    WHEN remaining_quantity - qty_diff <= 0 THEN 'DEPLETED'
+                    ELSE 'ACTIVE'
+                END,
+                updated_at = NOW()
+            WHERE id = NEW.import_batch_id;
+        END IF;
+        
     ELSIF TG_OP = 'DELETE' THEN
-        -- Hoàn trả khi xóa
-        UPDATE import_batches SET
-            remaining_quantity = remaining_quantity + OLD.quantity,
-            exported_quantity = exported_quantity - OLD.quantity,
+        -- Xóa: Hoàn trả toàn bộ
             status = 'ACTIVE',
             updated_at = NOW()
         WHERE id = OLD.import_batch_id;
@@ -560,7 +528,7 @@ CREATE TRIGGER trg_update_batch_export
     FOR EACH ROW
     EXECUTE FUNCTION update_batch_on_export();
 
--- Trigger: Cập nhật công nợ khách hàng
+-- Trigger 4: Cập nhật công nợ khách hàng (GIỮ - QUAN TRỌNG)
 CREATE OR REPLACE FUNCTION update_customer_debt()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -605,7 +573,6 @@ SELECT
     s.name AS supplier_name,
     p.code AS product_code,
     p.name AS product_name,
-    pp.code AS price_period_code,
     ib.import_date,
     ib.import_quantity,
     ib.remaining_quantity,
@@ -619,7 +586,6 @@ FROM import_batches ib
 JOIN commercial_warehouses w ON ib.warehouse_id = w.id
 JOIN suppliers s ON ib.supplier_id = s.id
 JOIN products p ON ib.product_id = p.id
-LEFT JOIN price_periods pp ON ib.price_period_id = pp.id
 WHERE ib.status = 'ACTIVE' AND ib.remaining_quantity > 0;
 
 COMMENT ON VIEW v_batch_inventory IS 'Tồn kho chi tiết theo lô - dễ query';
@@ -637,12 +603,12 @@ SELECT
     p.name AS product_name,
     ib.remaining_quantity,
     ib.final_unit_price AS cost_price,
-    pp.base_price AS current_market_price,
+    COALESCE(pp.price, ib.final_unit_price * 1.1) AS current_market_price, -- Lấy từ product_prices
     -- Tính lợi nhuận tiềm năng
-    (pp.base_price - ib.final_unit_price) AS unit_profit,
-    (pp.base_price - ib.final_unit_price) * ib.remaining_quantity AS total_potential_profit,
+    (COALESCE(pp.price, ib.final_unit_price * 1.1) - ib.final_unit_price) AS unit_profit,
+    (COALESCE(pp.price, ib.final_unit_price * 1.1) - ib.final_unit_price) * ib.remaining_quantity AS total_potential_profit,
     -- % lợi nhuận
-    ROUND(((pp.base_price - ib.final_unit_price) / ib.final_unit_price * 100), 2) AS profit_margin_percent,
+    ROUND(((COALESCE(pp.price, ib.final_unit_price * 1.1) - ib.final_unit_price) / ib.final_unit_price * 100), 2) AS profit_margin_percent,
     ib.import_date,
     CURRENT_DATE - ib.import_date AS age_days,
     -- Điểm ưu tiên (càng cao càng nên xuất trước)
@@ -656,9 +622,10 @@ FROM import_batches ib
 JOIN commercial_warehouses w ON ib.warehouse_id = w.id
 JOIN suppliers s ON ib.supplier_id = s.id
 JOIN products p ON ib.product_id = p.id
-LEFT JOIN price_periods pp ON ib.price_period_id = pp.id
-    AND pp.effective_from <= NOW()
-    AND (pp.effective_to IS NULL OR pp.effective_to >= NOW())
+LEFT JOIN product_prices pp ON pp.product_id = ib.product_id
+    AND pp.region_id = w.region_id
+    AND pp.valid_from <= NOW()
+    AND (pp.valid_to IS NULL OR pp.valid_to >= NOW())
 WHERE ib.status = 'ACTIVE'
     AND ib.remaining_quantity > 0
 ORDER BY priority_score DESC;
@@ -784,6 +751,219 @@ $$ LANGUAGE plpgsql;
 COMMENT ON FUNCTION suggest_optimal_batches IS 'Gợi ý lô hàng tối ưu khi xuất - tự động phân bổ số lượng';
 
 -- ============================================================================
+-- 15. FUNCTION - NHẬP TỒN ĐẦU KỲ
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION insert_opening_balance(
+    p_warehouse_id INTEGER,
+    p_supplier_id INTEGER,
+    p_product_id INTEGER,
+    p_quantity NUMERIC(18,3),
+    p_unit_cost NUMERIC(18,2),
+    p_opening_date DATE DEFAULT CURRENT_DATE,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS INTEGER AS $$
+DECLARE
+    v_batch_id INTEGER;
+    v_batch_code VARCHAR(50);
+BEGIN
+    -- Tạo mã lô tồn đầu
+    v_batch_code := 'OPENING-' || p_warehouse_id || '-' || p_product_id || '-' || p_supplier_id;
+    
+    -- Kiểm tra đã có tồn đầu chưa
+    SELECT id INTO v_batch_id
+    FROM import_batches
+    WHERE batch_code = v_batch_code;
+    
+    IF FOUND THEN
+        -- Đã có -> Cập nhật
+        UPDATE import_batches SET
+            import_quantity = p_quantity,
+            remaining_quantity = p_quantity,
+            unit_price = p_unit_cost,
+            final_unit_price = p_unit_cost,
+            subtotal = p_quantity * p_unit_cost,
+            total_amount = p_quantity * p_unit_cost,
+            notes = COALESCE(p_notes, 'Tồn đầu kỳ - Cập nhật'),
+            updated_at = NOW()
+        WHERE id = v_batch_id;
+        
+        RAISE NOTICE 'Cập nhật tồn đầu kỳ: Kho %, NCC %, SP %, SL: %', 
+            p_warehouse_id, p_supplier_id, p_product_id, p_quantity;
+    ELSE
+        -- Chưa có -> Thêm mới
+        INSERT INTO import_batches (
+            batch_code, warehouse_id, supplier_id, product_id,
+            import_quantity, remaining_quantity, exported_quantity,
+            unit_price, discount_percent, discount_amount, final_unit_price,
+            import_date, import_time,
+            vat_percent, vat_amount,
+            environmental_tax_rate, environmental_tax_amount,
+            subtotal, total_amount,
+            status, notes
+        ) VALUES (
+            v_batch_code, p_warehouse_id, p_supplier_id, p_product_id,
+            p_quantity, p_quantity, 0,
+            p_unit_cost, 0, 0, p_unit_cost,
+            p_opening_date, '00:00:00',
+            0, 0,
+            0, 0,
+            p_quantity * p_unit_cost, p_quantity * p_unit_cost,
+            'ACTIVE', COALESCE(p_notes, 'Tồn đầu kỳ')
+        ) RETURNING id INTO v_batch_id;
+        
+        RAISE NOTICE 'Thêm tồn đầu kỳ: Kho %, NCC %, SP %, SL: %', 
+            p_warehouse_id, p_supplier_id, p_product_id, p_quantity;
+    END IF;
+    
+    RETURN v_batch_id;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION insert_opening_balance IS 'Nhập tồn đầu kỳ khi bắt đầu sử dụng hệ thống. Nếu đã có sẽ cập nhật, chưa có sẽ thêm mới';
+
+-- ============================================================================
+-- 16. FUNCTION - KIỂM TRA VÀ LẤY THÔNG TIN TỒN KHO
+-- ============================================================================
+
+-- Function: Kiểm tra đủ hàng trước khi xuất
+CREATE OR REPLACE FUNCTION check_stock_available(
+    p_batch_id INTEGER,
+    p_quantity NUMERIC(18,3)
+)
+RETURNS BOOLEAN AS $$
+DECLARE
+    v_remaining NUMERIC(18,3);
+BEGIN
+    SELECT remaining_quantity INTO v_remaining
+    FROM import_batches
+    WHERE id = p_batch_id AND status = 'ACTIVE';
+    
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Lô hàng không tồn tại hoặc đã hết: %', p_batch_id;
+    END IF;
+    
+    IF v_remaining < p_quantity THEN
+        RAISE EXCEPTION 'Không đủ hàng. Còn lại: % lít, xuất: % lít', v_remaining, p_quantity;
+    END IF;
+    
+    RETURN TRUE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function: Lấy tồn kho hiện tại
+CREATE OR REPLACE FUNCTION get_current_stock(
+    p_warehouse_id INTEGER,
+    p_product_id INTEGER,
+    p_supplier_id INTEGER DEFAULT NULL
+)
+RETURNS TABLE (
+    supplier_id INTEGER,
+    supplier_name VARCHAR(255),
+    total_quantity NUMERIC(18,3),
+    total_batches INTEGER,
+    total_value NUMERIC(18,2)
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        s.id,
+        s.name,
+        COALESCE(SUM(ib.remaining_quantity), 0),
+        COUNT(ib.id)::INTEGER,
+        COALESCE(SUM(ib.remaining_quantity * ib.final_unit_price), 0)
+    FROM suppliers s
+    LEFT JOIN import_batches ib ON ib.supplier_id = s.id
+        AND ib.warehouse_id = p_warehouse_id
+        AND ib.product_id = p_product_id
+        AND ib.status = 'ACTIVE'
+        AND ib.remaining_quantity > 0
+    WHERE (p_supplier_id IS NULL OR s.id = p_supplier_id)
+    GROUP BY s.id, s.name
+    HAVING COALESCE(SUM(ib.remaining_quantity), 0) > 0
+    ORDER BY s.name;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION check_stock_available IS 'Kiểm tra đủ hàng trước khi xuất - throw exception nếu không đủ';
+COMMENT ON FUNCTION get_current_stock IS 'Lấy tồn kho hiện tại theo kho, sản phẩm, nhà cung cấp';
+
+
+-- ============================================================================
+-- 15. FUNCTION - NHẬP TỒN ĐẦU KỞ
+-- ============================================================================
+
+CREATE OR REPLACE FUNCTION insert_opening_balance(
+    p_warehouse_id INTEGER,
+    p_supplier_id INTEGER,
+    p_product_id INTEGER,
+    p_quantity NUMERIC(18,3),
+    p_unit_cost NUMERIC(18,2),
+    p_opening_date DATE DEFAULT CURRENT_DATE,
+    p_notes TEXT DEFAULT NULL
+)
+RETURNS INTEGER AS $$
+DECLARE
+    v_batch_id INTEGER;
+    v_batch_code VARCHAR(50);
+BEGIN
+    -- Tạo mã lô tồn đầu
+    v_batch_code := 'OPENING-' || p_warehouse_id || '-' || p_product_id || '-' || p_supplier_id;
+    
+    -- Kiểm tra đã có tồn đầu chưa
+    SELECT id INTO v_batch_id
+    FROM import_batches
+    WHERE batch_code = v_batch_code;
+    
+    IF FOUND THEN
+        -- Đã có -> Cập nhật
+        UPDATE import_batches SET
+            import_quantity = p_quantity,
+            remaining_quantity = p_quantity,
+            unit_price = p_unit_cost,
+            final_unit_price = p_unit_cost,
+            subtotal = p_quantity * p_unit_cost,
+            total_amount = p_quantity * p_unit_cost,
+            notes = COALESCE(p_notes, 'Tồn đầu kỳ - Cập nhật'),
+            updated_at = NOW()
+        WHERE id = v_batch_id;
+        
+        RAISE NOTICE 'Cập nhật tồn đầu kỳ: Kho %, NCC %, SP %, SL: %', 
+            p_warehouse_id, p_supplier_id, p_product_id, p_quantity;
+    ELSE
+        -- Chưa có -> Thêm mới
+        INSERT INTO import_batches (
+            batch_code, warehouse_id, supplier_id, product_id,
+            import_quantity, remaining_quantity, exported_quantity,
+            unit_price, discount_percent, discount_amount, final_unit_price,
+            import_date, import_time,
+            vat_percent, vat_amount,
+            environmental_tax_rate, environmental_tax_amount,
+            subtotal, total_amount,
+            status, notes
+        ) VALUES (
+            v_batch_code, p_warehouse_id, p_supplier_id, p_product_id,
+            p_quantity, p_quantity, 0,
+            p_unit_cost, 0, 0, p_unit_cost,
+            p_opening_date, '00:00:00',
+            0, 0,
+            0, 0,
+            p_quantity * p_unit_cost, p_quantity * p_unit_cost,
+            'ACTIVE', COALESCE(p_notes, 'Tồn đầu kỳ')
+        ) RETURNING id INTO v_batch_id;
+        
+        RAISE NOTICE 'Thêm tồn đầu kỳ: Kho %, NCC %, SP %, SL: %', 
+            p_warehouse_id, p_supplier_id, p_product_id, p_quantity;
+    END IF;
+    
+    RETURN v_batch_id;
+END;
+$$ LANGUAGE plpgsql;
+
+COMMENT ON FUNCTION insert_opening_balance IS 'Nhập tồn đầu kỳ khi bắt đầu sử dụng hệ thống. Nếu đã có sẽ cập nhật, chưa có sẽ thêm mới';
+
+-- ============================================================================
 -- 15. DỮ LIỆU MẪU - SAMPLE DATA
 -- ============================================================================
 
@@ -827,32 +1007,23 @@ INSERT INTO commercial_customers (code, name, customer_group_id, tax_code, addre
 ('VIP-001', 'Công ty TNHH Vận tải Thành Công', 4, '8888888888', 'Hà Nội', '0988888888', 'Ngô Văn H', 150000000, '45 ngày')
 ON CONFLICT (code) DO NOTHING;
 
--- Kì giá
-INSERT INTO price_periods (code, name, product_id, region_id, base_price, effective_from, effective_to) VALUES
-('E5-01-2026-MB', 'Giá xăng E5 tháng 01/2026 - Miền Bắc', 1, 1, 23500.00, '2026-01-01', '2026-01-31'),
-('E5-02-2026-MB', 'Giá xăng E5 tháng 02/2026 - Miền Bắc', 1, 1, 24000.00, '2026-02-01', NULL),
-('RON95-01-2026-MB', 'Giá xăng RON95 tháng 01/2026 - Miền Bắc', 2, 1, 24500.00, '2026-01-01', '2026-01-31'),
-('DO-01-2026-MB', 'Giá dầu DO tháng 01/2026 - Miền Bắc', 3, 1, 22000.00, '2026-01-01', '2026-01-31'),
-('DO-02-2026-MB', 'Giá dầu DO tháng 02/2026 - Miền Bắc', 3, 1, 22500.00, '2026-02-01', NULL)
-ON CONFLICT (code) DO NOTHING;
-
--- Lô hàng nhập mẫu
+-- Lô hàng nhập mẫu (Sử dụng giá từ product_prices)
 INSERT INTO import_batches (
-    batch_code, warehouse_id, supplier_id, product_id, price_period_id,
+    batch_code, warehouse_id, supplier_id, product_id, price_at_import,
     import_quantity, unit_price, discount_percent,
     import_date, import_time, invoice_number, vehicle_number,
     vat_percent, environmental_tax_rate, created_by
 ) VALUES
--- Kho HN - NCC Petrolimex - E5
-('LN-2026-0101', 1, 1, 1, 1, 50000.000, 22000.00, 3.00, '2026-01-05', '08:00:00', 'HD-001', '29A-12345', 10, 2000, 1),
-('LN-2026-0102', 1, 1, 1, 1, 30000.000, 22200.00, 2.50, '2026-01-15', '09:00:00', 'HD-002', '29A-67890', 10, 2000, 1),
+-- Kho HN - NCC Petrolimex - E5 (Giá thị trường 23500)
+('LN-2026-0101', 1, 1, 1, 23500.00, 50000.000, 22000.00, 3.00, '2026-01-05', '08:00:00', 'HD-001', '29A-12345', 10, 2000, 1),
+('LN-2026-0102', 1, 1, 1, 23500.00, 30000.000, 22200.00, 2.50, '2026-01-15', '09:00:00', 'HD-002', '29A-67890', 10, 2000, 1),
 -- Kho HN - NCC PVN - E5
-('LN-2026-0103', 1, 2, 1, 1, 40000.000, 21800.00, 4.00, '2026-01-08', '10:00:00', 'HD-003', '30A-11111', 10, 2000, 1),
--- Kho HN - NCC Petrolimex - Diesel
-('LN-2026-0104', 1, 1, 3, 4, 60000.000, 20500.00, 2.00, '2026-01-10', '14:00:00', 'HD-004', '29A-22222', 10, 1500, 1),
-('LN-2026-0105', 1, 1, 3, 4, 35000.000, 20800.00, 1.50, '2026-01-20', '11:00:00', 'HD-005', '29A-33333', 10, 1500, 1),
+('LN-2026-0103', 1, 2, 1, 23500.00, 40000.000, 21800.00, 4.00, '2026-01-08', '10:00:00', 'HD-003', '30A-11111', 10, 2000, 1),
+-- Kho HN - NCC Petrolimex - Diesel (Giá thị trường 22000)
+('LN-2026-0104', 1, 1, 3, 22000.00, 60000.000, 20500.00, 2.00, '2026-01-10', '14:00:00', 'HD-004', '29A-22222', 10, 1500, 1),
+('LN-2026-0105', 1, 1, 3, 22000.00, 35000.000, 20800.00, 1.50, '2026-01-20', '11:00:00', 'HD-005', '29A-33333', 10, 1500, 1),
 -- Kho HN - NCC PVN - Diesel
-('LN-2026-0106', 1, 2, 3, 4, 45000.000, 20300.00, 3.00, '2026-01-12', '15:00:00', 'HD-006', '30A-44444', 10, 1500, 1)
+('LN-2026-0106', 1, 2, 3, 22000.00, 45000.000, 20300.00, 3.00, '2026-01-12', '15:00:00', 'HD-006', '30A-44444', 10, 1500, 1)
 ON CONFLICT (batch_code) DO NOTHING;
 
 -- Số dư công nợ đầu kỳ
@@ -877,30 +1048,59 @@ BEGIN
     RAISE NOTICE '   - Tự động tính toán thuế BVMT, VAT, chiết khấu';
     RAISE NOTICE '   - Tự động cập nhật tồn kho, công nợ qua triggers';
     RAISE NOTICE '';
+    RAISE NOTICE '⚠️  QUAN TRỌNG - LOGIC TÍNH TOÁN:';
+    RAISE NOTICE '   🔴 SERVICE LAYER chịu trách nhiệm tính:';
+    RAISE NOTICE '      - discount_amount, final_unit_price';
+    RAISE NOTICE '      - subtotal, vat_amount, environmental_tax_amount';
+    RAISE NOTICE '      - total_amount, profit_amount';
+    RAISE NOTICE '';
+    RAISE NOTICE '   🟢 TRIGGERS tự động xử lý:';
+    RAISE NOTICE '      - Cập nhật remaining_quantity khi xuất';
+    RAISE NOTICE '      - Cập nhật status (ACTIVE/DEPLETED)';
+    RAISE NOTICE '      - Cập nhật current_debt khách hàng';
+    RAISE NOTICE '      - Tổng hợp tồn kho (commercial_inventory_summary)';
+    RAISE NOTICE '      - Tổng hợp đơn hàng (export_orders)';
+    RAISE NOTICE '';
     RAISE NOTICE '🔧 TÍNH NĂNG CHÍNH:';
     RAISE NOTICE '   ✓ Quản lý nhiều nhà cung cấp/kho';
     RAISE NOTICE '   ✓ Theo dõi từng lô hàng (FIFO/FEFO)';
-    RAISE NOTICE '   ✓ Tính thuế BVMT chi tiết';
     RAISE NOTICE '   ✓ Gợi ý lô hàng tối ưu (function suggest_optimal_batches)';
     RAISE NOTICE '   ✓ Báo cáo doanh thu/lợi nhuận theo lô';
     RAISE NOTICE '   ✓ Quản lý công nợ real-time';
     RAISE NOTICE '';
-    RAISE NOTICE '📈 VIEWS & FUNCTIONS:';
-    RAISE NOTICE '   - v_batch_inventory: Tồn kho chi tiết';
-    RAISE NOTICE '   - v_batch_optimization: Gợi ý lô tối ưu';
-    RAISE NOTICE '   - v_batch_revenue_report: Doanh thu theo lô';
-    RAISE NOTICE '   - v_customer_debt_report: Công nợ khách hàng';
-    RAISE NOTICE '   - suggest_optimal_batches(): Tự động gợi ý lô khi xuất';
+    RAISE NOTICE '📊 SAMPLE DATA:';
+    RAISE NOTICE '   - 4 Nhà cung cấp (Petrolimex, PVN...)';
+    RAISE NOTICE '   - 3 Kho thương mại';
+    RAISE NOTICE '   - 5 Nhóm khách hàng (Đại lý 1, 2, Cửa hàng...)';
+    RAISE NOTICE '   - 8 Khách hàng (CH10, CH11, CH31, CH372...)';
+    RAISE NOTICE '   - 6 Lô hàng nhập mẫu';
     RAISE NOTICE '';
     RAISE NOTICE '💡 VÍ DỤ SỬ DỤNG:';
-    RAISE NOTICE '   -- Gợi ý xuất 20000 lít E5 từ kho 1 với chiết khấu 3%:';
+    RAISE NOTICE '';
+    RAISE NOTICE '   -- 1. Nhập tồn đầu kỳ:';
+    RAISE NOTICE '   SELECT insert_opening_balance(';
+    RAISE NOTICE '       1,          -- warehouse_id';
+    RAISE NOTICE '       1,          -- supplier_id';
+    RAISE NOTICE '       1,          -- product_id (E5)';
+    RAISE NOTICE '       50000.000,  -- quantity';
+    RAISE NOTICE '       21000.00,   -- unit_cost';
+    RAISE NOTICE '       ''2026-01-01'',  -- opening_date';
+    RAISE NOTICE '       ''Tồn đầu kỳ tháng 1/2026''';
+    RAISE NOTICE '   );';
+    RAISE NOTICE '';
+    RAISE NOTICE '   -- 2. Kiểm tra tồn kho:';
+    RAISE NOTICE '   SELECT * FROM get_current_stock(1, 1);  -- Kho 1, Sản phẩm E5';
+    RAISE NOTICE '';
+    RAISE NOTICE '   -- 3. Gợi ý xuất hàng:';
     RAISE NOTICE '   SELECT * FROM suggest_optimal_batches(1, 1, 20000, 3);';
     RAISE NOTICE '';
-    RAISE NOTICE '   -- Xem tồn kho theo lô:';
-    RAISE NOTICE '   SELECT * FROM v_batch_inventory WHERE warehouse_code = ''KTM01'';';
+    RAISE NOTICE '   -- 4. Kiểm tra đủ hàng trước khi xuất:';
+    RAISE NOTICE '   SELECT check_stock_available(5, 10000);  -- Lô 5, xuất 10000 lít';
     RAISE NOTICE '';
-    RAISE NOTICE '   -- Báo cáo doanh thu:';
-    RAISE NOTICE '   SELECT * FROM v_batch_revenue_report ORDER BY gross_profit DESC;';
+    RAISE NOTICE '⚠️  XỮA/SỮA ĐƠN XUẤT:';
+    RAISE NOTICE '   - UPDATE export_order_items: Trigger tự động hoàn trả số cũ, trừ số mới';
+    RAISE NOTICE '   - DELETE export_order_items: Trigger tự động hoàn trả tồn';
+    RAISE NOTICE '   - Constraint đảm bảo remaining_quantity >= 0';
     RAISE NOTICE '';
     RAISE NOTICE '============================================================================';
 END $$;
