@@ -1,0 +1,16 @@
+import { Controller, Get, Query } from '@nestjs/common';
+import { InventoryReportService } from './inventory-report.service';
+
+@Controller('commercial/reports/inventory')
+export class InventoryReportController {
+  constructor(private readonly reportService: InventoryReportService) {}
+
+  @Get()
+  async getInventoryReport(
+    @Query('start_date') startDate: string,
+    @Query('end_date') endDate: string,
+    @Query('warehouse_id') warehouseId?: number,
+  ) {
+    return this.reportService.getInventoryReport(startDate, endDate, warehouseId);
+  }
+}

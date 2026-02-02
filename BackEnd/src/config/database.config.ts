@@ -26,7 +26,7 @@ export const getDatabaseConfig = (): TypeOrmModuleOptions => ({
     timezone: '+07:00', // UTC+7 (Asia/Ho_Chi_Minh)
   },
 
-  // Cache query plans để tăng tốc
+  // Cache query plans đểP tăng tốc
   cache: {
     duration: 60000, // Cache 60 giây
   },

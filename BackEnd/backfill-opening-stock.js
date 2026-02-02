@@ -19,7 +19,7 @@ async function backfillOpeningStock() {
   try {
     console.log('🔄 Bắt đầu backfill tồn đầu ca...');
 
-// 1. Lấy tất cả shifts theo thứ tự thời gian
+    // 1. Lấy tất cả shifts theo thứ tự thời gian
     const shiftsResult = await client.query(`
       SELECT id, store_id, shift_no, shift_date
       FROM shifts
@@ -34,6 +34,18 @@ async function backfillOpeningStock() {
 
     for (let i = 0; i < shifts.length; i++) {
       const shift = shifts[i];
+
+      // Lấy warehouse_id của store hiện tại
+      const warehouseResult = await client.query(`
+        SELECT id FROM warehouses WHERE store_id = $1 LIMIT 1
+      `, [shift.store_id]);
+      
+      if (!warehouseResult.rows.length) {
+        console.log(`⚠️  Store ${shift.store_id} không có warehouse - bỏ qua shift ${shift.id}`);
+        continue;
+      }
+      
+      const warehouseId = warehouseResult.rows[0].id;
 
       // Lấy tất cả products
       const productsResult = await client.query(`
@@ -61,7 +73,7 @@ async function backfillOpeningStock() {
           const prevOpeningProduct = prevOpening.find(x => x.productId === product.id);
           const prevOpeningStock = prevOpeningProduct?.openingStock || 0;
 
-          // Lấy import/export của shift trước từ ledger
+          // Lấy import/export của shift trước từ ledger (dùng warehouseId đúng)
           const prevLedgerResult = await client.query(`
             SELECT
               COALESCE(SUM(quantity_in), 0) AS total_import,
@@ -70,7 +82,7 @@ async function backfillOpeningStock() {
             WHERE product_id = $1
               AND warehouse_id = $2
               AND shift_id = $3
-          `, [product.id, prevShift.store_id, prevShift.id]);
+          `, [product.id, warehouseId, prevShift.id]);
 
           const prevImport = Number(prevLedgerResult.rows[0].total_import) || 0;
           const prevExport = Number(prevLedgerResult.rows[0].total_export) || 0;
@@ -89,7 +101,7 @@ async function backfillOpeningStock() {
           openingStock = Number(tankResult.rows[0].total_stock) || 0;
         }
 
-if (openingStock !== 0 || i === 0) { // Lưu nếu có tồn hoặc là shift đầu
+        if (openingStock !== 0 || i === 0) { // Lưu nếu có tồn hoặc là shift đầu
           openingStockData.push({
             productId: product.id,
             productCode: product.code,

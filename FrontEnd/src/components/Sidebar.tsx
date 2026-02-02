@@ -29,6 +29,11 @@ import {
   CalculatorIcon,
   ScaleIcon,
   DocumentDuplicateIcon,
+  TruckIcon,
+  BuildingOfficeIcon,
+  ShoppingCartIcon,
+  ArrowDownTrayIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -59,7 +64,7 @@ const navigation: NavItem[] = [
     roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'],
     children: [
       { name: 'Báo cáo ca', href: '/reports/shifts', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Sổ giao ca', href: '/reports/shift-handover', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      { name: 'Sổ giao ca', href: '/reports/shift-handover', icon: CheckBadgeIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
       { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
 
       { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
@@ -82,6 +87,21 @@ const navigation: NavItem[] = [
       { name: 'Quản Lý Giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
       { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'] },
       { name: 'Tài khoản', href: '/users', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR'] },
+    ],
+  },
+  {
+    name: 'Bán Thương Mại',
+    href: '/commercial',
+    icon: TruckIcon,
+    roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'],
+    children: [
+      { name: 'Nhà cung cấp', href: '/commercial/suppliers', icon: BuildingOfficeIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Kho thương mại', href: '/commercial/warehouses', icon: BuildingStorefrontIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Nhóm khách hàng', href: '/commercial/customer-groups', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Khách hàng TM', href: '/commercial/customers', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Nhập hàng (Lô)', href: '/commercial/import-batches', icon: ArrowDownTrayIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'Xuất hàng TM', href: '/commercial/export-orders', icon: ArrowUpTrayIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      { name: 'BC Nhập Xuất Tồn', href: '/commercial/inventory-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
     ],
   },
   {

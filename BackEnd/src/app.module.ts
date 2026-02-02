@@ -42,6 +42,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
 // Loss Config
 import { LossConfigModule } from './loss-config/loss-config.module';
 
+// Commercial Wholesale
+import { CommercialModule } from './commercial/commercial.module';
+
 @Module({
   imports: [
     // Configuration
@@ -98,6 +101,9 @@ import { LossConfigModule } from './loss-config/loss-config.module';
 
     // Loss Config
     LossConfigModule,
+
+    // Commercial Wholesale
+    CommercialModule,
   ],
   controllers: [AppController],
   providers: [AppService],

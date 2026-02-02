@@ -33,6 +33,13 @@ import { OpeningBalancePage } from './pages/OpeningBalancePage';
 import LossConfigPage from './pages/LossConfigPage';
 import InventoryClosingPage from './pages/InventoryClosingPage';
 import InventoryCheckListPage from './pages/InventoryCheckListPage';
+import CommercialSuppliersPage from './pages/CommercialSuppliersPage';
+import CommercialWarehousesPage from './pages/CommercialWarehousesPage';
+import CommercialCustomerGroupsPage from './pages/CommercialCustomerGroupsPage';
+import CommercialCustomersPage from './pages/CommercialCustomersPage';
+import CommercialImportBatchesPage from './pages/CommercialImportBatchesPage';
+import CommercialExportOrdersPage from './pages/CommercialExportOrdersPage';
+import CommercialInventoryReportPage from './pages/CommercialInventoryReportPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -330,6 +337,79 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Commercial Routes */}
+            <Route
+              path="/commercial/suppliers"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialSuppliersPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/warehouses"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialWarehousesPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/customer-groups"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialCustomerGroupsPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/customers"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialCustomersPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/import-batches"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialImportBatchesPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/export-orders"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialExportOrdersPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/commercial/inventory-report"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <CommercialInventoryReportPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

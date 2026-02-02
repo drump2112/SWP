@@ -428,9 +428,18 @@ export class ReportsService {
     const totalRetailAmount = totalPumpAmount - totalDebtAmount;
     const totalReceiptAmount = formattedReceipts.reduce((sum, r) => sum + r.amount, 0);
     const totalDepositAmount = formattedDeposits.reduce((sum, d) => sum + d.amount, 0);
-    const cashBalance = totalRetailAmount + totalReceiptAmount - totalDepositAmount;
 
-    // 7.1. ✅ Lấy tiền ca trước chuyển sang (bán lẻ ca trước chưa nộp)
+    // 7.1. ✅ Lấy tồn quỹ THỰC TẾ từ cash_ledger (tích lũy từ đầu đến hết ca hiện tại)
+    const cashBalanceResult = await this.cashLedgerRepository
+      .createQueryBuilder('cl')
+      .select('SUM(cl.cash_in - cl.cash_out)', 'totalBalance')
+      .where('cl.store_id = :storeId', { storeId: shift.storeId })
+      .andWhere('cl.shift_id <= :shiftId', { shiftId })
+      .getRawOne();
+
+    const cashBalance = Number(cashBalanceResult?.totalBalance) || 0;
+
+    // 7.2. ✅ Lấy tiền ca trước chuyển sang (để hiển thị riêng)
     let carryOverCash = 0;
     const prevShift = await this.shiftRepository
       .createQueryBuilder('s')
@@ -445,11 +454,12 @@ export class ReportsService {
       .getOne();
 
     if (prevShift) {
-      // Lấy cash_balance của shift trước từ cash_ledger
+      // Lấy cash_balance của shift trước từ cash_ledger (tích lũy đến hết ca trước)
       const prevCashLedger = await this.cashLedgerRepository
         .createQueryBuilder('cl')
         .select('SUM(cl.cash_in - cl.cash_out)', 'totalBalance')
-        .where('cl.shift_id = :shiftId', { shiftId: prevShift.id })
+        .where('cl.store_id = :storeId', { storeId: shift.storeId })
+        .andWhere('cl.shift_id <= :shiftId', { shiftId: prevShift.id })
         .getRawOne();
 
       carryOverCash = Number(prevCashLedger?.totalBalance) || 0;
