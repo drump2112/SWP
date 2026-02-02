@@ -73,10 +73,19 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
     },
     {
       label: 'Tháng trước',
-      getRange: () => ({
-        from: dayjs().subtract(1, 'month').startOf('month').format('YYYY-MM-DD'),
-        to: dayjs().subtract(1, 'month').endOf('month').format('YYYY-MM-DD'),
-      }),
+      getRange: () => {
+        const today = new Date();
+        const year = today.getMonth() === 0 ? today.getFullYear() - 1 : today.getFullYear();
+        const month = today.getMonth() === 0 ? 11 : today.getMonth() - 1;
+
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+
+        return {
+          from: dayjs(firstDay).format('YYYY-MM-DD'),
+          to: dayjs(lastDay).format('YYYY-MM-DD'),
+        };
+      },
     },
     {
       label: 'Quý này',
@@ -96,9 +105,14 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
 
   const handleQuickSelect = (option: typeof quickSelectOptions[0]) => {
     const { from, to } = option.getRange();
+    console.log('Quick select:', option.label, 'From:', from, 'To:', to);
+    // Gọi cả 2 callbacks trong cùng một batch
     onFromDateChange(from);
-    onToDateChange(to);
-    setIsOpen(false);
+    // Đợi một chút để đảm bảo state được update
+    setTimeout(() => {
+      onToDateChange(to);
+      setIsOpen(false);
+    }, 0);
   };
 
   return (
@@ -153,6 +167,7 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Từ ngày</label>
               <DatePicker
+                key={`from-${fromDate}`}
                 selected={fromDateObj}
                 onChange={(date) => {
                   if (date) {
@@ -165,13 +180,13 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 endDate={toDateObj}
                 maxDate={toDateObj || undefined}
                 inline
-                locale="vi"
               />
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-2 uppercase tracking-wide">Đến ngày</label>
               <DatePicker
+                key={`to-${toDate}`}
                 selected={toDateObj}
                 onChange={(date) => {
                   if (date) {
@@ -184,7 +199,6 @@ const DateRangePicker: React.FC<DateRangePickerProps> = ({
                 endDate={toDateObj}
                 minDate={fromDateObj || undefined}
                 inline
-                locale="vi"
               />
             </div>
           </div>

@@ -5,12 +5,13 @@ import { InventoryReportService } from './inventory-report.service';
 export class InventoryReportController {
   constructor(private readonly reportService: InventoryReportService) {}
 
-  @Get()
-  async getInventoryReport(
+  @Get('detailed')
+  async getDetailedReport(
     @Query('start_date') startDate: string,
     @Query('end_date') endDate: string,
     @Query('warehouse_id') warehouseId?: number,
+    @Query('supplier_id') supplierId?: number,
   ) {
-    return this.reportService.getInventoryReport(startDate, endDate, warehouseId);
+    return this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId);
   }
 }

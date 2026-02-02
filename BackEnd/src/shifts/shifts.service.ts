@@ -917,6 +917,18 @@ export class ShiftsService {
     }
 
     // 7.1. ✅ Tính tồn đầu ca (opening_stock_json)
+    // Lấy warehouse_id của store hiện tại
+    const storeWarehouse = await manager.findOne(Warehouse, {
+      where: { storeId: shift.storeId },
+    });
+
+    if (!storeWarehouse) {
+      throw new BadRequestException(
+        `Store ${shift.storeId} không có warehouse`,
+      );
+    }
+
+    const warehouseId = storeWarehouse.id;
     const products = await manager.find(Product);
     const openingStockData: any[] = [];
 
@@ -943,13 +955,13 @@ export class ShiftsService {
         );
         const prevOpeningStock = prevOpening?.openingStock || 0;
 
-        // Lấy import/export của shift trước từ ledger
+        // Lấy import/export của shift trước từ ledger (dùng warehouseId đúng)
         const prevLedger = await manager
           .createQueryBuilder(InventoryLedger, 'il')
           .select('SUM(il.quantity_in)', 'totalImport')
           .addSelect('SUM(il.quantity_out)', 'totalExport')
           .where('il.product_id = :productId', { productId: product.id })
-          .andWhere('il.warehouse_id = :warehouseId', { warehouseId: shift.storeId })
+          .andWhere('il.warehouse_id = :warehouseId', { warehouseId })
           .andWhere('il.shift_id = :shiftId', { shiftId: prevShift.id })
           .getRawOne();
 

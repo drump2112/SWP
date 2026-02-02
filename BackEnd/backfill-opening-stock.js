@@ -39,12 +39,12 @@ async function backfillOpeningStock() {
       const warehouseResult = await client.query(`
         SELECT id FROM warehouses WHERE store_id = $1 LIMIT 1
       `, [shift.store_id]);
-      
+
       if (!warehouseResult.rows.length) {
         console.log(`⚠️  Store ${shift.store_id} không có warehouse - bỏ qua shift ${shift.id}`);
         continue;
       }
-      
+
       const warehouseId = warehouseResult.rows[0].id;
 
       // Lấy tất cả products

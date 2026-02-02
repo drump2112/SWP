@@ -374,8 +374,8 @@ const DebtReportPage: React.FC = () => {
             <DateRangePicker
               fromDate={filters.fromDate || ''}
               toDate={filters.toDate || ''}
-              onFromDateChange={(date) => setFilters({ ...filters, fromDate: date })}
-              onToDateChange={(date) => setFilters({ ...filters, toDate: date })}
+              onFromDateChange={(date) => setFilters(prev => ({ ...prev, fromDate: date }))}
+              onToDateChange={(date) => setFilters(prev => ({ ...prev, toDate: date }))}
               label=""
             />
           </div>
