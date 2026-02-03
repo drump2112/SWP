@@ -1406,6 +1406,18 @@ export class ShiftsService {
 
     const updatedShift = await this.shiftRepository.save(shift);
 
+    // ⏰ CÂP NHẬT ledgerAt cho các bản ghi cash_ledger thiếu
+    // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
+    await this.cashLedgerRepository
+      .createQueryBuilder()
+      .update(CashLedger)
+      .set({ ledgerAt: closedAt })
+      .where('shift_id = :shiftId', { shiftId })
+      .andWhere('ledger_at IS NULL')
+      .execute();
+
+    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
+
     // Ghi audit log
     await this.auditLogRepository.save({
       tableName: 'shifts',
