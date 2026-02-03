@@ -4,6 +4,48 @@ import { Repository } from 'typeorm';
 import { ImportBatch } from '../../entities/import-batch.entity';
 import { ExportOrderItem } from '../../entities/export-order-item.entity';
 
+// Batch-level detail report (like the Excel template)
+export interface BatchDetailDto {
+  batch_id: number;
+  batch_code: string;
+  import_date: string;
+  product_name: string;
+  supplier_name: string;
+  warehouse_name: string;
+  // Import columns
+  import_quantity: number;
+  import_discount: number;
+  import_eco_fee: number;
+  import_env_tax: number;
+  import_total: number;
+  // Export columns
+  export_unit: string;
+  export_quantity: number;
+  export_discount: number;
+  export_eco_fee: number;
+  export_total: number;
+  export_env_tax: number;
+  export_profit: number;
+  // Inventory columns
+  closing_quantity: number;
+  closing_total: number;
+  note: string;
+}
+
+export interface BatchReportDto {
+  batches: BatchDetailDto[];
+  summary: {
+    total_import_quantity: number;
+    total_import_amount: number;
+    total_export_quantity: number;
+    total_export_amount: number;
+    total_closing_quantity: number;
+    total_closing_amount: number;
+    total_profit: number;
+  };
+}
+
+// Summary report (grouped by supplier/customer group)
 export interface ImportDetailDto {
   supplier_id: number;
   supplier_name: string;
@@ -281,5 +323,101 @@ export class InventoryReportService {
     record.revenue += itemRevenue;
     record.cost += itemCost;
     record.profit += itemProfit;
+  }
+
+  async getBatchReport(
+    startDate: string,
+    endDate: string,
+    warehouseId?: number,
+    supplierId?: number,
+  ): Promise<BatchReportDto> {
+    // Get all batches in the period
+    const batchesQuery = this.importBatchRepo
+      .createQueryBuilder('batch')
+      .leftJoinAndSelect('batch.warehouse', 'warehouse')
+      .leftJoinAndSelect('batch.product', 'product')
+      .leftJoinAndSelect('batch.supplier', 'supplier')
+      .where('batch.import_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+
+    if (warehouseId) {
+      batchesQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
+    }
+    
+    if (supplierId) {
+      batchesQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
+    }
+
+    const batches = await batchesQuery.orderBy('batch.import_date', 'ASC').getMany();
+
+    // Get all exports for these batches
+    const exportsQuery = this.exportOrderItemRepo
+      .createQueryBuilder('item')
+      .leftJoinAndSelect('item.export_order', 'order')
+      .where('order.order_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+
+    const exports = await exportsQuery.getMany();
+
+    // Group exports by batch_id
+    const exportsByBatch = new Map<number, ExportOrderItem[]>();
+    exports.forEach(item => {
+      if (!exportsByBatch.has(item.import_batch_id)) {
+        exportsByBatch.set(item.import_batch_id, []);
+      }
+      exportsByBatch.get(item.import_batch_id)!.push(item);
+    });
+
+    const batchDetails: BatchDetailDto[] = batches.map(batch => {
+      const batchExports = exportsByBatch.get(batch.id) || [];
+      
+      // Calculate export totals
+      const exportQuantity = batchExports.reduce((sum, item) => sum + item.quantity, 0);
+      const exportTotal = batchExports.reduce((sum, item) => sum + item.total_amount, 0);
+      const exportCost = batchExports.reduce((sum, item) => sum + (item.quantity * batch.unit_price), 0);
+      const exportProfit = exportTotal - exportCost;
+
+      // Calculate closing inventory
+      const closingQuantity = batch.import_quantity - exportQuantity;
+      const closingTotal = closingQuantity * batch.unit_price;
+
+      return {
+        batch_id: batch.id,
+        batch_code: batch.batch_code || `BATCH-${batch.id}`,
+        import_date: batch.import_date.toISOString().split('T')[0],
+        product_name: batch.product.name,
+        supplier_name: batch.supplier?.name || 'N/A',
+        warehouse_name: batch.warehouse.name,
+        // Import
+        import_quantity: batch.import_quantity,
+        import_discount: batch.discount_amount || 0,
+        import_eco_fee: 0,
+        import_env_tax: batch.environmental_tax_amount || 0,
+        import_total: batch.import_quantity * batch.unit_price,
+        // Export
+        export_unit: 'Lít',
+        export_quantity: exportQuantity,
+        export_discount: 0, // TODO: calculate from items
+        export_eco_fee: 0,
+        export_total: exportTotal,
+        export_env_tax: 0,
+        export_profit: exportProfit,
+        // Closing
+        closing_quantity: closingQuantity,
+        closing_total: closingTotal,
+        note: '',
+      };
+    });
+
+    return {
+      batches: batchDetails,
+      summary: {
+        total_import_quantity: batchDetails.reduce((sum, b) => sum + b.import_quantity, 0),
+        total_import_amount: batchDetails.reduce((sum, b) => sum + b.import_total, 0),
+        total_export_quantity: batchDetails.reduce((sum, b) => sum + b.export_quantity, 0),
+        total_export_amount: batchDetails.reduce((sum, b) => sum + b.export_total, 0),
+        total_closing_quantity: batchDetails.reduce((sum, b) => sum + b.closing_quantity, 0),
+        total_closing_amount: batchDetails.reduce((sum, b) => sum + b.closing_total, 0),
+        total_profit: batchDetails.reduce((sum, b) => sum + b.export_profit, 0),
+      },
+    };
   }
 }

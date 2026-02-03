@@ -43,12 +43,17 @@ const ShiftManagementPage: React.FC = () => {
     enabled: isAdmin, // Only fetch if user is admin
   });
 
-  // Fetch shifts - Admin xem tất cả, Store xem của mình
+  // Fetch shifts - Admin xem tất cả hoặc theo cửa hàng, Store xem của mình
   const { data: shifts, isLoading } = useQuery({
-    queryKey: ["shifts", user?.roleCode, user?.storeId],
+    queryKey: ["shifts", user?.roleCode, user?.storeId, selectedStoreFilter],
     queryFn: async () => {
-      // Super Admin/Admin/Director/Accounting xem tất cả ca
+      // Super Admin/Admin/Director/Accounting
       if (user?.roleCode === "SUPER_ADMIN" || user?.roleCode === "ADMIN" || user?.roleCode === "DIRECTOR" || user?.roleCode === "ACCOUNTING") {
+        // Nếu admin chọn lọc theo cửa hàng, gọi API getByStore
+        if (selectedStoreFilter) {
+          return shiftsApi.getByStore(selectedStoreFilter);
+        }
+        // Không chọn cửa hàng → lấy tất cả
         return shiftsApi.getAll();
       }
       // Store user chỉ xem ca của mình
@@ -253,10 +258,8 @@ const ShiftManagementPage: React.FC = () => {
       dayjs(shift.shiftDate).format("DD/MM/YYYY").includes(searchTerm) ||
       shift.store?.name?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    // Apply store filter for admin
-    const matchesStore = !selectedStoreFilter || shift.storeId === selectedStoreFilter;
-
-    return matchesSearch && matchesStore;
+    // Không cần filter store nữa vì backend đã filter rồi
+    return matchesSearch;
   });
 
   // Reset page when filter changes

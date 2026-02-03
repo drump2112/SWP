@@ -14,4 +14,14 @@ export class InventoryReportController {
   ) {
     return this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId);
   }
+
+  @Get('batch')
+  async getBatchReport(
+    @Query('start_date') startDate: string,
+    @Query('end_date') endDate: string,
+    @Query('warehouse_id') warehouseId?: number,
+    @Query('supplier_id') supplierId?: number,
+  ) {
+    return this.reportService.getBatchReport(startDate, endDate, warehouseId, supplierId);
+  }
 }

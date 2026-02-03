@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tanksApi, type Tank, type CreateTankDto, type UpdateTankDto } from '../api/tanks';
 import { pumpsApi, type Pump, type CreatePumpDto, type UpdatePumpDto } from '../api/pumps';
 import { productsApi } from '../api/products';
+import { showConfirm } from '../utils/sweetalert';
 import { PlusIcon, PencilIcon, TrashIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 interface StoreDetailTabsProps {
@@ -145,8 +146,14 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: number, type: 'tank' | 'pump') => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa ${type === 'tank' ? 'bồn bể' : 'vòi bơm'} này?`)) {
+  const handleDelete = async (id: number, type: 'tank' | 'pump') => {
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn xóa ${type === 'tank' ? 'bồn bể' : 'vòi bơm'} này?`,
+      'Xác nhận xóa',
+      'warning'
+    );
+    
+    if (confirmed) {
       if (type === 'tank') {
         deleteTankMutation.mutate(id);
       } else {
@@ -320,10 +327,10 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
                     <option value="">Chọn mặt hàng *</option>
                     {products?.filter(p => p.isFuel).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
-                  <input type="number" name="capacity" defaultValue={(editingItem as Tank)?.capacity} required step="0.001" placeholder="Dung tích (L) *" className="w-full px-3 py-2 border rounded-lg" />
+                  <input type="number" name="capacity" defaultValue={(editingItem as Tank)?.capacity} required min="1" step="1" placeholder="Dung tích (L) *" className="w-full px-3 py-2 border rounded-lg" />
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Tồn đầu (L)</label>
-                    <input type="number" name="currentStock" defaultValue={(editingItem as Tank)?.currentStock || 0} min="0" step="0.001" placeholder="Tồn đầu (L)" className="w-full px-3 py-2 border rounded-lg" />
+                    <input type="number" name="currentStock" defaultValue={(editingItem as Tank)?.currentStock || 0} min="0" step="1" placeholder="Tồn đầu (L)" className="w-full px-3 py-2 border rounded-lg" />
                   </div>
                 </>
               ) : (
