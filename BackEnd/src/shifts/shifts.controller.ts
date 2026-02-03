@@ -42,6 +42,22 @@ export class ShiftsController {
     return this.shiftsService.findAll();
   }
 
+  // ==================== SPECIFIC ROUTES (PHẢI ĐẶT TRƯỚC :id) ====================
+
+  @Get('report/:id')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  getShiftReport(@Param('id') id: string) {
+    return this.shiftsService.getShiftReport(+id);
+  }
+
+  @Get('store/:storeId')
+  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
+  findByStore(@Param('storeId') storeId: string) {
+    return this.shiftsService.findByStore(+storeId);
+  }
+
+  // ==================== DYNAMIC ROUTE (PHẢI ĐẶT SAU) ====================
+
   @Get(':id')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   findOne(@Param('id') id: string) {
@@ -101,18 +117,6 @@ export class ShiftsController {
   @Roles('ADMIN')
   lockShift(@Param('id') id: string, @CurrentUser() user: any) {
     return this.shiftsService.lockShift(+id, user);
-  }
-
-  @Get('report/:id')
-  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getShiftReport(@Param('id') id: string) {
-    return this.shiftsService.getShiftReport(+id);
-  }
-
-  @Get('store/:storeId')
-  @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  findByStore(@Param('storeId') storeId: string) {
-    return this.shiftsService.findByStore(+storeId);
   }
 
   // ==================== DEBT SALES ====================

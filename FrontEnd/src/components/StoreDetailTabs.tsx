@@ -152,7 +152,7 @@ const StoreDetailTabs: React.FC<StoreDetailTabsProps> = ({ storeId }) => {
       'Xác nhận xóa',
       'warning'
     );
-    
+
     if (confirmed) {
       if (type === 'tank') {
         deleteTankMutation.mutate(id);
