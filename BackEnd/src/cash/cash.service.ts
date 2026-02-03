@@ -71,9 +71,15 @@ export class CashService {
   async setOpeningBalance(dto: OpeningBalanceCashDto) {
     const { storeId, openingBalance, effectiveDate, notes } = dto;
 
-    // 1. Lấy số dư hiện tại
-    const currentBalanceResult = await this.getCashBalance(storeId);
-    const currentBalance = currentBalanceResult.balance;
+    // 1. Lấy số dư hiện tại (KHÔNG bao gồm OPENING_BALANCE)
+    const result = await this.cashLedgerRepository
+      .createQueryBuilder('cl')
+      .select('SUM(cl.cash_in - cl.cash_out)', 'balance')
+      .where('cl.store_id = :storeId', { storeId })
+      .andWhere('cl.ref_type != :refType', { refType: 'OPENING_BALANCE' })
+      .getRawOne();
+
+    const currentBalance = Number(result?.balance || 0);
 
     // 2. Tính chênh lệch
     const adjustment = openingBalance - currentBalance;
@@ -91,7 +97,7 @@ export class CashService {
       };
     }
 
-    // 3. Kiểm tra xem đã có OPENING_BALANCE trong ngày này chưa
+    // 3. Kiểm tra xem đã có OPENING_BALANCE trong ngày này chưa (dựa trên ledgerAt)
     const effectiveDateValue = effectiveDate ? new Date(effectiveDate) : new Date();
     const startOfDay = new Date(effectiveDateValue);
     startOfDay.setHours(0, 0, 0, 0);
@@ -103,11 +109,11 @@ export class CashService {
         storeId,
         refType: 'OPENING_BALANCE',
       },
-      order: { createdAt: 'DESC' },
+      order: { ledgerAt: 'DESC' }, // ⏰ Sắp xếp theo ledgerAt thay vì createdAt
     });
 
-    if (existingOpening) {
-      const existingDate = new Date(existingOpening.createdAt);
+    if (existingOpening && existingOpening.ledgerAt) {
+      const existingDate = new Date(existingOpening.ledgerAt);
       if (existingDate >= startOfDay && existingDate <= endOfDay) {
         throw new BadRequestException(
           `Đã có số dư đầu kỳ cho ngày ${effectiveDateValue.toLocaleDateString('vi-VN')}. Vui lòng xóa hoặc chọn ngày khác.`,
@@ -122,7 +128,7 @@ export class CashService {
       refId: undefined,
       cashIn: adjustment > 0 ? adjustment : 0,
       cashOut: adjustment < 0 ? Math.abs(adjustment) : 0,
-      ledgerAt: effectiveDateValue, // ⏰ Dùng ledgerAt thay vì createdAt để báo cáo lọc đúng
+      ledgerAt: effectiveDateValue, // ⏰ Dùng ledgerAt để báo cáo lọc đúng
     });
 
     const savedLedger = await this.cashLedgerRepository.save(cashLedger);
@@ -187,23 +193,26 @@ export class CashService {
     // 2. Tính số dư đầu kỳ cũ
     const oldOpeningBalance = Number(oldRecord.cashIn) - Number(oldRecord.cashOut);
 
-    // 3. Tính adjustment mới
-    const adjustment = newOpeningBalance - oldOpeningBalance;
-
-    if (adjustment === 0 && !effectiveDate) {
+    // 3. Kiểm tra có thay đổi không
+    if (oldOpeningBalance === newOpeningBalance && !effectiveDate) {
       return {
         success: true,
         message: 'Số dư không thay đổi',
       };
     }
 
-    // 4. Cập nhật record
-    oldRecord.cashIn = adjustment > 0 ? Number(oldRecord.cashIn) + adjustment : Number(oldRecord.cashIn);
-    oldRecord.cashOut = adjustment < 0 ? Number(oldRecord.cashOut) + Math.abs(adjustment) : Number(oldRecord.cashOut);
+    // 4. Cập nhật record - THAY THẾ giá trị mới hoàn toàn
+    if (newOpeningBalance >= 0) {
+      oldRecord.cashIn = newOpeningBalance;
+      oldRecord.cashOut = 0;
+    } else {
+      oldRecord.cashIn = 0;
+      oldRecord.cashOut = Math.abs(newOpeningBalance);
+    }
 
-    // Cập nhật ngày hiệu lực nếu có
+    // Cập nhật ngày hiệu lực nếu có (dùng ledgerAt thay vì createdAt)
     if (effectiveDate) {
-      oldRecord.createdAt = new Date(effectiveDate);
+      oldRecord.ledgerAt = new Date(effectiveDate);
     }
 
     await this.cashLedgerRepository.save(oldRecord);
@@ -215,7 +224,7 @@ export class CashService {
         id,
         oldOpeningBalance,
         newOpeningBalance,
-        adjustment,
+        adjustment: newOpeningBalance - oldOpeningBalance,
       },
     };
   }

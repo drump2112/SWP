@@ -1408,7 +1408,7 @@ export class ShiftsService {
 
     // ⏰ CÂP NHẬT ledgerAt cho các bản ghi cash_ledger thiếu
     // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
-    
+
     // 1. Update DEPOSIT: lấy từ deposit_at (nếu có)
     await this.dataSource.query(`
       UPDATE cash_ledger cl
