@@ -58,6 +58,7 @@ export class CashService {
       refId: undefined,
       cashIn: 0,
       cashOut: amount,
+      ledgerAt: new Date(), // ⏰ Ghi nhận thời gian nộp tiền
     });
 
     return this.cashLedgerRepository.save(cashLedger);
@@ -121,7 +122,7 @@ export class CashService {
       refId: undefined,
       cashIn: adjustment > 0 ? adjustment : 0,
       cashOut: adjustment < 0 ? Math.abs(adjustment) : 0,
-      createdAt: effectiveDateValue,
+      ledgerAt: effectiveDateValue, // ⏰ Dùng ledgerAt thay vì createdAt để báo cáo lọc đúng
     });
 
     const savedLedger = await this.cashLedgerRepository.save(cashLedger);

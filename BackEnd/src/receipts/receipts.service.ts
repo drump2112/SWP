@@ -64,6 +64,7 @@ export class ReceiptsService {
         refId: savedReceipt.id,
         cashIn: createReceiptDto.amount,
         cashOut: 0,
+        ledgerAt: new Date(), // ⏰ Ghi nhận thời gian thu tiền (receipts.service.ts không có receiptAt trong DTO cũ)
       });
       await manager.save(CashLedger, cashLedger);
 

@@ -1756,6 +1756,7 @@ export class ShiftsService {
         cashIn: 0,
         cashOut: createDto.amount,
         shiftId: shift.id,
+        ledgerAt: createDto.depositAt ? new Date(createDto.depositAt) : new Date(), // ⏰ Ghi nhận thời gian nộp tiền
       });
       await manager.save(cashLedger);
 
@@ -1869,6 +1870,7 @@ export class ShiftsService {
         refId: savedReceipt.id,
         cashIn: createDto.amount,
         cashOut: 0,
+        ledgerAt: createDto.receiptAt ? new Date(createDto.receiptAt) : new Date(), // ⏰ Ghi nhận thời gian thu tiền
       });
 
       return savedReceipt;
