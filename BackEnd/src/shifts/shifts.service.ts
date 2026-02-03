@@ -1408,6 +1408,30 @@ export class ShiftsService {
 
     // ⏰ CÂP NHẬT ledgerAt cho các bản ghi cash_ledger thiếu
     // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
+    
+    // 1. Update DEPOSIT: lấy từ cash_deposits.deposit_at
+    await this.dataSource.query(`
+      UPDATE cash_ledger cl
+      INNER JOIN cash_deposits cd ON cl.ref_id = cd.id
+      SET cl.ledger_at = cd.deposit_at
+      WHERE cl.shift_id = ?
+        AND cl.ref_type = 'DEPOSIT'
+        AND cl.ledger_at IS NULL
+        AND cd.deposit_at IS NOT NULL
+    `, [shiftId]);
+
+    // 2. Update RECEIPT: lấy từ receipts.receipt_at
+    await this.dataSource.query(`
+      UPDATE cash_ledger cl
+      INNER JOIN receipts r ON cl.ref_id = r.id
+      SET cl.ledger_at = r.receipt_at
+      WHERE cl.shift_id = ?
+        AND cl.ref_type = 'RECEIPT'
+        AND cl.ledger_at IS NULL
+        AND r.receipt_at IS NOT NULL
+    `, [shiftId]);
+
+    // 3. Fallback: các bản ghi còn lại dùng closedAt
     await this.cashLedgerRepository
       .createQueryBuilder()
       .update(CashLedger)
@@ -1416,7 +1440,7 @@ export class ShiftsService {
       .andWhere('ledger_at IS NULL')
       .execute();
 
-    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
+    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers from deposit_at/receipt_at`);
 
     // Ghi audit log
     await this.auditLogRepository.save({
