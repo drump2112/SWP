@@ -667,6 +667,7 @@ const ShiftOperationsPage: React.FC = () => {
             details: [{ customerId: customerId, amount: Number(r.amount) }],
             notes: r.notes,
             paymentMethod: r.paymentMethod || "CASH",
+            receiptAt: r.receiptAt, // ⏰ Thời gian thu tiền đã lưu
           };
         })
       );
@@ -1165,6 +1166,7 @@ const ShiftOperationsPage: React.FC = () => {
         details: r.details,
         notes: r.notes,
         paymentMethod: r.paymentMethod || "CASH",
+        receiptAt: r.receiptAt, // ⏰ Thời gian thu tiền do người dùng nhập
       })),
       deposits: draftDeposits.map((d) => ({
         id: String(d.id).startsWith("draft_") || String(d.id).startsWith("receipt-") ? undefined : d.id,

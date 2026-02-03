@@ -24,11 +24,17 @@ export class ReceiptsService {
   async create(createReceiptDto: CreateReceiptDto) {
     return this.dataSource.transaction(async (manager) => {
       // 1. Tạo receipt
+      const receiptAt = createReceiptDto.receiptAt ? new Date(createReceiptDto.receiptAt) : new Date();
+      const paymentMethod = createReceiptDto.paymentMethod || 'CASH';
+
       const receipt = manager.create(Receipt, {
         storeId: createReceiptDto.storeId,
         shiftId: createReceiptDto.shiftId,
         receiptType: createReceiptDto.receiptType,
         amount: createReceiptDto.amount,
+        paymentMethod: paymentMethod,
+        receiptAt: receiptAt,
+        notes: createReceiptDto.notes,
       });
       const savedReceipt = await manager.save(Receipt, receipt);
 
@@ -51,22 +57,27 @@ export class ReceiptsService {
               refId: savedReceipt.id,
               debit: 0,
               credit: detail.amount,
+              ledgerAt: receiptAt, // ⏰ Thời điểm thu tiền
             });
             await manager.save(DebtLedger, debtLedger);
           }
         }
       }
 
-      // 3. Ghi cash ledger (tiền vào quỹ)
-      const cashLedger = manager.create(CashLedger, {
-        storeId: createReceiptDto.storeId,
-        refType: 'RECEIPT',
-        refId: savedReceipt.id,
-        cashIn: createReceiptDto.amount,
-        cashOut: 0,
-        ledgerAt: new Date(), // ⏰ Ghi nhận thời gian thu tiền (receipts.service.ts không có receiptAt trong DTO cũ)
-      });
-      await manager.save(CashLedger, cashLedger);
+      // 3. Ghi cash ledger (tiền vào quỹ) - CHỈ khi thu bằng tiền mặt
+      // Nếu chuyển khoản thì tiền đã vào tài khoản ngân hàng, không qua quỹ tiền mặt
+      if (paymentMethod === 'CASH') {
+        const cashLedger = manager.create(CashLedger, {
+          storeId: createReceiptDto.storeId,
+          refType: 'RECEIPT',
+          refId: savedReceipt.id,
+          cashIn: createReceiptDto.amount,
+          cashOut: 0,
+          ledgerAt: receiptAt, // ⏰ Thời điểm thu tiền
+          notes: createReceiptDto.notes || 'Thu tiền thanh toán nợ',
+        });
+        await manager.save(CashLedger, cashLedger);
+      }
 
       return savedReceipt;
     });

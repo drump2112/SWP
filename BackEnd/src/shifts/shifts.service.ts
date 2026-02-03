@@ -698,6 +698,7 @@ export class ShiftsService {
           receiverName: deposit.receiverName,
           paymentMethod: deposit.paymentMethod || 'CASH',
           notes: deposit.notes,
+          sourceType: deposit.sourceType || 'RETAIL', // ⏰ Lưu sourceType để biết nguồn gốc
         });
 
         // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
@@ -1408,39 +1409,50 @@ export class ShiftsService {
 
     // ⏰ CÂP NHẬT ledgerAt cho các bản ghi cash_ledger thiếu
     // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
+    try {
+      // 1. Update DEPOSIT: lấy từ deposit_at (nếu có)
+      const depositResult = await this.dataSource.query(`
+        UPDATE cash_ledger cl
+        INNER JOIN cash_deposits cd ON cl.ref_id = cd.id
+        SET cl.ledger_at = cd.deposit_at
+        WHERE cl.shift_id = ?
+          AND cl.ref_type = 'DEPOSIT'
+          AND cl.ledger_at IS NULL
+          AND cd.deposit_at IS NOT NULL
+      `, [shiftId]);
+      console.log(`✅ Updated ${depositResult.affectedRows || 0} DEPOSIT cash_ledger rows`);
 
-    // 1. Update DEPOSIT: lấy từ deposit_at (nếu có)
-    await this.dataSource.query(`
-      UPDATE cash_ledger cl
-      INNER JOIN cash_deposits cd ON cl.ref_id = cd.id
-      SET cl.ledger_at = cd.deposit_at
-      WHERE cl.shift_id = ?
-        AND cl.ref_type = 'DEPOSIT'
-        AND cl.ledger_at IS NULL
-        AND cd.deposit_at IS NOT NULL
-    `, [shiftId]);
+      // 2. Update RECEIPT: lấy từ receipt_at (nếu có)
+      const receiptResult = await this.dataSource.query(`
+        UPDATE cash_ledger cl
+        INNER JOIN receipts r ON cl.ref_id = r.id
+        SET cl.ledger_at = r.receipt_at
+        WHERE cl.shift_id = ?
+          AND cl.ref_type = 'RECEIPT'
+          AND cl.ledger_at IS NULL
+          AND r.receipt_at IS NOT NULL
+      `, [shiftId]);
+      console.log(`✅ Updated ${receiptResult.affectedRows || 0} RECEIPT cash_ledger rows`);
 
-    // 2. Update RECEIPT: lấy từ receipt_at (nếu có)
-    await this.dataSource.query(`
-      UPDATE cash_ledger cl
-      INNER JOIN receipts r ON cl.ref_id = r.id
-      SET cl.ledger_at = r.receipt_at
-      WHERE cl.shift_id = ?
-        AND cl.ref_type = 'RECEIPT'
-        AND cl.ledger_at IS NULL
-        AND r.receipt_at IS NOT NULL
-    `, [shiftId]);
+      // 3. Fallback: TẤT CẢ bản ghi còn thiếu → dùng closedAt của ca
+      const fallbackResult = await this.cashLedgerRepository
+        .createQueryBuilder()
+        .update(CashLedger)
+        .set({ ledgerAt: closedAt })
+        .where('shift_id = :shiftId', { shiftId })
+        .andWhere('ledger_at IS NULL')
+        .execute();
+      console.log(`✅ Updated ${fallbackResult.affected || 0} remaining cash_ledger rows with closedAt`);
 
-    // 3. Fallback: TẤT CẢ bản ghi còn thiếu → dùng closedAt của ca
-    await this.cashLedgerRepository
-      .createQueryBuilder()
-      .update(CashLedger)
-      .set({ ledgerAt: closedAt })
-      .where('shift_id = :shiftId', { shiftId })
-      .andWhere('ledger_at IS NULL')
-      .execute();
-
-    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
+      console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
+    } catch (error) {
+      console.error(`❌ ERROR updating cash_ledger for shift ${shiftId}:`);
+      console.error(`   Error name: ${error.name}`);
+      console.error(`   Error message: ${error.message}`);
+      console.error(`   Error code: ${error.code}`);
+      console.error(`   Full error:`, error);
+      // Không throw error ở đây - chỉ log warning vì đây là optional update
+    }
 
     // Ghi audit log
     await this.auditLogRepository.save({
@@ -1867,12 +1879,17 @@ export class ShiftsService {
       }
 
       // 1. Tạo phiếu thu
+      const receiptAt = createDto.receiptAt ? new Date(createDto.receiptAt) : new Date();
+      const paymentMethod = createDto.paymentMethod || 'CASH';
+
       const receipt = manager.create(Receipt, {
         storeId: createDto.storeId,
         shiftId: createDto.shiftId,
         receiptType: createDto.receiptType,
         amount: createDto.amount,
         notes: createDto.notes,
+        paymentMethod: paymentMethod,
+        receiptAt: receiptAt,
       });
       const savedReceipt = await manager.save(receipt);
 
@@ -1895,18 +1912,24 @@ export class ShiftsService {
           refId: savedReceipt.id,
           debit: 0,
           credit: detail.amount, // Giảm nợ
+          ledgerAt: receiptAt, // ⏰ Thời điểm thu tiền
         });
       }
 
-      // 4. ⭐ GHI SỔ QUỸ: Thu tiền vào
-      await manager.save(CashLedger, {
-        shiftId: createDto.shiftId,
-        storeId: createDto.storeId,
-        refType: 'RECEIPT',
-        refId: savedReceipt.id,
-        cashIn: createDto.amount,
-        cashOut: 0,
-      });
+      // 4. ⭐ GHI SỔ QUỸ: Thu tiền vào (CHỈ khi thu bằng tiền mặt)
+      // Nếu chuyển khoản thì tiền đã vào tài khoản ngân hàng, không qua quỹ tiền mặt
+      if (paymentMethod === 'CASH') {
+        await manager.save(CashLedger, {
+          shiftId: createDto.shiftId,
+          storeId: createDto.storeId,
+          refType: 'RECEIPT',
+          refId: savedReceipt.id,
+          cashIn: createDto.amount,
+          cashOut: 0,
+          ledgerAt: receiptAt, // ⏰ Thời điểm thu tiền
+          notes: createDto.notes || 'Thu tiền thanh toán nợ',
+        });
+      }
 
       return savedReceipt;
     });

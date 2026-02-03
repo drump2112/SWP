@@ -1,4 +1,4 @@
-import { IsInt, IsNotEmpty, IsNumber, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import { IsInt, IsNotEmpty, IsNumber, IsString, IsArray, ValidateNested, IsOptional, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ReceiptDetailDto {
@@ -31,4 +31,16 @@ export class CreateReceiptDto {
   @Type(() => ReceiptDetailDto)
   @IsOptional()
   details?: ReceiptDetailDto[];
+
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @IsString()
+  @IsOptional()
+  paymentMethod?: string; // 'CASH', 'BANK_TRANSFER'
+
+  @IsString()
+  @IsOptional()
+  receiptAt?: string; // ISO datetime string
 }
