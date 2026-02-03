@@ -1409,7 +1409,7 @@ export class ShiftsService {
     // ⏰ CÂP NHẬT ledgerAt cho các bản ghi cash_ledger thiếu
     // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
     
-    // 1. Update DEPOSIT: lấy từ cash_deposits.deposit_at
+    // 1. Update DEPOSIT: lấy từ deposit_at (nếu có)
     await this.dataSource.query(`
       UPDATE cash_ledger cl
       INNER JOIN cash_deposits cd ON cl.ref_id = cd.id
@@ -1420,7 +1420,7 @@ export class ShiftsService {
         AND cd.deposit_at IS NOT NULL
     `, [shiftId]);
 
-    // 2. Update RECEIPT: lấy từ receipts.receipt_at
+    // 2. Update RECEIPT: lấy từ receipt_at (nếu có)
     await this.dataSource.query(`
       UPDATE cash_ledger cl
       INNER JOIN receipts r ON cl.ref_id = r.id
@@ -1431,7 +1431,7 @@ export class ShiftsService {
         AND r.receipt_at IS NOT NULL
     `, [shiftId]);
 
-    // 3. Fallback: các bản ghi còn lại dùng closedAt
+    // 3. Fallback: TẤT CẢ bản ghi còn thiếu → dùng closedAt của ca
     await this.cashLedgerRepository
       .createQueryBuilder()
       .update(CashLedger)
@@ -1440,7 +1440,7 @@ export class ShiftsService {
       .andWhere('ledger_at IS NULL')
       .execute();
 
-    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers from deposit_at/receipt_at`);
+    console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
 
     // Ghi audit log
     await this.auditLogRepository.save({
@@ -1792,7 +1792,7 @@ export class ShiftsService {
         cashIn: 0,
         cashOut: createDto.amount,
         shiftId: shift.id,
-        ledgerAt: createDto.depositAt ? new Date(createDto.depositAt) : new Date(), // ⏰ Ghi nhận thời gian nộp tiền
+        ledgerAt: createDto.depositAt ? new Date(createDto.depositAt) : new Date(), // ⏰ Lấy thời gian nộp tiền user chọn
       });
       await manager.save(cashLedger);
 
@@ -1906,7 +1906,6 @@ export class ShiftsService {
         refId: savedReceipt.id,
         cashIn: createDto.amount,
         cashOut: 0,
-        ledgerAt: createDto.receiptAt ? new Date(createDto.receiptAt) : new Date(), // ⏰ Ghi nhận thời gian thu tiền
       });
 
       return savedReceipt;
