@@ -689,7 +689,8 @@ export class ReportsService {
     const ledgerQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
       .leftJoinAndSelect('cl.store', 'store')
-      .orderBy('cl.shift_id', 'ASC')
+      .orderBy('cl.ledger_at', 'ASC') // ⏰ Ưu tiên thời gian trước - đúng nguyên tắc sổ quỹ
+      .addOrderBy('cl.shift_id', 'ASC')
       .addOrderBy(
         `CASE
           WHEN cl.ref_type = 'SHIFT_CLOSE' THEN 1
@@ -870,9 +871,36 @@ export class ReportsService {
       mergedLedgers.push(ledger);
     }
 
-    // Tính toán số dư luỹ kế
+    // ✅ GỘP THEO NGÀY: Tổng hợp tất cả giao dịch trong cùng ngày
+    const dailyLedgers: typeof mergedLedgers = [];
+    const dailyMap = new Map<string, typeof mergedLedgers[0]>();
+
+    for (const ledger of mergedLedgers) {
+      const dateKey = ledger.date ? new Date(ledger.date).toISOString().split('T')[0] : 'unknown';
+      
+      if (dailyMap.has(dateKey)) {
+        const existing = dailyMap.get(dateKey)!;
+        existing.cashIn += ledger.cashIn;
+        existing.cashOut += ledger.cashOut;
+        // Gộp details nếu cần (hoặc để null vì đã tổng hợp)
+        existing.notes = `Tổng hợp ${dateKey}`;
+      } else {
+        dailyMap.set(dateKey, {
+          ...ledger,
+          refType: 'DAILY_SUMMARY',
+          notes: `Tổng hợp ${dateKey}`,
+        });
+      }
+    }
+
+    // Chuyển Map về Array và sort theo ngày
+    const dailySummary = Array.from(dailyMap.values()).sort((a, b) => 
+      new Date(a.date).getTime() - new Date(b.date).getTime()
+    );
+
+    // Tính toán số dư luỹ kế cho từng ngày
     let runningBalance = openingBalance;
-    const ledgersWithBalance = mergedLedgers.map((l) => {
+    const ledgersWithBalance = dailySummary.map((l) => {
       runningBalance += l.cashIn - l.cashOut;
       return {
         ...l,
