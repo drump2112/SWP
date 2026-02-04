@@ -1662,7 +1662,7 @@ export class ShiftsService {
     });
   }
 
-  async findAll(limit = 100) {
+  async findAll(limit = 500) {
     return this.shiftRepository.find({
       order: { shiftDate: 'DESC', shiftNo: 'DESC' },
       take: limit,
