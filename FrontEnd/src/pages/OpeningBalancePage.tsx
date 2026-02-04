@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { customersApi } from '../api/customers';
 import { storesApi } from '../api/stores';
 import SearchableSelect from '../components/SearchableSelect';
+import { showConfirm } from '../utils/sweetalert';
 
 interface OpeningBalanceRecord {
   id: number;
@@ -78,8 +79,8 @@ export const OpeningBalancePage: React.FC = () => {
       }
 
       const balanceNum = parseFloat(balance);
-      if (isNaN(balanceNum) || balanceNum === 0) {
-        throw new Error('Số dư không hợp lệ (không được bằng 0, âm được phép)');
+      if (isNaN(balanceNum)) {
+        throw new Error('Số dư không hợp lệ (vui lòng nhập số)');
       }
 
       const customer = allCustomers.find((c) => c.id === selectedCustomerId);
@@ -135,6 +136,20 @@ export const OpeningBalancePage: React.FC = () => {
     },
   });
 
+  // Mutation: Xóa opening balance
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return customersApi.deleteOpeningBalance(id);
+    },
+    onSuccess: () => {
+      toast.success('Xóa số dư đầu kỳ thành công!');
+      queryClient.invalidateQueries({ queryKey: ['customers', 'opening-balance'] });
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Có lỗi xảy ra khi xóa');
+    },
+  });
+
   // Mutation: Import Excel
   const importMutation = useMutation({
     mutationFn: async () => {
@@ -181,8 +196,8 @@ export const OpeningBalancePage: React.FC = () => {
 
   const handleSaveEdit = (id: number) => {
     const balanceNum = parseFloat(editBalance);
-    if (isNaN(balanceNum) || balanceNum === 0) {
-      toast.error('Số dư không hợp lệ (không được bằng 0, âm được phép)');
+    if (isNaN(balanceNum)) {
+      toast.error('Số dư không hợp lệ (vui lòng nhập số)');
       return;
     }
 
@@ -199,6 +214,17 @@ export const OpeningBalancePage: React.FC = () => {
     setEditBalance('');
     setEditNotes('');
     setEditDate('');
+  };
+
+  const handleDelete = async (record: OpeningBalanceRecord) => {
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn xóa số dư đầu kỳ của khách hàng "${record.customerName}" tại "${record.storeName}"?\n\nSố dư: ${Number(record.balance).toLocaleString('vi-VN')} VNĐ\n\n⚠️ Chỉ có thể xóa nếu chưa có giao dịch khác.`,
+      'Xác nhận xóa số dư đầu kỳ',
+    );
+    
+    if (confirmed) {
+      deleteMutation.mutate(record.id);
+    }
   };
 
   const downloadTemplate = () => {
@@ -664,6 +690,16 @@ export const OpeningBalancePage: React.FC = () => {
                               </svg>
                               Sửa
                             </button>
+                            <button
+                              onClick={() => handleDelete(record)}
+                              disabled={deleteMutation.isPending}
+                              className="px-3 py-1.5 text-sm bg-gradient-to-r from-red-500 to-red-600 text-white rounded-md shadow hover:shadow-lg hover:from-red-600 hover:to-red-700 disabled:from-gray-400 disabled:to-gray-500 transition-all duration-300 flex items-center gap-1.5 font-medium"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Xóa
+                            </button>
                           </div>
                         )}
                       </td>
@@ -689,7 +725,7 @@ export const OpeningBalancePage: React.FC = () => {
               <strong>Tự động tạo liên kết:</strong> Nếu khách hàng chưa được liên kết với cửa hàng, hệ thống sẽ tự động tạo liên kết customer-store
             </li>
             <li>Mã khách hàng phải tồn tại trong hệ thống trước khi nhập</li>
-            <li>Số dư đầu kỳ có thể âm hoặc dương (dương = khách nợ, âm = khách được nợ), không được bằng 0</li>
+            <li>Số dư đầu kỳ có thể âm, dương hoặc bằng 0 (dương = khách nợ, âm = khách được nợ, 0 = không nợ)</li>
             <li>Dữ liệu sẽ được ghi vào sổ cái công nợ với loại <strong>OPENING_BALANCE</strong></li>
             <li>File Excel phải có các cột: <strong>Mã KH</strong>, <strong>Tên KH</strong>, <strong>Số dư đầu kỳ</strong>, <strong>Ghi chú</strong></li>
             <li><strong className="text-red-700">Chức năng này chỉ dành cho ADMIN và ACCOUNTING</strong></li>

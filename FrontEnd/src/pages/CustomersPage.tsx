@@ -395,6 +395,30 @@ const CustomersPage: React.FC = () => {
     }
   };
 
+  // Xóa liên kết khách hàng - cửa hàng
+  const handleRemoveCustomerFromStore = async (storeId: number, storeName: string) => {
+    if (!selectedCustomerForLimit) return;
+
+    const confirmed = await showConfirm(
+      `Bạn có chắc chắn muốn xóa liên kết với cửa hàng "${storeName}"?\n\nChỉ có thể xóa nếu chưa có giao dịch nào.`,
+      "Xác nhận xóa liên kết",
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      await customersApi.removeCustomerFromStore(
+        selectedCustomerForLimit.id,
+        storeId,
+      );
+      await refetchCreditLimits();
+      await queryClient.invalidateQueries({ queryKey: ["customers"] });
+      showSuccess("Đã xóa liên kết thành công!");
+    } catch (error: any) {
+      showError(error.response?.data?.message || "Xóa liên kết thất bại");
+    }
+  };
+
   const filteredCustomers = customers?.filter((customer) => {
     const matchesSearch =
       customer.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -1188,6 +1212,7 @@ const CustomersPage: React.FC = () => {
                                   isAdmin={user?.roleCode === 'SUPER_ADMIN' || user?.roleCode === 'ADMIN'}
                                   onUpdate={handleUpdateCreditLimit}
                                   onToggleBypass={handleToggleStoreBypass}
+                                  onRemove={handleRemoveCustomerFromStore}
                                 />
                               ));
                             })()}
@@ -1385,7 +1410,8 @@ const CreditLimitRow: React.FC<{
   isAdmin?: boolean;
   onUpdate: (storeId: number, creditLimit: number | null) => Promise<void>;
   onToggleBypass?: (storeId: number, bypass: boolean, bypassUntil?: string | null) => Promise<void>;
-}> = ({ limit, defaultLimit, globalBypassActive, isAdmin, onUpdate, onToggleBypass }) => {
+  onRemove?: (storeId: number, storeName: string) => Promise<void>;
+}> = ({ limit, defaultLimit, globalBypassActive, isAdmin, onUpdate, onToggleBypass, onRemove }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -1554,12 +1580,23 @@ const CreditLimitRow: React.FC<{
               </button>
             </div>
           ) : (
-            <button
-              onClick={handleEdit}
-              className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
-            >
-              Sửa
-            </button>
+            <div className="flex justify-center gap-2">
+              <button
+                onClick={handleEdit}
+                className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200"
+              >
+                Sửa
+              </button>
+              {isAdmin && onRemove && (
+                <button
+                  onClick={() => onRemove(limit.storeId, limit.storeName)}
+                  className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                  title="Xóa liên kết"
+                >
+                  Xóa
+                </button>
+              )}
+            </div>
           )}
         </td>
       </tr>

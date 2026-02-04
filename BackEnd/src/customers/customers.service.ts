@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
+import { Repository, DataSource, Not } from 'typeorm';
 import * as XLSX from 'xlsx';
 import { Customer } from '../entities/customer.entity';
 import { CustomerStore } from '../entities/customer-store.entity';
@@ -779,6 +779,72 @@ export class CustomersService {
   }
 
   /**
+   * Xóa liên kết khách hàng - cửa hàng
+   * Chỉ cho phép xóa nếu chưa có giao dịch nào
+   */
+  async removeCustomerFromStore(customerId: number, storeId: number) {
+    // Validate customer exists
+    const customer = await this.customerRepository.findOne({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException(`Khách hàng #${customerId} không tồn tại`);
+    }
+
+    // Validate store exists
+    const store = await this.storeRepository.findOne({
+      where: { id: storeId },
+    });
+    if (!store) {
+      throw new NotFoundException(`Cửa hàng #${storeId} không tồn tại`);
+    }
+
+    // Check if customer_store exists
+    const customerStore = await this.customerStoreRepository.findOne({
+      where: { customerId, storeId },
+    });
+
+    if (!customerStore) {
+      throw new NotFoundException(
+        `Khách hàng #${customerId} chưa được liên kết với cửa hàng #${storeId}`
+      );
+    }
+
+    // Check if there are any transactions (debt_ledger)
+    const debtCount = await this.debtLedgerRepository.count({
+      where: { customerId, storeId },
+    });
+
+    if (debtCount > 0) {
+      throw new BadRequestException(
+        `Không thể xóa liên kết. Khách hàng đã có ${debtCount} giao dịch tại cửa hàng này. Vui lòng liên hệ quản trị viên.`
+      );
+    }
+
+    // Check if there are any sales
+    const salesCount = await this.saleRepository.count({
+      where: { customerId, storeId },
+    });
+
+    if (salesCount > 0) {
+      throw new BadRequestException(
+        `Không thể xóa liên kết. Khách hàng đã có ${salesCount} đơn hàng tại cửa hàng này. Vui lòng liên hệ quản trị viên.`
+      );
+    }
+
+    // Delete the association
+    await this.customerStoreRepository.delete({ customerId, storeId });
+
+    return {
+      message: 'Xóa liên kết khách hàng - cửa hàng thành công',
+      customerId,
+      storeId,
+      customerName: customer.name,
+      storeName: store.name,
+    };
+  }
+
+  /**
    * Lấy hạn mức hiệu lực của khách hàng tại một cửa hàng
    */
   async getEffectiveCreditLimit(customerId: number, storeId: number): Promise<number> {
@@ -1038,16 +1104,8 @@ export class CustomersService {
             await manager.save(customerStore);
           }
 
-          // 3. Kiểm tra số dư không được bằng 0
-          if (item.openingBalance === 0) {
-            errors.push({
-              row: rowNumber,
-              customerCode: item.customerCode,
-              message: 'Số dư đầu kỳ không được bằng 0',
-            });
-            failedCount++;
-            continue;
-          }
+          // 3. Bỏ qua kiểm tra số dư bằng 0 (cho phép nhập 0)
+          // Số dư có thể là 0, dương, hoặc âm
 
           // 4. Tạo record vào debt_ledger
           const debtLedger = new DebtLedger();
@@ -1131,17 +1189,17 @@ export class CustomersService {
       throw new NotFoundException('Không tìm thấy bản ghi số dư đầu kỳ');
     }
 
-    if (newBalance === 0) {
-      throw new BadRequestException('Số dư đầu kỳ không được bằng 0');
-    }
-
-    // Dương = khách nợ (debit), âm = khách được nợ (credit)
+    // Cho phép số dư bằng 0 (đã thanh toán hết nợ)
+    // Dương = khách nợ (debit), âm = khách được nợ (credit), 0 = không nợ
     if (newBalance > 0) {
       record.debit = newBalance;
       record.credit = 0;
-    } else {
+    } else if (newBalance < 0) {
       record.debit = 0;
       record.credit = Math.abs(newBalance);
+    } else {
+      record.debit = 0;
+      record.credit = 0;
     }
     if (notes !== undefined) {
       record.notes = notes;
@@ -1156,6 +1214,47 @@ export class CustomersService {
       message: 'Cập nhật số dư đầu kỳ thành công',
       id: record.id,
       newBalance,
+    };
+  }
+
+  /**
+   * Xóa bản ghi số dư đầu kỳ
+   * Chỉ cho phép xóa nếu chưa có giao dịch khác
+   */
+  async deleteOpeningBalance(id: number) {
+    const record = await this.debtLedgerRepository.findOne({
+      where: { id, refType: 'OPENING_BALANCE' },
+      relations: ['customer', 'store'],
+    });
+
+    if (!record) {
+      throw new NotFoundException('Không tìm thấy bản ghi số dư đầu kỳ');
+    }
+
+    // Kiểm tra xem có giao dịch khác ngoài OPENING_BALANCE không
+    const otherTransactions = await this.debtLedgerRepository.count({
+      where: {
+        customerId: record.customerId,
+        storeId: record.storeId,
+        refType: Not('OPENING_BALANCE'),
+      },
+    });
+
+    if (otherTransactions > 0) {
+      throw new BadRequestException(
+        `Không thể xóa số dư đầu kỳ. Khách hàng đã có ${otherTransactions} giao dịch khác tại cửa hàng này.`
+      );
+    }
+
+    // Xóa bản ghi
+    await this.debtLedgerRepository.delete(id);
+
+    return {
+      message: 'Xóa số dư đầu kỳ thành công',
+      id,
+      customerName: record.customer?.name,
+      storeName: record.store?.name,
+      deletedBalance: Number(record.debit) - Number(record.credit),
     };
   }
 }

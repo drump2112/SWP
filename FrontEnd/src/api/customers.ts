@@ -207,6 +207,20 @@ export const customersApi = {
     return response.data;
   },
 
+  removeCustomerFromStore: async (
+    customerId: number,
+    storeId: number
+  ): Promise<{
+    message: string;
+    customerId: number;
+    storeId: number;
+    customerName: string;
+    storeName: string;
+  }> => {
+    const response = await api.delete(`/customers/${customerId}/stores/${storeId}`);
+    return response.data;
+  },
+
   validateDebtLimit: async (
     customerId: number,
     storeId: number,
@@ -304,6 +318,17 @@ export const customersApi = {
     newBalance: number;
   }> => {
     const response = await api.put(`/customers/opening-balance/${id}`, { balance, notes, createdAt });
+    return response.data;
+  },
+
+  deleteOpeningBalance: async (id: number): Promise<{
+    message: string;
+    id: number;
+    customerName: string;
+    storeName: string;
+    deletedBalance: number;
+  }> => {
+    const response = await api.delete(`/customers/opening-balance/${id}`);
     return response.data;
   },
 };

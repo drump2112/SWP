@@ -51,6 +51,12 @@ export class CustomersController {
     return this.customersService.updateOpeningBalance(+id, body.balance, body.notes, body.createdAt);
   }
 
+  @Delete('opening-balance/:id')
+  @Roles('ADMIN')
+  deleteOpeningBalance(@Param('id') id: string) {
+    return this.customersService.deleteOpeningBalance(+id);
+  }
+
   @Get(':id')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   findOne(@Param('id') id: string) {
@@ -162,6 +168,15 @@ export class CustomersController {
     @Body() dto: UpdateStoreCreditLimitDto
   ) {
     return this.customersService.updateStoreCreditLimit(+customerId, +storeId, dto);
+  }
+
+  @Delete(':customerId/stores/:storeId')
+  @Roles('ADMIN')
+  removeCustomerFromStore(
+    @Param('customerId') customerId: string,
+    @Param('storeId') storeId: string
+  ) {
+    return this.customersService.removeCustomerFromStore(+customerId, +storeId);
   }
 
   @Post(':customerId/validate-debt-limit')
