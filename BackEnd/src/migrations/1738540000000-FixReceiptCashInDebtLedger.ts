@@ -2,26 +2,26 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Migration: Fix công nợ cửa hàng cho các phiếu thu tiền mặt
- * 
+ *
  * VẤN ĐỀ:
  * - Trước đây, khi thu tiền mặt từ khách nợ, hệ thống chỉ:
  *   + Ghi CREDIT cho khách EXTERNAL (giảm nợ họ)
  *   + Ghi cashIn vào sổ quỹ
  *   + NHƯNG KHÔNG ghi DEBIT cho khách INTERNAL (tiền vào quỹ = nợ cửa hàng tăng)
- * 
+ *
  * - Khi nộp tiền về công ty từ phiếu thu (sourceType='RECEIPT'), hệ thống:
  *   + Ghi cashOut vào sổ quỹ
  *   + NHƯNG KHÔNG ghi CREDIT cho khách INTERNAL (bị skip vì sourceType='RECEIPT')
- * 
+ *
  * KẾT QUẢ:
  * - Công nợ cửa hàng KHÔNG bằng Sổ quỹ
- * 
+ *
  * GIẢI PHÁP:
  * 1. Tìm tất cả phiếu thu tiền mặt chưa có bản ghi DEBIT RECEIPT_CASH_IN cho INTERNAL
  * 2. Tạo bản ghi DEBIT RECEIPT_CASH_IN cho khách INTERNAL
  * 3. Tìm tất cả phiếu nộp tiền mặt (từ phiếu thu) chưa có CREDIT DEPOSIT cho INTERNAL
  * 4. Tạo bản ghi CREDIT DEPOSIT cho khách INTERNAL
- * 
+ *
  * LƯU Ý: Migration này có thể chạy nhiều lần (idempotent) vì check tồn tại trước khi insert
  */
 export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterface {
@@ -35,7 +35,7 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
 
     // Tìm tất cả phiếu thu tiền mặt mà chưa có bản ghi RECEIPT_CASH_IN trong debt_ledger
     const receiptsNeedingDebit = await queryRunner.query(`
-      SELECT 
+      SELECT
         r.id AS receipt_id,
         r.store_id,
         r.shift_id,
@@ -53,8 +53,8 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
         AND s.status = 'CLOSED'
         -- Chưa có bản ghi RECEIPT_CASH_IN cho phiếu thu này
         AND NOT EXISTS (
-          SELECT 1 FROM debt_ledger dl 
-          WHERE dl.ref_type = 'RECEIPT_CASH_IN' 
+          SELECT 1 FROM debt_ledger dl
+          WHERE dl.ref_type = 'RECEIPT_CASH_IN'
             AND dl.ref_id = r.id
             AND dl.customer_id = ic.id
         )
@@ -67,7 +67,7 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     for (const receipt of receiptsNeedingDebit) {
       await queryRunner.query(`
         INSERT INTO debt_ledger (
-          customer_id, store_id, shift_id, ref_type, ref_id, 
+          customer_id, store_id, shift_id, ref_type, ref_id,
           debit, credit, notes, ledger_at, created_at
         ) VALUES (
           $1, $2, $3, 'RECEIPT_CASH_IN', $4,
@@ -95,21 +95,21 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     // Tìm phiếu nộp tiền mặt mà:
     // - Có trong ca đã đóng
     // - Chưa có bản ghi CREDIT DEPOSIT cho khách INTERNAL
-    // 
-    // LƯU Ý: Vì trước đây có check sourceType !== 'RECEIPT', 
+    //
+    // LƯU Ý: Vì trước đây có check sourceType !== 'RECEIPT',
     // nhưng sourceType không được lưu vào DB, nên ta không thể biết chính xác
     // phiếu nộp nào là từ RECEIPT, phiếu nào là từ RETAIL.
-    // 
-    // CÁCH XỬ LÝ: 
+    //
+    // CÁCH XỬ LÝ:
     // - Tìm tất cả phiếu nộp tiền mặt chưa có CREDIT cho INTERNAL
     // - Insert CREDIT nếu chưa có
-    // 
+    //
     // Điều này an toàn vì:
     // - Nếu đã có CREDIT từ trước (RETAIL) → không insert thêm (check EXISTS)
     // - Nếu chưa có CREDIT (RECEIPT bị skip) → insert CREDIT mới
 
     const depositsNeedingCredit = await queryRunner.query(`
-      SELECT 
+      SELECT
         cd.id AS deposit_id,
         cd.store_id,
         cd.shift_id,
@@ -127,8 +127,8 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
         AND s.status = 'CLOSED'
         -- Chưa có bản ghi CREDIT DEPOSIT cho phiếu nộp này
         AND NOT EXISTS (
-          SELECT 1 FROM debt_ledger dl 
-          WHERE dl.ref_type = 'DEPOSIT' 
+          SELECT 1 FROM debt_ledger dl
+          WHERE dl.ref_type = 'DEPOSIT'
             AND dl.ref_id = cd.id
             AND dl.customer_id = ic.id
             AND dl.credit > 0
@@ -142,7 +142,7 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     for (const deposit of depositsNeedingCredit) {
       await queryRunner.query(`
         INSERT INTO debt_ledger (
-          customer_id, store_id, shift_id, ref_type, ref_id, 
+          customer_id, store_id, shift_id, ref_type, ref_id,
           debit, credit, notes, ledger_at, created_at
         ) VALUES (
           $1, $2, $3, 'DEPOSIT', $4,
@@ -168,7 +168,7 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     console.log('\n📊 Bước 3: Kiểm tra kết quả...');
 
     const summary = await queryRunner.query(`
-      SELECT 
+      SELECT
         c.id AS customer_id,
         c.name AS customer_name,
         s.name AS store_name,
@@ -192,7 +192,7 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     console.log('   ' + '─'.repeat(100));
     console.log('   | Cửa hàng             | Khách INTERNAL        | Tổng DEBIT     | Tổng CREDIT    | Công nợ        | Sổ quỹ         |');
     console.log('   ' + '─'.repeat(100));
-    
+
     for (const row of summary) {
       const storeName = (row.store_name || '').padEnd(20).substring(0, 20);
       const customerName = (row.customer_name || '').padEnd(20).substring(0, 20);
@@ -200,9 +200,9 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
       const credit = Number(row.total_credit).toLocaleString('vi-VN').padStart(12);
       const balance = Number(row.balance).toLocaleString('vi-VN').padStart(12);
       const cashBalance = Number(row.cash_balance).toLocaleString('vi-VN').padStart(12);
-      
+
       const match = Math.abs(Number(row.balance) - Number(row.cash_balance)) < 1 ? '✅' : '⚠️';
-      
+
       console.log(`   | ${storeName} | ${customerName} | ${debit} | ${credit} | ${balance} | ${cashBalance} | ${match}`);
     }
     console.log('   ' + '─'.repeat(100));
@@ -217,15 +217,15 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
 
     // Xóa các bản ghi RECEIPT_CASH_IN được tạo bởi migration
     const deletedDebit = await queryRunner.query(`
-      DELETE FROM debt_ledger 
-      WHERE ref_type = 'RECEIPT_CASH_IN' 
+      DELETE FROM debt_ledger
+      WHERE ref_type = 'RECEIPT_CASH_IN'
         AND notes LIKE '[Migration]%'
     `);
 
     // Xóa các bản ghi CREDIT DEPOSIT được tạo bởi migration
     const deletedCredit = await queryRunner.query(`
-      DELETE FROM debt_ledger 
-      WHERE ref_type = 'DEPOSIT' 
+      DELETE FROM debt_ledger
+      WHERE ref_type = 'DEPOSIT'
         AND credit > 0
         AND notes LIKE '[Migration]%'
     `);

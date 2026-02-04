@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Migration: Fix công nợ cửa hàng cho các phiếu thu tiền mặt
 -- File: fix-receipt-cash-in-debt-ledger.sql
--- 
+--
 -- VẤN ĐỀ:
 -- - Trước đây khi thu tiền mặt từ khách nợ, KHÔNG ghi DEBIT cho khách INTERNAL
 -- - Khi nộp tiền từ phiếu thu, KHÔNG ghi CREDIT cho khách INTERNAL (bị skip)
@@ -15,7 +15,7 @@
 -- 1. Chạy phần PREVIEW trước để xem dữ liệu sẽ được thêm
 -- 2. Nếu OK, chạy phần EXECUTE
 -- 3. Chạy phần VERIFY để kiểm tra kết quả
--- 
+--
 -- LƯU Ý: Script này có thể chạy nhiều lần (idempotent) vì check NOT EXISTS
 -- =============================================================================
 
@@ -24,7 +24,7 @@
 -- =============================================================================
 
 -- 1.1. Xem phiếu thu tiền mặt cần bổ sung DEBIT cho INTERNAL
-SELECT 
+SELECT
     '[DEBIT sẽ thêm]' AS action,
     r.id AS receipt_id,
     st.name AS store_name,
@@ -40,15 +40,15 @@ INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
 WHERE r.payment_method = 'CASH'
   AND s.status = 'CLOSED'
   AND NOT EXISTS (
-    SELECT 1 FROM debt_ledger dl 
-    WHERE dl.ref_type = 'RECEIPT_CASH_IN' 
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.ref_type = 'RECEIPT_CASH_IN'
       AND dl.ref_id = r.id
       AND dl.customer_id = ic.id
   )
 ORDER BY r.id;
 
 -- 1.2. Xem phiếu nộp tiền mặt cần bổ sung CREDIT cho INTERNAL
-SELECT 
+SELECT
     '[CREDIT sẽ thêm]' AS action,
     cd.id AS deposit_id,
     st.name AS store_name,
@@ -64,8 +64,8 @@ INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
 WHERE cd.payment_method = 'CASH'
   AND s.status = 'CLOSED'
   AND NOT EXISTS (
-    SELECT 1 FROM debt_ledger dl 
-    WHERE dl.ref_type = 'DEPOSIT' 
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.ref_type = 'DEPOSIT'
       AND dl.ref_id = cd.id
       AND dl.customer_id = ic.id
       AND dl.credit > 0
@@ -82,10 +82,10 @@ BEGIN;
 
 -- 2.1. Insert DEBIT RECEIPT_CASH_IN cho phiếu thu tiền mặt
 INSERT INTO debt_ledger (
-    customer_id, store_id, shift_id, ref_type, ref_id, 
+    customer_id, store_id, shift_id, ref_type, ref_id,
     debit, credit, notes, ledger_at, created_at
 )
-SELECT 
+SELECT
     ic.id AS customer_id,
     r.store_id,
     r.shift_id,
@@ -103,8 +103,8 @@ INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
 WHERE r.payment_method = 'CASH'
   AND s.status = 'CLOSED'
   AND NOT EXISTS (
-    SELECT 1 FROM debt_ledger dl 
-    WHERE dl.ref_type = 'RECEIPT_CASH_IN' 
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.ref_type = 'RECEIPT_CASH_IN'
       AND dl.ref_id = r.id
       AND dl.customer_id = ic.id
   );
@@ -114,10 +114,10 @@ WHERE r.payment_method = 'CASH'
 
 -- 2.2. Insert CREDIT DEPOSIT cho phiếu nộp tiền mặt
 INSERT INTO debt_ledger (
-    customer_id, store_id, shift_id, ref_type, ref_id, 
+    customer_id, store_id, shift_id, ref_type, ref_id,
     debit, credit, notes, ledger_at, created_at
 )
-SELECT 
+SELECT
     ic.id AS customer_id,
     cd.store_id,
     cd.shift_id,
@@ -135,8 +135,8 @@ INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
 WHERE cd.payment_method = 'CASH'
   AND s.status = 'CLOSED'
   AND NOT EXISTS (
-    SELECT 1 FROM debt_ledger dl 
-    WHERE dl.ref_type = 'DEPOSIT' 
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.ref_type = 'DEPOSIT'
       AND dl.ref_id = cd.id
       AND dl.customer_id = ic.id
       AND dl.credit > 0
@@ -151,7 +151,7 @@ COMMIT;
 -- =============================================================================
 
 -- 3.1. So sánh Công nợ INTERNAL vs Sổ quỹ theo từng cửa hàng
-SELECT 
+SELECT
     st.name AS store_name,
     ic.name AS internal_customer,
     COALESCE(debt.total_debit, 0) AS tong_debit,
@@ -160,19 +160,19 @@ SELECT
     COALESCE(cash.total_in, 0) AS tong_cash_in,
     COALESCE(cash.total_out, 0) AS tong_cash_out,
     COALESCE(cash.total_in, 0) - COALESCE(cash.total_out, 0) AS so_quy,
-    CASE 
-        WHEN ABS((COALESCE(debt.total_debit, 0) - COALESCE(debt.total_credit, 0)) - 
-                 (COALESCE(cash.total_in, 0) - COALESCE(cash.total_out, 0))) < 1 
+    CASE
+        WHEN ABS((COALESCE(debt.total_debit, 0) - COALESCE(debt.total_credit, 0)) -
+                 (COALESCE(cash.total_in, 0) - COALESCE(cash.total_out, 0))) < 1
         THEN '✅ KHỚP'
-        ELSE '⚠️ LỆCH: ' || 
-             ((COALESCE(debt.total_debit, 0) - COALESCE(debt.total_credit, 0)) - 
+        ELSE '⚠️ LỆCH: ' ||
+             ((COALESCE(debt.total_debit, 0) - COALESCE(debt.total_credit, 0)) -
               (COALESCE(cash.total_in, 0) - COALESCE(cash.total_out, 0)))::TEXT
     END AS trang_thai
 FROM stores st
 INNER JOIN customer_stores cs ON cs.store_id = st.id
 INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
 LEFT JOIN (
-    SELECT 
+    SELECT
         dl.store_id,
         dl.customer_id,
         SUM(dl.debit) AS total_debit,
@@ -182,7 +182,7 @@ LEFT JOIN (
     GROUP BY dl.store_id, dl.customer_id
 ) debt ON debt.store_id = st.id AND debt.customer_id = ic.id
 LEFT JOIN (
-    SELECT 
+    SELECT
         cl.store_id,
         SUM(cl.cash_in) AS total_in,
         SUM(cl.cash_out) AS total_out
@@ -192,7 +192,7 @@ LEFT JOIN (
 ORDER BY st.name;
 
 -- 3.2. Xem chi tiết các bản ghi mới được thêm
-SELECT 
+SELECT
     '[DEBIT mới]' AS loai,
     dl.id,
     c.name AS khach_hang,
@@ -212,7 +212,7 @@ WHERE dl.ref_type = 'RECEIPT_CASH_IN'
 ORDER BY dl.created_at DESC
 LIMIT 20;
 
-SELECT 
+SELECT
     '[CREDIT mới]' AS loai,
     dl.id,
     c.name AS khach_hang,
@@ -235,17 +235,107 @@ LIMIT 20;
 
 
 -- =============================================================================
+-- PHẦN 3.5: DEBUG - Phân tích cửa hàng bị lệch lớn (VD: CH 371)
+-- =============================================================================
+
+-- 3.5.1. So sánh chi tiết Cash Ledger vs Debt Ledger của 1 cửa hàng
+-- Thay đổi store_id theo cửa hàng cần debug
+WITH store_debug AS (
+    SELECT id FROM stores WHERE name LIKE '%371%' LIMIT 1
+)
+SELECT
+    'CASH_LEDGER' AS source,
+    cl.ref_type,
+    COUNT(*) AS so_luong,
+    SUM(cl.cash_in) AS total_in,
+    SUM(cl.cash_out) AS total_out
+FROM cash_ledger cl, store_debug sd
+WHERE cl.store_id = sd.id
+GROUP BY cl.ref_type
+UNION ALL
+SELECT
+    'DEBT_LEDGER' AS source,
+    dl.ref_type,
+    COUNT(*) AS so_luong,
+    SUM(dl.debit) AS total_debit,
+    SUM(dl.credit) AS total_credit
+FROM debt_ledger dl
+INNER JOIN store_debug sd ON dl.store_id = sd.id
+INNER JOIN customers c ON c.id = dl.customer_id AND c.type = 'INTERNAL'
+WHERE dl.superseded_by_shift_id IS NULL
+GROUP BY dl.ref_type
+ORDER BY source, ref_type;
+
+-- 3.5.2. Tìm các giao dịch CashIn không có DEBIT tương ứng
+WITH store_debug AS (
+    SELECT id FROM stores WHERE name LIKE '%371%' LIMIT 1
+)
+SELECT
+    'CashIn thiếu DEBIT' AS van_de,
+    cl.id AS cash_ledger_id,
+    cl.ref_type,
+    cl.ref_id,
+    cl.cash_in,
+    cl.notes,
+    cl.ledger_at
+FROM cash_ledger cl
+INNER JOIN store_debug sd ON cl.store_id = sd.id
+INNER JOIN customer_stores cs ON cs.store_id = sd.id
+INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
+WHERE cl.cash_in > 0
+  AND NOT EXISTS (
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.customer_id = ic.id
+      AND dl.store_id = cl.store_id
+      AND dl.debit > 0
+      AND (
+        (dl.ref_type = cl.ref_type AND dl.ref_id = cl.ref_id)
+        OR (dl.ref_type = 'RECEIPT_CASH_IN' AND cl.ref_type = 'RECEIPT' AND dl.ref_id = cl.ref_id)
+        OR (dl.ref_type = 'RETAIL_SALE' AND cl.ref_type = 'SHIFT_CLOSE')
+      )
+  )
+ORDER BY cl.ledger_at;
+
+-- 3.5.3. Tìm các giao dịch CashOut không có CREDIT tương ứng
+WITH store_debug AS (
+    SELECT id FROM stores WHERE name LIKE '%371%' LIMIT 1
+)
+SELECT
+    'CashOut thiếu CREDIT' AS van_de,
+    cl.id AS cash_ledger_id,
+    cl.ref_type,
+    cl.ref_id,
+    cl.cash_out,
+    cl.notes,
+    cl.ledger_at
+FROM cash_ledger cl
+INNER JOIN store_debug sd ON cl.store_id = sd.id
+INNER JOIN customer_stores cs ON cs.store_id = sd.id
+INNER JOIN customers ic ON ic.id = cs.customer_id AND ic.type = 'INTERNAL'
+WHERE cl.cash_out > 0
+  AND NOT EXISTS (
+    SELECT 1 FROM debt_ledger dl
+    WHERE dl.customer_id = ic.id
+      AND dl.store_id = cl.store_id
+      AND dl.credit > 0
+      AND dl.ref_type = 'DEPOSIT'
+      AND dl.ref_id = cl.ref_id
+  )
+ORDER BY cl.ledger_at;
+
+
+-- =============================================================================
 -- PHẦN 4: ROLLBACK - Nếu cần hoàn tác
 -- =============================================================================
 
 -- CẢNH BÁO: Chỉ chạy nếu cần rollback!
 -- Xóa các bản ghi được tạo bởi migration
 
--- DELETE FROM debt_ledger 
--- WHERE ref_type = 'RECEIPT_CASH_IN' 
+-- DELETE FROM debt_ledger
+-- WHERE ref_type = 'RECEIPT_CASH_IN'
 --   AND notes LIKE '[Migration]%';
 
--- DELETE FROM debt_ledger 
--- WHERE ref_type = 'DEPOSIT' 
+-- DELETE FROM debt_ledger
+-- WHERE ref_type = 'DEPOSIT'
 --   AND credit > 0
 --   AND notes LIKE '[Migration]%';

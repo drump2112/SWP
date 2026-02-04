@@ -81,7 +81,20 @@ export class ReportsService {
     fromDate?: Date;
     toDate?: Date;
   }) {
-    const { storeId, customerId, fromDate, toDate } = params;
+    const { storeId, customerId } = params;
+    let { fromDate, toDate } = params;
+
+    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
+    if (fromDate) {
+      fromDate = new Date(fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+    }
+
+    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDate) {
+      toDate = new Date(toDate);
+      toDate.setHours(23, 59, 59, 999);
+    }
 
     // Lấy danh sách ID khách hàng có giao dịch công nợ
     const customerIdsQuery = this.debtLedgerRepository
@@ -125,7 +138,7 @@ export class ReportsService {
               customer.id,
               storeId,
               new Date(0),
-              fromDate,
+              new Date(fromDate.getTime() - 1), // Lấy đến trước fromDate
             )
           : 0;
 
@@ -666,7 +679,20 @@ export class ReportsService {
     fromDate?: Date;
     toDate?: Date;
   }) {
-    const { storeId, fromDate, toDate } = params;
+    const { storeId } = params;
+    let { fromDate, toDate } = params;
+
+    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
+    if (fromDate) {
+      fromDate = new Date(fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+    }
+
+    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDate) {
+      toDate = new Date(toDate);
+      toDate.setHours(23, 59, 59, 999);
+    }
 
     // Lấy số dư đầu kỳ (trước fromDate)
     const openingBalanceQuery = this.cashLedgerRepository
@@ -877,7 +903,7 @@ export class ReportsService {
 
     for (const ledger of mergedLedgers) {
       const dateKey = ledger.date ? new Date(ledger.date).toISOString().split('T')[0] : 'unknown';
-      
+
       if (dailyMap.has(dateKey)) {
         const existing = dailyMap.get(dateKey)!;
         existing.cashIn += ledger.cashIn;
@@ -894,7 +920,7 @@ export class ReportsService {
     }
 
     // Chuyển Map về Array và sort theo ngày
-    const dailySummary = Array.from(dailyMap.values()).sort((a, b) => 
+    const dailySummary = Array.from(dailyMap.values()).sort((a, b) =>
       new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -951,6 +977,18 @@ export class ReportsService {
 
   // Dashboard tổng quan cho giám đốc
   async getDashboard(fromDate: Date, toDate: Date) {
+    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
+    if (fromDate) {
+      fromDate = new Date(fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+    }
+
+    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDate) {
+      toDate = new Date(toDate);
+      toDate.setHours(23, 59, 59, 999);
+    }
+
     const [totalSales, debtSummary, cashSummary, inventorySummary] =
       await Promise.all([
         // Tổng doanh thu - ⏰ Dùng closed_at thay vì shift_date
@@ -1355,7 +1393,23 @@ export class ReportsService {
   async getRevenueSalesReport(
     query: RevenueSalesReportQueryDto,
   ): Promise<RevenueSalesReportResponse> {
-    const { productId, storeId, fromDateTime, toDateTime } = query;
+    const { productId, storeId } = query;
+    let fromDateTime = query.fromDateTime;
+    let toDateTime = query.toDateTime;
+
+    // Đảm bảo fromDateTime bắt đầu từ 00:00:00 của ngày
+    if (fromDateTime) {
+      const date = new Date(fromDateTime);
+      date.setHours(0, 0, 0, 0);
+      fromDateTime = date.toISOString();
+    }
+
+    // Đảm bảo toDateTime bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDateTime) {
+      const date = new Date(toDateTime);
+      date.setHours(23, 59, 59, 999);
+      toDateTime = date.toISOString();
+    }
 
     // ========== QUERY 1: TỔNG XUẤT BÁN từ PUMP_READINGS (lượng bơm qua vòi) ==========
     // Đây là tổng thực sự = Bán lẻ + Bán công nợ
@@ -1549,7 +1603,19 @@ export class ReportsService {
   async getSalesByCustomerReport(
     query: SalesByCustomerReportQueryDto,
   ): Promise<SalesByCustomerReportResponse> {
-    const { customerId, storeId, productId, fromDateTime, toDateTime } = query;
+    let { customerId, storeId, productId, fromDateTime, toDateTime } = query;
+
+    // Đảm bảo fromDateTime bắt đầu từ 00:00:00 của ngày
+    if (fromDateTime) {
+      const dateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
+      fromDateTime = new Date(dateStr).toISOString();
+    }
+
+    // Đảm bảo toDateTime bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDateTime) {
+      const dateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
+      toDateTime = new Date(dateStr).toISOString();
+    }
 
     // Query sales có customerId (bán công nợ)
     const salesQuery = this.saleRepository
@@ -1593,16 +1659,13 @@ export class ReportsService {
     // 🔥 Filter theo shift.openedAt để gán doanh thu về ngày mở ca (đúng ngày làm việc)
     // Ví dụ: Ca mở 23h ngày 23, đóng 7h ngày 24 → doanh thu thuộc ngày 23
     if (fromDateTime) {
-      // Nếu chưa có timestamp (YYYY-MM-DD), thêm vào. Nếu đã có (ISO string) thì giữ nguyên
-      const fromDateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
       salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateStr),
+        fromDateTime: new Date(fromDateTime),
       });
     }
     if (toDateTime) {
-      const toDateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
       salesQuery.andWhere('shift.openedAt <= :toDateTime', {
-        toDateTime: new Date(toDateStr),
+        toDateTime: new Date(toDateTime),
       });
     }
 
@@ -1675,6 +1738,18 @@ export class ReportsService {
   ) {
     if (!storeId) {
       return [];
+    }
+
+    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
+    if (fromDate) {
+      fromDate = new Date(fromDate);
+      fromDate.setHours(0, 0, 0, 0);
+    }
+
+    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
+    if (toDate) {
+      toDate = new Date(toDate);
+      toDate.setHours(23, 59, 59, 999);
     }
 
     const query = this.pumpReadingRepository
