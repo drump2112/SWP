@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import { customersApi } from '../api/customers';
 import { storesApi } from '../api/stores';
 import SearchableSelect from '../components/SearchableSelect';
+import Select2 from '../components/Select2';
 import { showConfirm } from '../utils/sweetalert';
 
 interface OpeningBalanceRecord {
@@ -53,6 +54,14 @@ export const OpeningBalancePage: React.FC = () => {
   const [editNotes, setEditNotes] = useState<string>('');
   const [editDate, setEditDate] = useState<string>('');
 
+  // State cho phân trang
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+
+  // State cho filter tìm kiếm
+  const [searchText, setSearchText] = useState('');
+  const [filterStoreId, setFilterStoreId] = useState<number | null>(null);
+
   // Fetch stores
   const { data: stores = [] } = useQuery({
     queryKey: ['stores'],
@@ -70,6 +79,23 @@ export const OpeningBalancePage: React.FC = () => {
     queryKey: ['customers', 'opening-balance'],
     queryFn: () => customersApi.getOpeningBalanceRecords(),
   });
+
+  // Lọc dữ liệu theo filter
+  const filteredRecords = records.filter((record) => {
+    const searchLower = searchText.toLowerCase();
+    const matchSearch = !searchText ||
+      record.customerCode.toLowerCase().includes(searchLower) ||
+      record.customerName.toLowerCase().includes(searchLower);
+    const matchStore = !filterStoreId || record.storeId === filterStoreId;
+
+    return matchSearch && matchStore;
+  });
+
+  // Tính toán phân trang
+  const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentRecords = filteredRecords.slice(startIndex, endIndex);
 
   // Mutation: Thêm mới opening balance (thủ công)
   const addMutation = useMutation({
@@ -221,7 +247,7 @@ export const OpeningBalancePage: React.FC = () => {
       `Bạn có chắc chắn muốn xóa số dư đầu kỳ của khách hàng "${record.customerName}" tại "${record.storeName}"?\n\nSố dư: ${Number(record.balance).toLocaleString('vi-VN')} VNĐ\n\n⚠️ Chỉ có thể xóa nếu chưa có giao dịch khác.`,
       'Xác nhận xóa số dư đầu kỳ',
     );
-    
+
     if (confirmed) {
       deleteMutation.mutate(record.id);
     }
@@ -570,47 +596,114 @@ export const OpeningBalancePage: React.FC = () => {
             </h2>
           </div>
 
+          {/* Filter tìm kiếm */}
+          <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  🔍 Tìm kiếm khách hàng
+                </label>
+                <input
+                  type="text"
+                  value={searchText}
+                  onChange={(e) => {
+                    setSearchText(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Nhập mã hoặc tên khách hàng..."
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  🏪 Lọc theo cửa hàng
+                </label>
+                <Select2
+                  value={filterStoreId || 0}
+                  onChange={(val) => {
+                    setFilterStoreId(val === 0 ? null : val as number);
+                    setCurrentPage(1);
+                  }}
+                  options={[
+                    { value: 0, label: 'Tất cả cửa hàng' },
+                    ...stores.map((store) => ({
+                      value: store.id,
+                      label: `${store.name} (${store.code})`,
+                    })),
+                  ]}
+                  className="h-[42px]"
+                />
+              </div>
+            </div>
+
+            {/* Nút xóa filter */}
+            {(searchText || filterStoreId) && (
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => {
+                    setSearchText('');
+                    setFilterStoreId(null);
+                    setCurrentPage(1);
+                  }}
+                  className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Xóa bộ lọc
+                </button>
+              </div>
+            )}
+          </div>
+
           {isLoading ? (
             <div className="p-8 text-center text-gray-500">Đang tải...</div>
           ) : records.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               Chưa có dữ liệu. Vui lòng thêm mới hoặc import từ Excel.
             </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              <div className="text-lg mb-2">🔍</div>
+              Không tìm thấy bản ghi nào phù hợp với bộ lọc.
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      STT
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Mã KH
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Tên khách hàng
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Cửa hàng
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Số dư (VND)
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Ngày nhập
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Ghi chú
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {records.map((record, index) => (
-                    <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 text-sm text-gray-600">{index + 1}</td>
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        STT
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Mã KH
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Tên khách hàng
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Cửa hàng
+                      </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Số dư (VND)
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Ngày nhập
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Ghi chú
+                      </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Thao tác
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {currentRecords.map((record, index) => (
+                      <tr key={record.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 text-sm text-gray-600">{startIndex + index + 1}</td>
                       <td className="px-4 py-3 text-sm font-medium text-gray-800">
                         {record.customerCode}
                       </td>
@@ -708,6 +801,69 @@ export const OpeningBalancePage: React.FC = () => {
                 </tbody>
               </table>
             </div>
+
+            {/* Phân trang */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
+                <div className="text-sm text-gray-700">
+                  Hiển thị <span className="font-semibold">{startIndex + 1}</span> - <span className="font-semibold">{Math.min(endIndex, filteredRecords.length)}</span> trong tổng số <span className="font-semibold">{filteredRecords.length}</span> bản ghi
+                  {(searchText || filterStoreId) && (
+                    <span className="text-blue-600 ml-1">(đã lọc từ {records.length} bản ghi)</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    ← Trước
+                  </button>
+
+                  {/* Hiển thị các số trang */}
+                  <div className="flex gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Hiển thị trang đầu, cuối, và các trang gần trang hiện tại
+                      const showPage = page === 1 ||
+                                       page === totalPages ||
+                                       (page >= currentPage - 1 && page <= currentPage + 1);
+
+                      const showEllipsis = (page === 2 && currentPage > 3) ||
+                                          (page === totalPages - 1 && currentPage < totalPages - 2);
+
+                      if (showEllipsis) {
+                        return <span key={page} className="px-3 py-2 text-sm text-gray-500">...</span>;
+                      }
+
+                      if (!showPage) return null;
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                            page === currentPage
+                              ? 'bg-blue-600 text-white font-semibold'
+                              : 'bg-white border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="px-3 py-2 text-sm bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sau →
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
 
