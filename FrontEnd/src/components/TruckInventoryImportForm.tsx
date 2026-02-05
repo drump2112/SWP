@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import dayjs from 'dayjs';
 import { productsApi } from '../api/products';
 import { tanksApi } from '../api/tanks';
 
@@ -57,7 +58,9 @@ const TruckInventoryImportForm: React.FC<Props> = ({ onSubmit, onCancel, storeId
     const now = new Date();
     return now.toISOString().slice(0, 16); // Format: YYYY-MM-DDTHH:mm
   };
-  const [docAt, setDocAt] = useState(initialData?.docAt || getDefaultDateTime());
+  const [docAt, setDocAt] = useState(
+    initialData?.docAt ? dayjs(initialData.docAt).format('YYYY-MM-DDTHH:mm') : getDefaultDateTime()
+  );
   const [supplierName, setSupplierName] = useState(initialData?.supplierName || '');
   const [invoiceNumber, setInvoiceNumber] = useState(initialData?.invoiceNumber || '');
   const [licensePlate, setLicensePlate] = useState(initialData?.licensePlate || '');

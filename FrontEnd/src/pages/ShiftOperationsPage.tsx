@@ -3474,7 +3474,7 @@ const ShiftOperationsPage: React.FC = () => {
                         required
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.depositAt
+                            ? dayjs(draftDeposits.find((d) => d.id === editingDepositId)?.depositAt).format("YYYY-MM-DDTHH:mm")
                             : dayjs().format("YYYY-MM-DDTHH:mm")
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
