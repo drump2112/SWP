@@ -309,15 +309,16 @@ export class CustomersService {
         .leftJoin('customer_stores', 'cs', 'cs.customer_id = c.id AND cs.store_id = :storeId', { storeId })
         .addSelect('cs.credit_limit', 'storeCreditLimit')
         .addSelect('cs.bypass_credit_limit', 'storeBypassCreditLimit')
-        .addSelect('cs.bypass_until', 'storeBypassUntil')
-        .where('cs.store_id = :storeId', { storeId });
+        .addSelect('cs.bypass_until', 'storeBypassUntil');
+      // KHÔNG dùng WHERE cs.store_id vì nó sẽ loại bỏ khách hàng chưa có record trong customer_stores
+      // Điều kiện store_id đã được filter trong LEFT JOIN ON clause
     } else {
       // Admin (không có storeId) - lấy tất cả khách hàng
       // Dùng subquery để check nếu có BẤT KỲ store nào được bypass
       query = query
         .addSelect(subQuery => {
           return subQuery
-            .select('MAX(CASE WHEN cs.bypass_credit_limit = true AND (cs.bypass_until IS NULL OR cs.bypass_until > NOW()) THEN 1 ELSE 0 END)')
+            .select('MAX(CASE WHEN cs.bypass_credit_limit = true AND (cs.bypass_until IS NULL OR cs.bypass_until >= NOW()) THEN 1 ELSE 0 END)')
             .from('customer_stores', 'cs')
             .where('cs.customer_id = c.id');
         }, 'anyStoreBypassActive')
@@ -332,6 +333,8 @@ export class CustomersService {
       // Ưu tiên creditLimit của store, nếu không có thì dùng mặc định
       const storeCreditLimit = row.storeCreditLimit;
       const defaultCreditLimit = Number(row.defaultCreditLimit || 0);
+      
+      // Tính hạn mức hiệu lực: Ưu tiên hạn mức riêng của store
       const creditLimit = storeCreditLimit !== null && storeCreditLimit !== undefined
         ? Number(storeCreditLimit)
         : defaultCreditLimit;
@@ -349,7 +352,7 @@ export class CustomersService {
       const isDateExpired = (dateStr: any) => {
         if (!dateStr) return false; // Null/undefined = vô thời hạn
         try {
-          return new Date(dateStr).getTime() <= Date.now();
+          return new Date(dateStr).getTime() < Date.now(); // Sửa <= thành < để nhất quán
         } catch {
           return false;
         }
@@ -367,10 +370,8 @@ export class CustomersService {
       const globalBypassActive = isBypassSet(row.globalBypassCreditLimit) && !isDateExpired(row.globalBypassUntil);
       const isBypassed = globalBypassActive || storeBypassActive;
 
-      // Debug log
-      if (isBypassed || creditLimit === 0) {
-        console.log(`[Credit Status] ${row.customerName}: bypass=${isBypassed}, creditLimit=${creditLimit}, globalBypass=${row.globalBypassCreditLimit}, globalUntil=${row.globalBypassUntil}, anyStoreBypass=${row.anyStoreBypassActive}`);
-      }
+      // Debug log - Log tất cả để dễ debug
+      console.log(`[Credit Status] ${row.customerName} (${row.customerCode}): storeLimit=${storeCreditLimit}, defaultLimit=${defaultCreditLimit}, effectiveLimit=${creditLimit}, debt=${currentDebt}, available=${availableCredit}, bypass=${isBypassed}`);
 
       return {
         customerId: row.customerId,
@@ -378,7 +379,7 @@ export class CustomersService {
         customerCode: row.customerCode,
         customerType: row.customerType,
         storeId,
-        creditLimit,
+        creditLimit, // Hạn mức hiệu lực (ưu tiên store limit, fallback về default)
         currentDebt,
         availableCredit,
         creditUsagePercent: Math.round(creditUsagePercent * 100) / 100,
@@ -397,8 +398,11 @@ export class CustomersService {
     // Get current debt balance
     const { balance } = await this.getDebtBalance(customerId, storeId);
 
-    // Calculate available credit
-    const creditLimit = Number(customer.creditLimit || 0);
+    // Lấy hạn mức hiệu lực (ưu tiên hạn mức riêng của store)
+    const creditLimit = storeId 
+      ? await this.getEffectiveCreditLimit(customerId, storeId)
+      : Number(customer.creditLimit || 0);
+
     const availableCredit = creditLimit - balance;
     const creditUsagePercent = creditLimit > 0 ? (balance / creditLimit) * 100 : 0;
 
@@ -411,7 +415,7 @@ export class CustomersService {
     const isDateExpired = (date: any) => {
       if (!date) return false; // Null/undefined = vô thời hạn
       try {
-        return date.getTime ? date.getTime() <= Date.now() : new Date(date).getTime() <= Date.now();
+        return date.getTime ? date.getTime() < Date.now() : new Date(date).getTime() < Date.now();
       } catch {
         return false;
       }
@@ -433,7 +437,7 @@ export class CustomersService {
       customerCode: customer.code,
       customerType: customer.type,
       storeId,
-      creditLimit,
+      creditLimit, // Hạn mức hiệu lực
       currentDebt: balance,
       availableCredit,
       creditUsagePercent: Math.round(creditUsagePercent * 100) / 100,
@@ -682,10 +686,11 @@ export class CustomersService {
         const currentDebt = debtBalance.balance;
         const availableCredit = Math.max(0, effectiveLimit - currentDebt);
 
-        // Check bypass status
+        // Check bypass status - sửa logic để nhất quán
         const now = new Date();
-        const storeBypassActive = cs?.bypassCreditLimit && (!cs?.bypassUntil || cs.bypassUntil >= now);
-        const globalBypassActive = customer.bypassCreditLimit && (!customer.bypassUntil || customer.bypassUntil >= now);
+        // Còn hiệu lực khi: bypassUntil NULL (vô thời hạn) HOẶC bypassUntil > now (chưa hết hạn)
+        const storeBypassActive = cs?.bypassCreditLimit && (!cs?.bypassUntil || cs.bypassUntil > now);
+        const globalBypassActive = customer.bypassCreditLimit && (!customer.bypassUntil || customer.bypassUntil > now);
 
         return {
           customerId,
@@ -883,7 +888,8 @@ export class CustomersService {
     });
 
     if (customerStore?.bypassCreditLimit) {
-      const isExpired = customerStore.bypassUntil ? customerStore.bypassUntil < now : false;
+      // Sửa: dùng <= để nhất quán - hết hạn khi bypassUntil <= now
+      const isExpired = customerStore.bypassUntil ? customerStore.bypassUntil <= now : false;
       if (!isExpired) {
         return {
           isBypassed: true,
@@ -905,7 +911,8 @@ export class CustomersService {
     });
 
     if (customer?.bypassCreditLimit) {
-      const isExpired = customer.bypassUntil ? customer.bypassUntil < now : false;
+      // Sửa: dùng <= để nhất quán
+      const isExpired = customer.bypassUntil ? customer.bypassUntil <= now : false;
       if (!isExpired) {
         return {
           isBypassed: true,
