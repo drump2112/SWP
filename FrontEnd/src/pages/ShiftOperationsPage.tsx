@@ -103,6 +103,7 @@ const ShiftOperationsPage: React.FC = () => {
   const [showDebtSaleForm, setShowDebtSaleForm] = useState(false);
   const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
   const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
+  const [debtSaleFormAmountFormatted, setDebtSaleFormAmountFormatted] = useState<string>("");
   const [isAmountManuallyEntered, setIsAmountManuallyEntered] = useState(false); // Flag để biết người dùng đã nhập thành tiền thủ công
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
@@ -2856,6 +2857,7 @@ const ShiftOperationsPage: React.FC = () => {
                           setDebtSaleFormPrice(0);
                           setDebtSaleFormQuantity(0);
                           setDebtSaleFormAmount(0);
+                          setDebtSaleFormAmountFormatted("");
                           setIsAmountManuallyEntered(false);
                           setSelectedDebtCustomer(null);
                           setSelectedDebtProduct(null);
@@ -2898,10 +2900,13 @@ const ShiftOperationsPage: React.FC = () => {
                           if (value && productPrices[value as number]) {
                             setDebtSaleFormPrice(productPrices[value as number]);
                             // Tính lại thành tiền khi đổi mặt hàng - làm tròn
-                            setDebtSaleFormAmount(Math.round(debtSaleFormQuantity * productPrices[value as number]));
+                            const amount = Math.round(debtSaleFormQuantity * productPrices[value as number]);
+                            setDebtSaleFormAmount(amount);
+                            setDebtSaleFormAmountFormatted(amount > 0 ? amount.toLocaleString('vi-VN') : '');
                           } else {
                             setDebtSaleFormPrice(0);
                             setDebtSaleFormAmount(0);
+                            setDebtSaleFormAmountFormatted("");
                           }
                         }}
                         placeholder="-- Chọn mặt hàng --"
@@ -2930,7 +2935,9 @@ const ShiftOperationsPage: React.FC = () => {
                           // Chỉ tính lại amount nếu người dùng ĐANG nhập số lượng (không phải từ nhập thành tiền)
                           // Reset flag vì người dùng đang nhập số lượng trực tiếp
                           setIsAmountManuallyEntered(false);
-                          setDebtSaleFormAmount(Math.round(qty * debtSaleFormPrice));
+                          const amount = Math.round(qty * debtSaleFormPrice);
+                          setDebtSaleFormAmount(amount);
+                          setDebtSaleFormAmountFormatted(amount > 0 ? amount.toLocaleString('vi-VN') : '');
                         }}
                         onBlur={(e) => {
                           const qty = parseFloat(e.target.value) || 0;
@@ -2991,16 +2998,22 @@ const ShiftOperationsPage: React.FC = () => {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Thành tiền (₫)</label>
                       <input
-                        type="number"
-                        step="1"
-                        value={debtSaleFormAmount || ""}
+                        type="text"
+                        value={debtSaleFormAmountFormatted}
                         onKeyDown={(e) => {
                           if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                             e.stopPropagation();
                           }
                         }}
                         onChange={(e) => {
-                          const amount = parseFloat(e.target.value) || 0;
+                          const value = e.target.value;
+                          // Remove all non-digit characters
+                          const numericValue = value.replace(/\D/g, '');
+                          // Format with dots
+                          const formattedValue = numericValue ? Number(numericValue).toLocaleString('vi-VN') : '';
+                          setDebtSaleFormAmountFormatted(formattedValue);
+                          
+                          const amount = numericValue ? parseInt(numericValue) : 0;
                           // Làm tròn số tiền ngay khi nhập
                           setDebtSaleFormAmount(Math.round(amount));
                           // Đánh dấu người dùng đã nhập thành tiền thủ công

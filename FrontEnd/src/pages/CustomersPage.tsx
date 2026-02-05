@@ -1108,7 +1108,7 @@ const CustomersPage: React.FC = () => {
               onClick={handleCloseCreditLimitModal}
             />
 
-            <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full p-6">
+            <div className="relative bg-white rounded-lg shadow-xl max-w-6xl w-full p-6">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-xl font-semibold text-gray-900">
@@ -1419,14 +1419,16 @@ const CreditLimitRow: React.FC<{
   const [selectedDuration, setSelectedDuration] = useState<string>('24');
 
   const handleEdit = () => {
-    setEditValue(limit.creditLimit !== null ? String(limit.creditLimit) : "");
+    setEditValue(limit.creditLimit !== null ? Number(limit.creditLimit).toLocaleString('vi-VN') : "");
     setIsEditing(true);
   };
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const value = editValue.trim() === "" ? null : Number(editValue);
+      // Remove dots and convert to number
+      const cleanValue = editValue.replace(/\./g, '').trim();
+      const value = cleanValue === "" ? null : Number(cleanValue);
       await onUpdate(limit.storeId, value);
       setIsEditing(false);
     } catch (error) {
@@ -1434,6 +1436,15 @@ const CreditLimitRow: React.FC<{
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Remove all non-digit characters
+    const numericValue = value.replace(/\D/g, '');
+    // Format with dots
+    const formattedValue = numericValue ? Number(numericValue).toLocaleString('vi-VN') : '';
+    setEditValue(formattedValue);
   };
 
   const handleCancel = () => {
@@ -1500,13 +1511,11 @@ const CreditLimitRow: React.FC<{
         <td className="px-4 py-3 text-sm text-right">
           {isEditing ? (
             <input
-              type="number"
+              type="text"
               value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
+              onChange={handleInputChange}
               placeholder="Để trống = dùng mặc định"
               className="w-full px-2 py-1 border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 text-right"
-              min="0"
-              step="1000"
             />
           ) : (
             <span className="text-gray-700">
