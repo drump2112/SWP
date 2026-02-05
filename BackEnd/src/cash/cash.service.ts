@@ -172,7 +172,7 @@ export class CashService {
       cashIn: Number(record.cashIn),
       cashOut: Number(record.cashOut),
       netAmount: Number(record.cashIn) - Number(record.cashOut),
-      effectiveDate: record.createdAt,
+      effectiveDate: record.ledgerAt || record.createdAt, // Ngày hiệu lực (fallback về createdAt nếu null)
       createdAt: record.createdAt,
     }));
   }

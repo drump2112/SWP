@@ -187,6 +187,7 @@ LEFT JOIN (
         SUM(cl.cash_in) AS total_in,
         SUM(cl.cash_out) AS total_out
     FROM cash_ledger cl
+    WHERE cl.superseded_by_shift_id IS NULL  -- ✅ CHỈ LẤY DATA HIỆU LỰC (quan trọng khi có 2 ca/ngày)
     GROUP BY cl.store_id
 ) cash ON cash.store_id = st.id
 ORDER BY st.name;
@@ -251,6 +252,7 @@ SELECT
     SUM(cl.cash_out) AS total_out
 FROM cash_ledger cl, store_debug sd
 WHERE cl.store_id = sd.id
+  AND cl.superseded_by_shift_id IS NULL  -- ✅ CHỈ LẤY DATA HIỆU LỰC
 GROUP BY cl.ref_type
 UNION ALL
 SELECT
