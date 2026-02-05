@@ -95,6 +95,7 @@ const CashOpeningBalance: React.FC = () => {
       toast.success(`✅ ${data.message}`);
       setOpeningBalance('');
       setNotes('');
+      setEffectiveDate(new Date().toISOString().split('T')[0]); // Reset ngày hiệu lực về hôm nay
       setShowAddForm(false);
       queryClient.invalidateQueries({ queryKey: ['cash-balance'] });
       queryClient.invalidateQueries({ queryKey: ['cash-report'] });
