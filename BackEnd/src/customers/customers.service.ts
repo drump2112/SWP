@@ -314,7 +314,7 @@ export class CustomersService {
       // Điều kiện store_id đã được filter trong LEFT JOIN ON clause
     } else {
       // Admin (không có storeId) - lấy tất cả khách hàng
-      // Dùng subquery để check nếu có BẤT KỲ store nào được bypass
+      // Lấy hạn mức cao nhất từ các cửa hàng nếu customers.credit_limit = 0 hoặc NULL
       query = query
         .addSelect(subQuery => {
           return subQuery
@@ -322,7 +322,14 @@ export class CustomersService {
             .from('customer_stores', 'cs')
             .where('cs.customer_id = c.id');
         }, 'anyStoreBypassActive')
-        .addSelect('NULL', 'storeCreditLimit')
+        // Lấy hạn mức cao nhất từ tất cả các cửa hàng
+        .addSelect(subQuery => {
+          return subQuery
+            .select('MAX(cs.credit_limit)')
+            .from('customer_stores', 'cs')
+            .where('cs.customer_id = c.id')
+            .andWhere('cs.credit_limit IS NOT NULL');
+        }, 'maxStoreCreditLimit')
         .addSelect('NULL', 'storeBypassCreditLimit')
         .addSelect('NULL', 'storeBypassUntil');
     }
@@ -330,14 +337,31 @@ export class CustomersService {
     const results = await query.getRawMany();
 
     return results.map(row => {
-      // Ưu tiên creditLimit của store, nếu không có thì dùng mặc định
-      const storeCreditLimit = row.storeCreditLimit;
       const defaultCreditLimit = Number(row.defaultCreditLimit || 0);
+      const storeCreditLimit = row.storeCreditLimit; // Khi có storeId cụ thể
+      const maxStoreCreditLimit = row.maxStoreCreditLimit; // Hạn mức cao nhất từ tất cả cửa hàng (ADMIN view)
       
-      // Tính hạn mức hiệu lực: Ưu tiên hạn mức riêng của store
-      const creditLimit = storeCreditLimit !== null && storeCreditLimit !== undefined
-        ? Number(storeCreditLimit)
-        : defaultCreditLimit;
+      // Tính hạn mức hiệu lực:
+      // 1. Nếu có storeId → Dùng hạn mức riêng của store đó, fallback về default
+      // 2. Nếu ADMIN (không có storeId):
+      //    - Nếu defaultCreditLimit > 0 → Dùng default
+      //    - Nếu defaultCreditLimit = 0 hoặc NULL → Dùng MAX hạn mức từ các cửa hàng
+      let creditLimit: number;
+      if (storeId) {
+        // User của cửa hàng cụ thể
+        creditLimit = storeCreditLimit !== null && storeCreditLimit !== undefined
+          ? Number(storeCreditLimit)
+          : defaultCreditLimit;
+      } else {
+        // Admin view - Ưu tiên default, nếu = 0 thì lấy max từ stores
+        if (defaultCreditLimit > 0) {
+          creditLimit = defaultCreditLimit;
+        } else {
+          creditLimit = maxStoreCreditLimit !== null && maxStoreCreditLimit !== undefined
+            ? Number(maxStoreCreditLimit)
+            : 0;
+        }
+      }
 
       const currentDebt = Number(row.currentDebt || 0);
       const availableCredit = creditLimit - currentDebt;
@@ -371,7 +395,7 @@ export class CustomersService {
       const isBypassed = globalBypassActive || storeBypassActive;
 
       // Debug log - Log tất cả để dễ debug
-      console.log(`[Credit Status] ${row.customerName} (${row.customerCode}): storeLimit=${storeCreditLimit}, defaultLimit=${defaultCreditLimit}, effectiveLimit=${creditLimit}, debt=${currentDebt}, available=${availableCredit}, bypass=${isBypassed}`);
+      console.log(`[Credit Status] ${row.customerName} (${row.customerCode}): defaultLimit=${defaultCreditLimit}, storeLimit=${storeCreditLimit}, maxStoreLimit=${maxStoreCreditLimit}, effectiveLimit=${creditLimit}, debt=${currentDebt}, available=${availableCredit}, bypass=${isBypassed}`);
 
       return {
         customerId: row.customerId,
