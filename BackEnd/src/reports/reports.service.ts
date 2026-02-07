@@ -668,6 +668,14 @@ export class ReportsService {
   }) {
     const { storeId, fromDate, toDate } = params;
 
+    // Normalize toDate to end-of-day so filtering like 2026-01-01 -> 2026-01-31
+    // includes all entries on the `toDate` (until 23:59:59.999).
+    let toDateInclusive: Date | undefined = undefined;
+    if (toDate) {
+      toDateInclusive = new Date(toDate);
+      toDateInclusive.setHours(23, 59, 59, 999);
+    }
+
     // Lấy số dư đầu kỳ (trước fromDate)
     const openingBalanceQuery = this.cashLedgerRepository
       .createQueryBuilder('cl')
@@ -705,17 +713,17 @@ export class ReportsService {
       ledgerQuery.where('cl.store_id = :storeId', { storeId });
     }
 
-    if (fromDate && toDate) {
+    if (fromDate && toDateInclusive) {
       // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
       if (storeId) {
         ledgerQuery.andWhere('cl.ledger_at BETWEEN :fromDate AND :toDate', {
           fromDate,
-          toDate,
+          toDate: toDateInclusive,
         });
       } else {
         ledgerQuery.where('cl.ledger_at BETWEEN :fromDate AND :toDate', {
           fromDate,
-          toDate,
+          toDate: toDateInclusive,
         });
       }
     }
