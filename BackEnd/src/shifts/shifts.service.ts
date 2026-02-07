@@ -211,7 +211,22 @@ export class ShiftsService {
             refId: In(receiptIds),
           });
         }
-        // Xóa thêm CashLedger của Deposit và Expense nếu cần (tương tự như trên)...
+
+        // ✅ Xóa CashLedger và DebtLedger của DEPOSIT (QUAN TRỌNG!)
+        await manager.delete(CashLedger, {
+          refType: 'DEPOSIT',
+          shiftId: id,
+        });
+        await manager.delete(DebtLedger, {
+          refType: 'DEPOSIT',
+          shiftId: id,
+        });
+
+        // ✅ Xóa CashLedger của EXPENSE
+        await manager.delete(CashLedger, {
+          refType: 'EXPENSE',
+          shiftId: id,
+        });
       } catch (error) {
         console.error('❌ Lỗi khi xóa LEAF NODES:', error.message);
         throw new BadRequestException(`Lỗi xóa dữ liệu phụ: ${error.message}`);
