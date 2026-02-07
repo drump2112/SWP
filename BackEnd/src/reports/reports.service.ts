@@ -83,6 +83,13 @@ export class ReportsService {
   }) {
     const { storeId, customerId, fromDate, toDate } = params;
 
+    // Normalize toDate to end-of-day so filtering includes the whole day
+    let toDateInclusive: Date | undefined = undefined;
+    if (toDate) {
+      toDateInclusive = new Date(toDate);
+      toDateInclusive.setHours(23, 59, 59, 999);
+    }
+
     // Lấy danh sách ID khách hàng có giao dịch công nợ
     const customerIdsQuery = this.debtLedgerRepository
       .createQueryBuilder('dl')
@@ -138,11 +145,11 @@ export class ReportsService {
           ledgerQuery.andWhere('dl.store_id = :storeId', { storeId });
         }
 
-        if (fromDate && toDate) {
+        if (fromDate && toDateInclusive) {
           // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
           ledgerQuery.andWhere('dl.ledger_at BETWEEN :fromDate AND :toDate', {
             fromDate,
-            toDate,
+            toDate: toDateInclusive,
           });
         }
 
