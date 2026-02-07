@@ -274,7 +274,7 @@ export class ShiftsService {
     user: any,
     _shift?: Shift,
   ): Promise<Shift> {
-    let shift = _shift;
+    let shift: Shift | null = _shift || null;
     if (!shift) {
       // Lock the shift row to prevent concurrent closes (SELECT ... FOR UPDATE)
       shift = await manager
