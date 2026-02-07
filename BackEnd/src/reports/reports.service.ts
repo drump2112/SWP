@@ -81,20 +81,7 @@ export class ReportsService {
     fromDate?: Date;
     toDate?: Date;
   }) {
-    const { storeId, customerId } = params;
-    let { fromDate, toDate } = params;
-
-    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
-    if (fromDate) {
-      fromDate = new Date(fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-    }
-
-    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDate) {
-      toDate = new Date(toDate);
-      toDate.setHours(23, 59, 59, 999);
-    }
+    const { storeId, customerId, fromDate, toDate } = params;
 
     // Lấy danh sách ID khách hàng có giao dịch công nợ
     const customerIdsQuery = this.debtLedgerRepository
@@ -138,7 +125,7 @@ export class ReportsService {
               customer.id,
               storeId,
               new Date(0),
-              new Date(fromDate.getTime() - 1), // Lấy đến trước fromDate
+              fromDate,
             )
           : 0;
 
@@ -679,20 +666,7 @@ export class ReportsService {
     fromDate?: Date;
     toDate?: Date;
   }) {
-    const { storeId } = params;
-    let { fromDate, toDate } = params;
-
-    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
-    if (fromDate) {
-      fromDate = new Date(fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-    }
-
-    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDate) {
-      toDate = new Date(toDate);
-      toDate.setHours(23, 59, 59, 999);
-    }
+    const { storeId, fromDate, toDate } = params;
 
     // Lấy số dư đầu kỳ (trước fromDate)
     const openingBalanceQuery = this.cashLedgerRepository
@@ -845,7 +819,8 @@ export class ReportsService {
         const cashInEntries = entriesInShift.filter((l) => l.refType === 'SHIFT_CLOSE' || l.refType === 'RECEIPT');
         const totalCashIn = cashInEntries.reduce((sum, c) => sum + (c.cashIn || 0), 0);
 
-        // Nếu tổng nộp = tổng thu (bao gồm cả SHIFT_CLOSE và RECEIPT) và có ít nhất 1 bản ghi nộp
+        // ✅ FIX: CHỈ gộp khi tất cả tiền thu trong ca đều được nộp ra (cân bằng tuyệt đối)
+        // Nếu không cân bằng, hiển thị từng dòng riêng để không ẩn thông tin
         if (depositsInSameShift.length > 0 && totalDeposit > 0 && totalDeposit === totalCashIn) {
           const shiftCloseEntry = entriesInShift.find((l) => l.refType === 'SHIFT_CLOSE') || null;
           const receiptEntries = entriesInShift.filter((l) => l.refType === 'RECEIPT');
@@ -885,13 +860,17 @@ export class ReportsService {
 
           processedShiftIds.add(ledger.shiftId);
           continue;
+        } else if (depositsInSameShift.length > 0 && totalDeposit > 0) {
+          // ✅ Không cân bằng: Hiển thị từng RECEIPT và DEPOSIT riêng biệt
+          // Điều này đảm bảo không ẩn bất kỳ khoản nộp tiền nào
+          // Các hàng sẽ được xử lý bên dưới trong logic "Các trường hợp khác"
+          processedShiftIds.add(ledger.shiftId);
         }
       }
 
-      // Nếu ledger thuộc ca đã bị gộp thì bỏ qua
-      if (ledger.refType === 'DEPOSIT' && ledger.shiftId && processedShiftIds.has(ledger.shiftId)) {
-        continue;
-      }
+      // ✅ FIX: KHÔNG bỏ qua deposits được nạp riêng nếu không được gộp
+      // Chỉ bỏ qua nếu chúng đã được gộp thành SHIFT_CLOSE_DEPOSIT
+      // (không còn check processedShiftIds cho DEPOSIT)
 
       // Các trường hợp khác: giữ nguyên
       mergedLedgers.push(ledger);
@@ -977,18 +956,6 @@ export class ReportsService {
 
   // Dashboard tổng quan cho giám đốc
   async getDashboard(fromDate: Date, toDate: Date) {
-    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
-    if (fromDate) {
-      fromDate = new Date(fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-    }
-
-    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDate) {
-      toDate = new Date(toDate);
-      toDate.setHours(23, 59, 59, 999);
-    }
-
     const [totalSales, debtSummary, cashSummary, inventorySummary] =
       await Promise.all([
         // Tổng doanh thu - ⏰ Dùng closed_at thay vì shift_date
@@ -1393,23 +1360,7 @@ export class ReportsService {
   async getRevenueSalesReport(
     query: RevenueSalesReportQueryDto,
   ): Promise<RevenueSalesReportResponse> {
-    const { productId, storeId } = query;
-    let fromDateTime = query.fromDateTime;
-    let toDateTime = query.toDateTime;
-
-    // Đảm bảo fromDateTime bắt đầu từ 00:00:00 của ngày
-    if (fromDateTime) {
-      const date = new Date(fromDateTime);
-      date.setHours(0, 0, 0, 0);
-      fromDateTime = date.toISOString();
-    }
-
-    // Đảm bảo toDateTime bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDateTime) {
-      const date = new Date(toDateTime);
-      date.setHours(23, 59, 59, 999);
-      toDateTime = date.toISOString();
-    }
+    const { productId, storeId, fromDateTime, toDateTime } = query;
 
     // ========== QUERY 1: TỔNG XUẤT BÁN từ PUMP_READINGS (lượng bơm qua vòi) ==========
     // Đây là tổng thực sự = Bán lẻ + Bán công nợ
@@ -1603,19 +1554,7 @@ export class ReportsService {
   async getSalesByCustomerReport(
     query: SalesByCustomerReportQueryDto,
   ): Promise<SalesByCustomerReportResponse> {
-    let { customerId, storeId, productId, fromDateTime, toDateTime } = query;
-
-    // Đảm bảo fromDateTime bắt đầu từ 00:00:00 của ngày
-    if (fromDateTime) {
-      const dateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
-      fromDateTime = new Date(dateStr).toISOString();
-    }
-
-    // Đảm bảo toDateTime bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDateTime) {
-      const dateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
-      toDateTime = new Date(dateStr).toISOString();
-    }
+    const { customerId, storeId, productId, fromDateTime, toDateTime } = query;
 
     // Query sales có customerId (bán công nợ)
     const salesQuery = this.saleRepository
@@ -1659,13 +1598,16 @@ export class ReportsService {
     // 🔥 Filter theo shift.openedAt để gán doanh thu về ngày mở ca (đúng ngày làm việc)
     // Ví dụ: Ca mở 23h ngày 23, đóng 7h ngày 24 → doanh thu thuộc ngày 23
     if (fromDateTime) {
+      // Nếu chưa có timestamp (YYYY-MM-DD), thêm vào. Nếu đã có (ISO string) thì giữ nguyên
+      const fromDateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
       salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
-        fromDateTime: new Date(fromDateTime),
+        fromDateTime: new Date(fromDateStr),
       });
     }
     if (toDateTime) {
+      const toDateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
       salesQuery.andWhere('shift.openedAt <= :toDateTime', {
-        toDateTime: new Date(toDateTime),
+        toDateTime: new Date(toDateStr),
       });
     }
 
@@ -1738,18 +1680,6 @@ export class ReportsService {
   ) {
     if (!storeId) {
       return [];
-    }
-
-    // Đảm bảo fromDate bắt đầu từ 00:00:00 của ngày
-    if (fromDate) {
-      fromDate = new Date(fromDate);
-      fromDate.setHours(0, 0, 0, 0);
-    }
-
-    // Đảm bảo toDate bao gồm cả ngày cuối cùng (set to end of day)
-    if (toDate) {
-      toDate = new Date(toDate);
-      toDate.setHours(23, 59, 59, 999);
     }
 
     const query = this.pumpReadingRepository

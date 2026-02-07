@@ -274,13 +274,17 @@ export class ShiftsService {
     user: any,
     _shift?: Shift,
   ): Promise<Shift> {
-    const shift =
-      _shift ||
-      (await manager.findOne(Shift, {
-        where: { id: closeShiftDto.shiftId },
-        relations: ['store', 'store.region'],
-      })) ||
-      undefined;
+    let shift = _shift;
+    if (!shift) {
+      // Lock the shift row to prevent concurrent closes (SELECT ... FOR UPDATE)
+      shift = await manager
+        .createQueryBuilder(Shift, 'shift')
+        .setLock('pessimistic_write')
+        .leftJoinAndSelect('shift.store', 'store')
+        .leftJoinAndSelect('store.region', 'region')
+        .where('shift.id = :id', { id: closeShiftDto.shiftId })
+        .getOne();
+    }
 
     if (!shift) {
       throw new NotFoundException('Shift not found');
@@ -375,6 +379,27 @@ export class ShiftsService {
         testExport, // Xuất kiểm thử / Quay kho (lưu riêng)
       };
     });
+
+    // Server-side validation: ensure readings are valid and quantity > 0.
+    // This prevents malicious or accidental negative values (paste/devtools).
+    for (const pr of pumpReadingsData) {
+      // Validate numeric presence
+      const sv = Number(pr.startValue ?? 0);
+      const ev = Number(pr.endValue ?? 0);
+      const qty = Number(pr.quantity ?? 0);
+
+      if (ev < sv) {
+        throw new BadRequestException(
+          `Số cuối (${ev}) không thể nhỏ hơn số đầu (${sv}) cho vòi ${pr.pumpCode || pr.pumpId}`,
+        );
+      }
+
+      if (qty <= 0) {
+        throw new BadRequestException(
+          `Số lượng bán phải lớn hơn 0 cho vòi ${pr.pumpCode || pr.pumpId}`,
+        );
+      }
+    }
 
     await manager
       .createQueryBuilder()

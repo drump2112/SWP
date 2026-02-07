@@ -342,7 +342,7 @@ export class InventoryReportService {
     if (warehouseId) {
       batchesQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
     }
-    
+
     if (supplierId) {
       batchesQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
     }
@@ -368,7 +368,7 @@ export class InventoryReportService {
 
     const batchDetails: BatchDetailDto[] = batches.map(batch => {
       const batchExports = exportsByBatch.get(batch.id) || [];
-      
+
       // Calculate export totals
       const exportQuantity = batchExports.reduce((sum, item) => sum + item.quantity, 0);
       const exportTotal = batchExports.reduce((sum, item) => sum + item.total_amount, 0);

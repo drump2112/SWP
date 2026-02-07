@@ -252,7 +252,7 @@ const CommercialInventoryReportPage: React.FC = () => {
                   {reportData.exports.map((item, index) => {
                     const isGroupRow = item.customer_id === null;
                     const displayName = isGroupRow ? item.customer_group_name : item.customer_name;
-                    
+
                     return (
                       <tr key={index} className={isGroupRow ? "bg-gray-100 font-bold" : "hover:bg-gray-50"}>
                         <td className="px-4 py-2 text-center border">{index + 1}</td>

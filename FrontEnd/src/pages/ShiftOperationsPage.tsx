@@ -3012,7 +3012,7 @@ const ShiftOperationsPage: React.FC = () => {
                           // Format with dots
                           const formattedValue = numericValue ? Number(numericValue).toLocaleString('vi-VN') : '';
                           setDebtSaleFormAmountFormatted(formattedValue);
-                          
+
                           const amount = numericValue ? parseInt(numericValue) : 0;
                           // Làm tròn số tiền ngay khi nhập
                           setDebtSaleFormAmount(Math.round(amount));
