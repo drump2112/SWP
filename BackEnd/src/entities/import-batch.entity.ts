@@ -58,8 +58,8 @@ export class ImportBatch {
   @Column({ type: 'decimal', precision: 18, scale: 2 })
   unit_price: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
-  discount_percent: number;
+  @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
+  discount_per_unit: number;
 
   @Column({ type: 'decimal', precision: 18, scale: 2, default: 0 })
   discount_amount: number;

@@ -28,7 +28,9 @@ const CommercialImportBatchesPage: React.FC = () => {
     batch_code: '',
     import_quantity: 0,
     unit_price: 0,
-    vat_percent: 10,
+    discount_per_unit: 0,
+    import_date: new Date().toISOString().split('T')[0],
+    vat_percent: 8,
     notes: '',
   });
 
@@ -119,7 +121,9 @@ const CommercialImportBatchesPage: React.FC = () => {
       batch_code: '',
       import_quantity: 0,
       unit_price: 0,
-      vat_percent: 10,
+      discount_per_unit: 0,
+      import_date: new Date().toISOString().split('T')[0],
+      vat_percent: 8,
       notes: '',
     });
     setEditingBatch(null);
@@ -135,6 +139,8 @@ const CommercialImportBatchesPage: React.FC = () => {
         batch_code: batch.batch_code,
         import_quantity: batch.import_quantity,
         unit_price: batch.unit_price,
+        discount_per_unit: batch.discount_per_unit,
+        import_date: new Date(batch.import_date).toISOString().split('T')[0],
         vat_percent: batch.vat_percent,
         notes: batch.notes || '',
       });
@@ -187,7 +193,9 @@ const CommercialImportBatchesPage: React.FC = () => {
   const totalPages = Math.ceil(filteredBatches.length / itemsPerPage);
 
   const calculateTotal = () => {
-    const subtotal = formData.import_quantity * formData.unit_price;
+    const lineTotal = formData.import_quantity * formData.unit_price;
+    const discountAmount = formData.import_quantity * (formData.discount_per_unit || 0);
+    const subtotal = lineTotal - discountAmount;
     const vat = subtotal * (formData.vat_percent || 0) / 100;
     return subtotal + vat;
   };
@@ -329,88 +337,84 @@ const CommercialImportBatchesPage: React.FC = () => {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
+              <table className="min-w-full divide-y divide-gray-200 text-xs">
+                <thead className="bg-gradient-to-r from-blue-50 to-blue-100">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Mã lô
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Kho
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nhà cung cấp
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sản phẩm
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Số lượng
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Còn lại
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Đơn giá
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Tổng tiền
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ngày nhập
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Thao tác
-                    </th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Mã lô</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Kho</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">NCC</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Sản phẩm</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">SL nhập</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Còn lại</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Đơn giá</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">CK/lít</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Tiền hàng</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Subtotal</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">VAT</th>
+                    <th className="px-4 py-3 text-right font-semibold text-gray-700">Tổng cộng</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Ngày nhập</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedBatches.map((batch) => (
-                    <tr key={batch.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {batch.batch_code}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {batch.warehouse?.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {batch.supplier?.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {batch.product?.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <tr key={batch.id} className="hover:bg-blue-50 transition-colors">
+                      <td className="px-4 py-3 whitespace-nowrap font-medium text-gray-900">{batch.batch_code}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">{batch.warehouse?.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-600">{batch.supplier?.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-gray-900 font-medium">{batch.product?.name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">
                         {batch.import_quantity.toLocaleString('vi-VN')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={batch.remaining_quantity > 0 ? 'text-green-600 font-semibold' : 'text-gray-400'}>
+                      <td className="px-4 py-3 whitespace-nowrap text-right">
+                        <span className={batch.remaining_quantity > 0 ? 'text-green-600 font-semibold' : 'text-red-500 font-semibold'}>
                           {batch.remaining_quantity.toLocaleString('vi-VN')}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">
                         {batch.unit_price.toLocaleString('vi-VN')} ₫
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">
+                        {batch.discount_per_unit.toLocaleString('vi-VN')} ₫
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">
+                        {(batch.import_quantity * batch.unit_price).toLocaleString('vi-VN')} ₫
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right font-medium text-gray-900">
+                        {batch.subtotal.toLocaleString('vi-VN')} ₫
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div className="text-right text-gray-600">
+                          {batch.vat_percent.toLocaleString('vi-VN')}%
+                        </div>
+                        <div className="text-right text-gray-900 font-medium">
+                          {batch.vat_amount.toLocaleString('vi-VN')} ₫
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right text-lg font-bold text-blue-600">
                         {batch.total_amount.toLocaleString('vi-VN')} ₫
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      <td className="px-4 py-3 whitespace-nowrap text-center text-gray-600">
                         {new Date(batch.import_date).toLocaleDateString('vi-VN')}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleOpenModal(batch)}
-                          className="text-blue-600 hover:text-blue-900 mr-3"
-                        >
-                          <PencilIcon className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(batch)}
-                          className="text-red-600 hover:text-red-900"
-                          disabled={batch.remaining_quantity !== batch.import_quantity}
-                          title={batch.remaining_quantity !== batch.import_quantity ? 'Không thể xóa lô đã xuất hàng' : ''}
-                        >
-                          <TrashIcon className={`h-5 w-5 ${batch.remaining_quantity !== batch.import_quantity ? 'opacity-50' : ''}`} />
-                        </button>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => handleOpenModal(batch)}
+                            className="text-blue-600 hover:text-blue-900 hover:bg-blue-100 p-1 rounded transition-colors"
+                            title="Chỉnh sửa"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(batch)}
+                            className="text-red-600 hover:text-red-900 hover:bg-red-100 p-1 rounded transition-colors disabled:opacity-50"
+                            disabled={batch.remaining_quantity !== batch.import_quantity}
+                            title={batch.remaining_quantity !== batch.import_quantity ? 'Không thể xóa lô đã xuất hàng' : 'Xóa'}
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -583,7 +587,7 @@ const CommercialImportBatchesPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Số lượng <span className="text-red-500">*</span>
@@ -614,6 +618,36 @@ const CommercialImportBatchesPage: React.FC = () => {
                     placeholder="0"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Chiết khấu/lít (₫)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.discount_per_unit || 0}
+                    onChange={(e) => setFormData({ ...formData, discount_per_unit: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ngày nhập <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.import_date || ''}
+                    onChange={(e) => setFormData({ ...formData, import_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -641,9 +675,21 @@ const CommercialImportBatchesPage: React.FC = () => {
                     </span>
                   </div>
                   <div>
+                    <span className="text-gray-600">Chiết khấu:</span>
+                    <span className="ml-2 font-semibold">
+                      {(formData.import_quantity * (formData.discount_per_unit || 0)).toLocaleString('vi-VN')} ₫
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="ml-2 font-semibold">
+                      {(formData.import_quantity * formData.unit_price - formData.import_quantity * (formData.discount_per_unit || 0)).toLocaleString('vi-VN')} ₫
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-gray-600">VAT:</span>
                     <span className="ml-2 font-semibold">
-                      {((formData.import_quantity * formData.unit_price * (formData.vat_percent || 0)) / 100).toLocaleString('vi-VN')} ₫
+                      {(((formData.import_quantity * formData.unit_price - formData.import_quantity * (formData.discount_per_unit || 0)) * (formData.vat_percent || 0)) / 100).toLocaleString('vi-VN')} ₫
                     </span>
                   </div>
                   <div className="col-span-2 text-lg">

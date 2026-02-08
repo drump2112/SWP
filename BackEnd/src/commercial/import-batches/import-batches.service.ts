@@ -16,13 +16,13 @@ export class ImportBatchesService {
     // Calculate amounts
     const import_quantity = createBatchDto.import_quantity;
     const unit_price = createBatchDto.unit_price;
-    const discount_percent = createBatchDto.discount_percent || 0;
+    const discount_per_unit = createBatchDto.discount_per_unit || 0;
     const vat_percent = createBatchDto.vat_percent || 0;
     const environmental_tax_rate = createBatchDto.environmental_tax_rate || 0;
 
     const line_total = import_quantity * unit_price;
-    const discount_amount = (line_total * discount_percent) / 100;
-    const final_unit_price = unit_price - (discount_amount / import_quantity);
+    const discount_amount = import_quantity * discount_per_unit;
+    const final_unit_price = unit_price - discount_per_unit;
     const subtotal = line_total - discount_amount;
     const vat_amount = (subtotal * vat_percent) / 100;
     const environmental_tax_amount = (subtotal * environmental_tax_rate) / 100;
@@ -38,7 +38,7 @@ export class ImportBatchesService {
       total_amount,
       remaining_quantity: import_quantity,
       exported_quantity: 0,
-      import_date: new Date(),
+      import_date: createBatchDto.import_date ? new Date(createBatchDto.import_date) : new Date(),
     });
 
     return await this.batchesRepository.save(batch);
@@ -99,16 +99,16 @@ export class ImportBatchesService {
     const batch = await this.findOne(id);
 
     // Recalculate amounts if relevant fields are updated
-    if (updateBatchDto.import_quantity || updateBatchDto.unit_price || updateBatchDto.vat_percent !== undefined || updateBatchDto.discount_percent !== undefined) {
+    if (updateBatchDto.import_quantity || updateBatchDto.unit_price || updateBatchDto.vat_percent !== undefined || updateBatchDto.discount_per_unit !== undefined) {
       const import_quantity = updateBatchDto.import_quantity || batch.import_quantity;
       const unit_price = updateBatchDto.unit_price || batch.unit_price;
-      const discount_percent = updateBatchDto.discount_percent !== undefined ? updateBatchDto.discount_percent : batch.discount_percent;
+      const discount_per_unit = updateBatchDto.discount_per_unit !== undefined ? updateBatchDto.discount_per_unit : batch.discount_per_unit;
       const vat_percent = updateBatchDto.vat_percent !== undefined ? updateBatchDto.vat_percent : batch.vat_percent;
       const environmental_tax_rate = updateBatchDto.environmental_tax_rate !== undefined ? updateBatchDto.environmental_tax_rate : batch.environmental_tax_rate;
 
       const line_total = import_quantity * unit_price;
-      const discount_amount = (line_total * discount_percent) / 100;
-      const final_unit_price = unit_price - (discount_amount / import_quantity);
+      const discount_amount = import_quantity * discount_per_unit;
+      const final_unit_price = unit_price - discount_per_unit;
       const subtotal = line_total - discount_amount;
       const vat_amount = (subtotal * vat_percent) / 100;
       const environmental_tax_amount = (subtotal * environmental_tax_rate) / 100;

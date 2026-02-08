@@ -10,7 +10,7 @@ export interface ImportBatch {
   remaining_quantity: number;
   exported_quantity: number;
   unit_price: number;
-  discount_percent: number;
+  discount_per_unit: number;
   discount_amount: number;
   final_unit_price: number;
   import_date: string;
@@ -48,7 +48,8 @@ export interface CreateImportBatchDto {
   batch_code: string;
   import_quantity: number;
   unit_price: number;
-  discount_percent?: number;
+  discount_per_unit?: number;
+  import_date?: string;
   invoice_number?: string;
   vehicle_number?: string;
   vat_percent?: number;
