@@ -213,19 +213,19 @@ const CommercialInventoryReportPage: React.FC = () => {
                   <tr className="bg-yellow-50 font-bold">
                     <td colSpan={2} className="px-4 py-2 text-center border">TỔNG CỘNG</td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.imports.reduce((sum, item) => sum + item.quantity_a95, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.imports.reduce((sum, item) => sum + item.quantity_a95, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.imports.reduce((sum, item) => sum + item.quantity_do, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.imports.reduce((sum, item) => sum + item.quantity_do, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.imports.reduce((sum, item) => sum + item.quantity_e5, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.imports.reduce((sum, item) => sum + item.quantity_e5, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.imports.reduce((sum, item) => sum + item.quantity_do001, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.imports.reduce((sum, item) => sum + item.quantity_do001, 0)).toLocaleString('vi-VN')}
                     </td>
-                    <td className="px-4 py-2 text-right border">{reportData.summary.total_import_quantity.toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-2 text-right border">{reportData.summary.total_import_amount.toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">{Number(reportData.summary.total_import_quantity).toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">{Number(reportData.summary.total_import_amount).toLocaleString('vi-VN')}</td>
                   </tr>
                 </tbody>
               </table>
@@ -295,29 +295,29 @@ const CommercialInventoryReportPage: React.FC = () => {
                   <tr className="bg-yellow-50 font-bold">
                     <td colSpan={2} className="px-4 py-2 text-center border">TỔNG CỘNG</td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.exports.reduce((sum, item) => sum + item.quantity_a95, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.exports.reduce((sum, item) => sum + item.quantity_a95, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.exports.reduce((sum, item) => sum + item.quantity_do, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.exports.reduce((sum, item) => sum + item.quantity_do, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.exports.reduce((sum, item) => sum + item.quantity_e5, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.exports.reduce((sum, item) => sum + item.quantity_e5, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.exports.reduce((sum, item) => sum + item.quantity_do001, 0).toLocaleString('vi-VN')}
+                      {Number(reportData.exports.reduce((sum, item) => sum + item.quantity_do001, 0)).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {reportData.summary.total_export_quantity.toLocaleString('vi-VN')}
+                      {Number(reportData.summary.total_export_quantity).toLocaleString('vi-VN')}
                     </td>
-                    <td className="px-4 py-2 text-right border">{reportData.summary.total_export_quantity.toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">{Number(reportData.summary.total_export_quantity).toLocaleString('vi-VN')}</td>
                     <td className="px-4 py-2 text-right border">-</td>
                     <td className="px-4 py-2 text-right border">-</td>
                     <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border">{reportData.summary.total_revenue.toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">{Number(reportData.summary.total_revenue).toLocaleString('vi-VN')}</td>
                     <td className="px-4 py-2 text-right border">-</td>
                     <td className="px-4 py-2 text-right border">-</td>
                     <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border text-green-600">{reportData.summary.total_profit.toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border text-green-600">{Number(reportData.summary.total_profit).toLocaleString('vi-VN')}</td>
                   </tr>
                 </tbody>
               </table>
