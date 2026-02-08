@@ -55,6 +55,14 @@ export interface DetailedInventoryReport {
 }
 
 export const inventoryReportAPI = {
-  getDetailedReport: (params: { start_date: string; end_date: string; warehouse_id?: number; supplier_id?: number }) =>
-    axios.get<DetailedInventoryReport>(`${API_URL}/detailed`, { params }),
+  getDetailedReport: async (params: { start_date: string; end_date: string; warehouse_id?: number; supplier_id?: number }) => {
+    try {
+      const response = await axios.get<DetailedInventoryReport>(`${API_URL}/detailed`, { params });
+      console.log('[inventoryReportAPI] getDetailedReport success:', response.data);
+      return response;
+    } catch (error) {
+      console.error('[inventoryReportAPI] getDetailedReport error:', error);
+      throw error;
+    }
+  },
 };

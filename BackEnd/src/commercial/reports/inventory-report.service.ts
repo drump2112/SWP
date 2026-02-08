@@ -113,8 +113,9 @@ export class InventoryReportService {
     warehouseId?: number,
     supplierId?: number,
   ): Promise<DetailedInventoryReportDto> {
-    // Get imports with supplier info
-    const importsQuery = this.importBatchRepo
+    try {
+      // Get imports with supplier info
+      const importsQuery = this.importBatchRepo
       .createQueryBuilder('batch')
       .leftJoinAndSelect('batch.warehouse', 'warehouse')
       .leftJoinAndSelect('batch.product', 'product')
@@ -129,8 +130,7 @@ export class InventoryReportService {
       importsQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
     }
 
-    const imports = await importsQuery.getMany();
-
+    const imports = await importsQuery.getMany();      console.log(`[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`);
     // Get exports with customer and group info
     const exportsQuery = this.exportOrderItemRepo
       .createQueryBuilder('item')
@@ -147,10 +147,17 @@ export class InventoryReportService {
     }
 
     const exports = await exportsQuery.getMany();
+      console.log(`[InventoryReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
 
-    // Group imports by supplier and product
-    const importMap = new Map<string, ImportDetailDto>();
-    imports.forEach((batch) => {
+      // Group imports by supplier and product
+      const importMap = new Map<string, ImportDetailDto>();
+      imports.forEach((batch) => {
+        // Validate batch data before processing
+        if (!batch.warehouse || !batch.product) {
+          console.warn(`[InventoryReport] Skipping batch ${batch.id} - missing warehouse or product`);
+          return;
+        }
+
       const key = `${batch.supplier_id}-${batch.product_id}-${batch.warehouse_id}`;
       if (!importMap.has(key)) {
         importMap.set(key, {
@@ -192,6 +199,11 @@ export class InventoryReportService {
     exports.forEach((item) => {
       const batch = item.import_batch;
       const customer = item.customer;
+        // Validate export data before processing
+        if (!batch || !batch.warehouse || !batch.product) {
+          console.warn(`[InventoryReport] Skipping export item ${item.id} - missing batch, warehouse or product`);
+          return;
+        }
       const groupId = customer?.customer_group_id || null;
       const groupName = customer?.customer_group?.name || 'Khác';
 
@@ -282,7 +294,7 @@ export class InventoryReportService {
     // Only count group totals for summary (not individual customers)
     const groupTotals = exportDetails.filter(d => d.customer_id === null);
 
-    return {
+    const result = {
       imports: importDetails,
       exports: exportDetails,
       summary: {
@@ -294,9 +306,20 @@ export class InventoryReportService {
         total_profit: groupTotals.reduce((sum, d) => sum + d.profit, 0),
       },
     };
+    console.log(`[InventoryReport] Report generated: ${importDetails.length} imports, ${exportDetails.length} export lines`);
+    return result;
+    } catch (error) {
+      console.error('[InventoryReport] Error generating report:', error);
+      throw error;
+    }
   }
 
-  private addExportData(record: ExportDetailDto, item: ExportOrderItem, batch: ImportBatch): void {
+  private addExportData(record: ExportDetailDto, item: ExportOrderItem, batch: ImportBatch | null): void {
+    if (!batch || !batch.product) {
+      console.warn(`[InventoryReport] addExportData: Batch or product is null`);
+      return;
+    }
+
     const productName = batch.product.name.toUpperCase();
     const itemRevenue = item.total_amount;
     const itemCost = item.quantity * batch.unit_price;
@@ -331,43 +354,52 @@ export class InventoryReportService {
     warehouseId?: number,
     supplierId?: number,
   ): Promise<BatchReportDto> {
-    // Get all batches in the period
-    const batchesQuery = this.importBatchRepo
-      .createQueryBuilder('batch')
-      .leftJoinAndSelect('batch.warehouse', 'warehouse')
-      .leftJoinAndSelect('batch.product', 'product')
-      .leftJoinAndSelect('batch.supplier', 'supplier')
-      .where('batch.import_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+    try {
+      // Get all batches in the period
+      const batchesQuery = this.importBatchRepo
+        .createQueryBuilder('batch')
+        .leftJoinAndSelect('batch.warehouse', 'warehouse')
+        .leftJoinAndSelect('batch.product', 'product')
+        .leftJoinAndSelect('batch.supplier', 'supplier')
+        .where('batch.import_date BETWEEN :startDate AND :endDate', { startDate, endDate });
 
-    if (warehouseId) {
-      batchesQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
-    }
-
-    if (supplierId) {
-      batchesQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
-    }
-
-    const batches = await batchesQuery.orderBy('batch.import_date', 'ASC').getMany();
-
-    // Get all exports for these batches
-    const exportsQuery = this.exportOrderItemRepo
-      .createQueryBuilder('item')
-      .leftJoinAndSelect('item.export_order', 'order')
-      .where('order.order_date BETWEEN :startDate AND :endDate', { startDate, endDate });
-
-    const exports = await exportsQuery.getMany();
-
-    // Group exports by batch_id
-    const exportsByBatch = new Map<number, ExportOrderItem[]>();
-    exports.forEach(item => {
-      if (!exportsByBatch.has(item.import_batch_id)) {
-        exportsByBatch.set(item.import_batch_id, []);
+      if (warehouseId) {
+        batchesQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
       }
-      exportsByBatch.get(item.import_batch_id)!.push(item);
-    });
 
-    const batchDetails: BatchDetailDto[] = batches.map(batch => {
-      const batchExports = exportsByBatch.get(batch.id) || [];
+      if (supplierId) {
+        batchesQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
+      }
+
+      const batches = await batchesQuery.orderBy('batch.import_date', 'ASC').getMany();
+      console.log(`[BatchReport] Found ${batches.length} batches from ${startDate} to ${endDate}`);
+
+      // Get all exports for these batches
+      const exportsQuery = this.exportOrderItemRepo
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.export_order', 'order')
+        .where('order.order_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+
+      const exports = await exportsQuery.getMany();
+      console.log(`[BatchReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
+
+      // Group exports by batch_id
+      const exportsByBatch = new Map<number, ExportOrderItem[]>();
+      exports.forEach(item => {
+        if (!exportsByBatch.has(item.import_batch_id)) {
+          exportsByBatch.set(item.import_batch_id, []);
+        }
+        exportsByBatch.get(item.import_batch_id)!.push(item);
+      });
+
+      const batchDetails: BatchDetailDto[] = batches.map(batch => {
+        // Validate batch data
+        if (!batch.warehouse || !batch.product) {
+          console.warn(`[BatchReport] Skipping batch ${batch.id} - missing warehouse or product`);
+          return null as any;
+        }
+
+        const batchExports = exportsByBatch.get(batch.id) || [];
 
       // Calculate export totals
       const exportQuantity = batchExports.reduce((sum, item) => sum + item.quantity, 0);
@@ -405,19 +437,25 @@ export class InventoryReportService {
         closing_total: closingTotal,
         note: '',
       };
-    });
+      }).filter(b => b !== null);
 
-    return {
-      batches: batchDetails,
-      summary: {
-        total_import_quantity: batchDetails.reduce((sum, b) => sum + b.import_quantity, 0),
-        total_import_amount: batchDetails.reduce((sum, b) => sum + b.import_total, 0),
-        total_export_quantity: batchDetails.reduce((sum, b) => sum + b.export_quantity, 0),
-        total_export_amount: batchDetails.reduce((sum, b) => sum + b.export_total, 0),
-        total_closing_quantity: batchDetails.reduce((sum, b) => sum + b.closing_quantity, 0),
-        total_closing_amount: batchDetails.reduce((sum, b) => sum + b.closing_total, 0),
-        total_profit: batchDetails.reduce((sum, b) => sum + b.export_profit, 0),
-      },
-    };
+      const result = {
+        batches: batchDetails,
+        summary: {
+          total_import_quantity: batchDetails.reduce((sum, b) => sum + b.import_quantity, 0),
+          total_import_amount: batchDetails.reduce((sum, b) => sum + b.import_total, 0),
+          total_export_quantity: batchDetails.reduce((sum, b) => sum + b.export_quantity, 0),
+          total_export_amount: batchDetails.reduce((sum, b) => sum + b.export_total, 0),
+          total_closing_quantity: batchDetails.reduce((sum, b) => sum + b.closing_quantity, 0),
+          total_closing_amount: batchDetails.reduce((sum, b) => sum + b.closing_total, 0),
+          total_profit: batchDetails.reduce((sum, b) => sum + b.export_profit, 0),
+        },
+      };
+      console.log(`[BatchReport] Report generated: ${batchDetails.length} batches`);
+      return result;
+    } catch (error) {
+      console.error('[BatchReport] Error generating report:', error);
+      throw error;
+    }
   }
 }

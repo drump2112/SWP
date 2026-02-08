@@ -35,16 +35,21 @@ const CommercialInventoryReportPage: React.FC = () => {
     },
   });
 
-  const { data: reportData, isLoading, refetch } = useQuery({
+  const { data: reportData, isLoading, refetch, error } = useQuery({
     queryKey: ['inventory-report-detailed', startDate, endDate, warehouseFilter, supplierFilter],
     queryFn: async () => {
-      const response = await inventoryReportAPI.getDetailedReport({
-        start_date: startDate,
-        end_date: endDate,
-        warehouse_id: warehouseFilter || undefined,
-        supplier_id: supplierFilter || undefined,
-      });
-      return response.data;
+      try {
+        const response = await inventoryReportAPI.getDetailedReport({
+          start_date: startDate,
+          end_date: endDate,
+          warehouse_id: warehouseFilter || undefined,
+          supplier_id: supplierFilter || undefined,
+        });
+        return response.data;
+      } catch (err) {
+        console.error('[CommercialInventoryReportPage] Error loading report:', err);
+        throw err;
+      }
     },
     enabled: !!startDate && !!endDate,
   });
@@ -140,6 +145,17 @@ const CommercialInventoryReportPage: React.FC = () => {
         <div className="p-8 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Đang tải...</p>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-600 font-semibold">Lỗi khi tải báo cáo</p>
+          <p className="text-red-500 mt-2 text-sm">{error instanceof Error ? error.message : 'Không xác định được lỗi'}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+          >
+            Thử lại
+          </button>
         </div>
       ) : !reportData ? (
         <div className="p-8 text-center text-gray-500">

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, BadRequestException } from '@nestjs/common';
 import { InventoryReportService } from './inventory-report.service';
 
 @Controller('commercial/reports/inventory')
@@ -12,7 +12,15 @@ export class InventoryReportController {
     @Query('warehouse_id') warehouseId?: number,
     @Query('supplier_id') supplierId?: number,
   ) {
-    return this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId);
+    try {
+      if (!startDate || !endDate) {
+        throw new BadRequestException('start_date and end_date are required');
+      }
+      return await this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId);
+    } catch (error) {
+      console.error('[InventoryReportController] Error in getDetailedReport:', error);
+      throw error;
+    }
   }
 
   @Get('batch')
@@ -22,6 +30,14 @@ export class InventoryReportController {
     @Query('warehouse_id') warehouseId?: number,
     @Query('supplier_id') supplierId?: number,
   ) {
-    return this.reportService.getBatchReport(startDate, endDate, warehouseId, supplierId);
+    try {
+      if (!startDate || !endDate) {
+        throw new BadRequestException('start_date and end_date are required');
+      }
+      return await this.reportService.getBatchReport(startDate, endDate, warehouseId, supplierId);
+    } catch (error) {
+      console.error('[InventoryReportController] Error in getBatchReport:', error);
+      throw error;
+    }
   }
 }
