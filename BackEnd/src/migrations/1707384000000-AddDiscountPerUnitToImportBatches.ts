@@ -16,10 +16,10 @@ export class AddDiscountPerUnitToImportBatches1707384000000 implements Migration
 
     // Nếu cột discount_percent tồn tại, có thể xóa nó
     const table = await queryRunner.getTable('import_batches');
-    
+
     if (table) {
       const discountPercentColumn = table.findColumnByName('discount_percent');
-      
+
       if (discountPercentColumn) {
         await queryRunner.dropColumn('import_batches', 'discount_percent');
       }

@@ -394,9 +394,6 @@ export class CustomersService {
       const globalBypassActive = isBypassSet(row.globalBypassCreditLimit) && !isDateExpired(row.globalBypassUntil);
       const isBypassed = globalBypassActive || storeBypassActive;
 
-      // Debug log - Log tất cả để dễ debug
-      console.log(`[Credit Status] ${row.customerName} (${row.customerCode}): defaultLimit=${defaultCreditLimit}, storeLimit=${storeCreditLimit}, maxStoreLimit=${maxStoreCreditLimit}, effectiveLimit=${creditLimit}, debt=${currentDebt}, available=${availableCredit}, bypass=${isBypassed}`);
-
       return {
         customerId: row.customerId,
         customerName: row.customerName,

@@ -72,9 +72,6 @@ const creditLimit = storeId
 ### 4. **Thiếu Debug Log**
 
 **Thêm log chi tiết** để dễ debug:
-```typescript
-console.log(`[Credit Status] ${row.customerName} (${row.customerCode}): storeLimit=${storeCreditLimit}, defaultLimit=${defaultCreditLimit}, effectiveLimit=${creditLimit}, debt=${currentDebt}, available=${availableCredit}, bypass=${isBypassed}`);
-```
 
 ---
 
