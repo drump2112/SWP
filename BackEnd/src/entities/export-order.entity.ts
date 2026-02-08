@@ -28,6 +28,13 @@ export class ExportOrder {
   @JoinColumn({ name: 'warehouse_id' })
   warehouse: CommercialWarehouse;
 
+  @Column({ nullable: true })
+  customer_id: number | null;
+
+  @ManyToOne(() => CommercialCustomer)
+  @JoinColumn({ name: 'customer_id' })
+  customer: CommercialCustomer;
+
   // Thông tin đơn hàng (xe bồn)
   @Column({ type: 'date' })
   order_date: Date;

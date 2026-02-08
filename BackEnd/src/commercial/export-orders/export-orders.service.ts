@@ -57,9 +57,17 @@ export class ExportOrdersService {
         throw new BadRequestException('warehouse_id is required or could not be determined from batches');
       }
 
+      // Get customer_id from first item
+      const customer_id = createOrderDto.items[0]?.customer_id;
+
+      if (!customer_id) {
+        throw new BadRequestException('customer_id is required in order items');
+      }
+
       // 2. Create export order (without items initially)
       const order = queryRunner.manager.create(ExportOrder, {
         warehouse_id: warehouse_id,
+        customer_id: customer_id,
         order_code: createOrderDto.order_number || `XB${Date.now()}`,
         order_date: createOrderDto.order_date ? new Date(createOrderDto.order_date) : new Date(),
         vehicle_number: createOrderDto.vehicle_number || '',
@@ -132,6 +140,7 @@ export class ExportOrdersService {
       return await this.findOne(savedOrder.id);
     } catch (error) {
       await queryRunner.rollbackTransaction();
+      console.error('Export order creation error:', error);
       throw error;
     } finally {
       await queryRunner.release();
