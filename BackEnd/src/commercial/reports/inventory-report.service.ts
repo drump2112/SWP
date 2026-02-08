@@ -130,7 +130,9 @@ export class InventoryReportService {
       importsQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
     }
 
-    const imports = await importsQuery.getMany();      console.log(`[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`);
+    const imports = await importsQuery.getMany();
+    console.log(`[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`);
+
     // Get exports with customer and group info
     const exportsQuery = this.exportOrderItemRepo
       .createQueryBuilder('item')
@@ -147,16 +149,16 @@ export class InventoryReportService {
     }
 
     const exports = await exportsQuery.getMany();
-      console.log(`[InventoryReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
+    console.log(`[InventoryReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
 
-      // Group imports by supplier and product
-      const importMap = new Map<string, ImportDetailDto>();
-      imports.forEach((batch) => {
-        // Validate batch data before processing
-        if (!batch.warehouse || !batch.product) {
-          console.warn(`[InventoryReport] Skipping batch ${batch.id} - missing warehouse or product`);
-          return;
-        }
+    // Group imports by supplier and product
+    const importMap = new Map<string, ImportDetailDto>();
+    imports.forEach((batch) => {
+      // Validate batch data before processing
+      if (!batch.warehouse || !batch.product) {
+        console.warn(`[InventoryReport] Skipping batch ${batch.id} - missing warehouse or product`);
+        return;
+      }
 
       const key = `${batch.supplier_id}-${batch.product_id}-${batch.warehouse_id}`;
       if (!importMap.has(key)) {
@@ -178,42 +180,66 @@ export class InventoryReportService {
       const record = importMap.get(key)!;
       const productName = batch.product.name.toUpperCase();
 
-        // Match sản phẩm vào category
-        if (productName.includes('A95') || productName.includes('95')) {
-          record.quantity_a95 += batch.import_quantity;
-        } 
-        else if (productName.includes('E5')) {
-          record.quantity_e5 += batch.import_quantity;
-        } 
-        else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) && 
+      // Match sản phẩm vào category
+      if (productName.includes('A95') || productName.includes('95')) {
+        record.quantity_a95 += batch.import_quantity;
+      } else if (productName.includes('E5')) {
+        record.quantity_e5 += batch.import_quantity;
+      } else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
                  (productName.includes('0.001') || productName.includes('0,001'))) {
-          record.quantity_do001 += batch.import_quantity;
-        } 
-        else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-            customer_id: null,
-            customer_name: null,
-            warehouse_id: batch.warehouse_id,
-            warehouse_name: batch.warehouse.name,
-            quantity_a95: 0,
-            quantity_do: 0,
-            quantity_e5: 0,
-            quantity_do001: 0,
-            total_quantity: 0,
-            revenue_a95: 0,
-            revenue_do: 0,
-            revenue_e5: 0,
-            revenue_do001: 0,
-            revenue: 0,
-            cost: 0,
-            profit_a95: 0,
-            profit_do: 0,
-            profit_e5: 0,
-            profit: 0,
-          });
-        }
-        const groupRecord = exportGroupMap.get(groupKey)!;
-        this.addExportData(groupRecord, item, batch);
+        record.quantity_do001 += batch.import_quantity;
+      } else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
+        record.quantity_do += batch.import_quantity;
       }
+
+      record.total_quantity += batch.import_quantity;
+      record.total_amount += batch.import_quantity * batch.unit_price;
+    });
+
+    // Group exports by customer group and individual customer
+    const exportGroupMap = new Map<string, ExportDetailDto>();
+    const exportCustomerMap = new Map<string, ExportDetailDto>();
+
+    exports.forEach((item) => {
+      if (!item.import_batch || !item.import_batch.warehouse || !item.import_batch.product) {
+        console.warn(`[InventoryReport] Skipping export item ${item.id} - missing batch data`);
+        return;
+      }
+
+      const batch = item.import_batch;
+      const customer = item.customer;
+      const groupId = customer?.customer_group_id || null;
+      const groupName = customer?.customer_group?.name || 'Không nhóm';
+
+      // Create/update customer group total
+      const groupKey = `group-${groupId}-${batch.warehouse_id}`;
+      if (!exportGroupMap.has(groupKey)) {
+        exportGroupMap.set(groupKey, {
+          customer_group_id: groupId,
+          customer_group_name: groupName,
+          customer_id: null,
+          customer_name: null,
+          warehouse_id: batch.warehouse_id,
+          warehouse_name: batch.warehouse.name,
+          quantity_a95: 0,
+          quantity_do: 0,
+          quantity_e5: 0,
+          quantity_do001: 0,
+          total_quantity: 0,
+          revenue_a95: 0,
+          revenue_do: 0,
+          revenue_e5: 0,
+          revenue_do001: 0,
+          revenue: 0,
+          cost: 0,
+          profit_a95: 0,
+          profit_do: 0,
+          profit_e5: 0,
+          profit: 0,
+        });
+      }
+      const groupRecord = exportGroupMap.get(groupKey)!;
+      this.addExportData(groupRecord, item, batch);
 
       // Create/update individual customer
       const customerKey = `customer-${item.customer_id}-${batch.warehouse_id}`;
@@ -307,19 +333,19 @@ export class InventoryReportService {
       record.quantity_a95 += item.quantity;
       record.revenue_a95 += itemRevenue;
       record.profit_a95 += itemProfit;
-    } 
+    }
     // E5
     else if (productName.includes('E5')) {
       record.quantity_e5 += item.quantity;
       record.revenue_e5 += itemRevenue;
       record.profit_e5 += itemProfit;
-    } 
+    }
     // DO 0.001 (kiểm tra cụ thể trước DO chung)
-    else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) && 
+    else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
              (productName.includes('0.001') || productName.includes('0,001'))) {
       record.quantity_do001 += item.quantity;
       record.revenue_do001 += itemRevenue;
-    } 
+    }
     // DO chung (Diesel Oil)
     else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
       record.quantity_do += item.quantity;
