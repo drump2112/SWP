@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:3000/api/commercial/reports/inventory';
+import api from './client';
 
 export interface ImportDetailItem {
   supplier_id: number;
@@ -57,7 +55,7 @@ export interface DetailedInventoryReport {
 export const inventoryReportAPI = {
   getDetailedReport: async (params: { start_date: string; end_date: string; warehouse_id?: number; supplier_id?: number }) => {
     try {
-      const response = await axios.get<DetailedInventoryReport>(`${API_URL}/detailed`, { params });
+      const response = await api.get<DetailedInventoryReport>(`/commercial/reports/inventory/detailed`, { params });
       console.log('[inventoryReportAPI] getDetailedReport success:', response.data);
       return response;
     } catch (error) {

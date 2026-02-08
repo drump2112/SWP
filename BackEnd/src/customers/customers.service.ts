@@ -340,7 +340,7 @@ export class CustomersService {
       const defaultCreditLimit = Number(row.defaultCreditLimit || 0);
       const storeCreditLimit = row.storeCreditLimit; // Khi có storeId cụ thể
       const maxStoreCreditLimit = row.maxStoreCreditLimit; // Hạn mức cao nhất từ tất cả cửa hàng (ADMIN view)
-      
+
       // Tính hạn mức hiệu lực:
       // 1. Nếu có storeId → Dùng hạn mức riêng của store đó, fallback về default
       // 2. Nếu ADMIN (không có storeId):
@@ -420,7 +420,7 @@ export class CustomersService {
     const { balance } = await this.getDebtBalance(customerId, storeId);
 
     // Lấy hạn mức hiệu lực (ưu tiên hạn mức riêng của store)
-    const creditLimit = storeId 
+    const creditLimit = storeId
       ? await this.getEffectiveCreditLimit(customerId, storeId)
       : Number(customer.creditLimit || 0);
 

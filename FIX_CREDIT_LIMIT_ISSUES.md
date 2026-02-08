@@ -1,6 +1,6 @@
 # SỬA LỖI QUẢN LÝ ĐỊNH MỨC CÔNG NỢ
 
-**Ngày:** 2026-02-05  
+**Ngày:** 2026-02-05
 **Vấn đề:** Hệ thống tính toán hạn mức công nợ không đúng - hiển thị hạn mức mặc định thay vì hạn mức hiệu lực tại từng cửa hàng.
 
 ---
@@ -62,7 +62,7 @@ const creditLimit = Number(customer.creditLimit || 0); // ❌ Chỉ dùng mặc 
 
 **Đã sửa:**
 ```typescript
-const creditLimit = storeId 
+const creditLimit = storeId
   ? await this.getEffectiveCreditLimit(customerId, storeId) // ✅ Ưu tiên hạn mức riêng
   : Number(customer.creditLimit || 0);
 ```
@@ -80,7 +80,7 @@ const creditLimit = storeId
 ### 1. **Sửa Backend Service** (`customers.service.ts`)
 
 #### a. Bỏ WHERE clause sai trong `getAllCreditStatus()`
-- Loại bỏ `.where('cs.store_id = :storeId')` 
+- Loại bỏ `.where('cs.store_id = :storeId')`
 - Điều kiện store đã được filter trong LEFT JOIN ON clause
 
 #### b. Chuẩn hóa logic kiểm tra thời gian bypass
@@ -115,10 +115,10 @@ WHERE bypass_credit_limit = TRUE
 #### c. Tạo View để query dễ dàng
 ```sql
 CREATE VIEW v_customer_effective_credit_limit AS
-SELECT 
+SELECT
   c.id,
   COALESCE(cs.credit_limit, c.credit_limit, 0) as effective_credit_limit,
-  CASE 
+  CASE
     WHEN cs.bypass_credit_limit = TRUE AND (cs.bypass_until IS NULL OR cs.bypass_until > NOW())
     THEN TRUE
     WHEN c.bypass_credit_limit = TRUE AND (c.bypass_until IS NULL OR c.bypass_until > NOW())
@@ -133,8 +133,8 @@ LEFT JOIN customer_stores cs ON c.id = cs.customer_id AND s.id = cs.store_id;
 
 #### d. Tạo index để tối ưu
 ```sql
-CREATE INDEX idx_customer_stores_bypass_until 
-  ON customer_stores(bypass_until) 
+CREATE INDEX idx_customer_stores_bypass_until
+  ON customer_stores(bypass_until)
   WHERE bypass_credit_limit = TRUE AND bypass_until IS NOT NULL;
 ```
 
