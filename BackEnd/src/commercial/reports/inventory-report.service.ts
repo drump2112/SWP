@@ -179,21 +179,31 @@ export class InventoryReportService {
       }
       const record = importMap.get(key)!;
       const productName = batch.product.name.toUpperCase();
+      const importQty = Number(batch.import_quantity) || 0;
+      const unitPrice = Number(batch.unit_price) || 0;
+
+      console.log(`[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}" (${productName}), quantity=${importQty}, price=${unitPrice}`);
 
       // Match sản phẩm vào category
       if (productName.includes('A95') || productName.includes('95')) {
-        record.quantity_a95 += batch.import_quantity;
+        console.log(`  → Matched to A95`);
+        record.quantity_a95 += importQty;
       } else if (productName.includes('E5')) {
-        record.quantity_e5 += batch.import_quantity;
+        console.log(`  → Matched to E5`);
+        record.quantity_e5 += importQty;
       } else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
                  (productName.includes('0.001') || productName.includes('0,001'))) {
-        record.quantity_do001 += batch.import_quantity;
+        console.log(`  → Matched to DO001`);
+        record.quantity_do001 += importQty;
       } else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-        record.quantity_do += batch.import_quantity;
+        console.log(`  → Matched to DO`);
+        record.quantity_do += importQty;
+      } else {
+        console.log(`  ⚠ NO MATCH - Product will be unmapped`);
       }
 
-      record.total_quantity += batch.import_quantity;
-      record.total_amount += batch.import_quantity * batch.unit_price;
+      record.total_quantity += importQty;
+      record.total_amount += importQty * unitPrice;
     });
 
     // Group exports by customer group and individual customer
@@ -210,6 +220,8 @@ export class InventoryReportService {
       const customer = item.customer;
       const groupId = customer?.customer_group_id || null;
       const groupName = customer?.customer_group?.name || 'Không nhóm';
+
+      console.log(`[InventoryReport] Processing export item ${item.id}: product="${batch.product.name}", quantity=${item.quantity}, customer="${customer?.name}"`);
 
       // Create/update customer group total
       const groupKey = `group-${groupId}-${batch.warehouse_id}`;
@@ -323,37 +335,47 @@ export class InventoryReportService {
     }
 
     const productName = batch.product.name.toUpperCase();
-    const itemRevenue = item.total_amount;
-    const itemCost = item.quantity * batch.unit_price;
+    const itemQty = Number(item.quantity) || 0;
+    const itemRevenue = Number(item.total_amount) || 0;
+    const unitPrice = Number(batch.unit_price) || 0;
+    const itemCost = itemQty * unitPrice;
     const itemProfit = itemRevenue - itemCost;
+
+    console.log(`[addExportData] product="${batch.product.name}" (${productName}), qty=${itemQty}, revenue=${itemRevenue}, cost=${itemCost}`);
 
     // Match sản phẩm vào category
     // A95/RON95
     if (productName.includes('A95') || productName.includes('95')) {
-      record.quantity_a95 += item.quantity;
+      console.log(`  → Export matched to A95`);
+      record.quantity_a95 += itemQty;
       record.revenue_a95 += itemRevenue;
       record.profit_a95 += itemProfit;
     }
     // E5
     else if (productName.includes('E5')) {
-      record.quantity_e5 += item.quantity;
+      console.log(`  → Export matched to E5`);
+      record.quantity_e5 += itemQty;
       record.revenue_e5 += itemRevenue;
       record.profit_e5 += itemProfit;
     }
     // DO 0.001 (kiểm tra cụ thể trước DO chung)
     else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
              (productName.includes('0.001') || productName.includes('0,001'))) {
-      record.quantity_do001 += item.quantity;
+      console.log(`  → Export matched to DO001`);
+      record.quantity_do001 += itemQty;
       record.revenue_do001 += itemRevenue;
     }
     // DO chung (Diesel Oil)
     else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-      record.quantity_do += item.quantity;
+      console.log(`  → Export matched to DO`);
+      record.quantity_do += itemQty;
       record.revenue_do += itemRevenue;
       record.profit_do += itemProfit;
+    } else {
+      console.log(`  ⚠ Export NO MATCH - Product unmapped`);
     }
 
-    record.total_quantity += item.quantity;
+    record.total_quantity += itemQty;
     record.revenue += itemRevenue;
     record.cost += itemCost;
     record.profit += itemProfit;
@@ -413,14 +435,14 @@ export class InventoryReportService {
         const batchExports = exportsByBatch.get(batch.id) || [];
 
       // Calculate export totals
-      const exportQuantity = batchExports.reduce((sum, item) => sum + item.quantity, 0);
-      const exportTotal = batchExports.reduce((sum, item) => sum + item.total_amount, 0);
-      const exportCost = batchExports.reduce((sum, item) => sum + (item.quantity * batch.unit_price), 0);
+      const exportQuantity = batchExports.reduce((sum, item) => sum + Number(item.quantity), 0);
+      const exportTotal = batchExports.reduce((sum, item) => sum + Number(item.total_amount), 0);
+      const exportCost = batchExports.reduce((sum, item) => sum + (Number(item.quantity) * Number(batch.unit_price)), 0);
       const exportProfit = exportTotal - exportCost;
 
       // Calculate closing inventory
-      const closingQuantity = batch.import_quantity - exportQuantity;
-      const closingTotal = closingQuantity * batch.unit_price;
+      const closingQuantity = Number(batch.import_quantity) - exportQuantity;
+      const closingTotal = closingQuantity * Number(batch.unit_price);
 
       return {
         batch_id: batch.id,
@@ -430,11 +452,11 @@ export class InventoryReportService {
         supplier_name: batch.supplier?.name || 'N/A',
         warehouse_name: batch.warehouse.name,
         // Import
-        import_quantity: batch.import_quantity,
-        import_discount: batch.discount_amount || 0,
+        import_quantity: Number(batch.import_quantity) || 0,
+        import_discount: Number(batch.discount_amount) || 0,
         import_eco_fee: 0,
-        import_env_tax: batch.environmental_tax_amount || 0,
-        import_total: batch.import_quantity * batch.unit_price,
+        import_env_tax: Number(batch.environmental_tax_amount) || 0,
+        import_total: Number(batch.import_quantity) * Number(batch.unit_price),
         // Export
         export_unit: 'Lít',
         export_quantity: exportQuantity,
