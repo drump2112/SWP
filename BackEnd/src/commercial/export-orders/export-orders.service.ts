@@ -25,7 +25,13 @@ export class ExportOrdersService {
     await queryRunner.startTransaction();
 
     try {
+      // Validate items exist
+      if (!createOrderDto.items || createOrderDto.items.length === 0) {
+        throw new BadRequestException('Order must have at least one item');
+      }
+
       // 1. Validate stock availability for all items
+      const batchMap = new Map();
       for (const itemDto of createOrderDto.items) {
         const batch = await queryRunner.manager.findOne(ImportBatch, {
           where: { id: itemDto.batch_id },
@@ -40,16 +46,25 @@ export class ExportOrdersService {
             `Insufficient stock in batch ${batch.batch_code}. Available: ${batch.remaining_quantity}, Requested: ${itemDto.quantity}`
           );
         }
+
+        batchMap.set(itemDto.batch_id, batch);
+      }
+
+      // Get warehouse_id from first batch if not provided
+      const warehouse_id = createOrderDto.warehouse_id || Array.from(batchMap.values())[0]?.warehouse_id;
+
+      if (!warehouse_id) {
+        throw new BadRequestException('warehouse_id is required or could not be determined from batches');
       }
 
       // 2. Create export order (without items initially)
       const order = queryRunner.manager.create(ExportOrder, {
-        warehouse_id: createOrderDto.warehouse_id,
+        warehouse_id: warehouse_id,
         order_code: createOrderDto.order_number || `XB${Date.now()}`,
         order_date: createOrderDto.order_date ? new Date(createOrderDto.order_date) : new Date(),
-        vehicle_number: createOrderDto.vehicle_number,
-        driver_name: createOrderDto.driver_name,
-        driver_phone: createOrderDto.driver_phone,
+        vehicle_number: createOrderDto.vehicle_number || '',
+        driver_name: createOrderDto.driver_name || '',
+        driver_phone: createOrderDto.driver_phone || '',
         payment_method: createOrderDto.payment_method || 'DEBT',
         payment_status: createOrderDto.payment_status || 'UNPAID',
         status: 'PENDING',
@@ -63,17 +78,15 @@ export class ExportOrdersService {
       let total_discount = 0;
 
       for (const itemDto of createOrderDto.items) {
-        const batch = await queryRunner.manager.findOne(ImportBatch, {
-          where: { id: itemDto.batch_id },
-        });
+        const batch = batchMap.get(itemDto.batch_id);
 
         if (!batch) {
           throw new NotFoundException(`Batch with ID ${itemDto.batch_id} not found`);
         }
 
-        const discount_per_unit = itemDto.discount_amount || 0;
+        const discount_per_unit = (itemDto.discount_amount || 0) / itemDto.quantity;
         const line_total = itemDto.quantity * itemDto.unit_price;
-        const discount_amount = itemDto.quantity * discount_per_unit;
+        const discount_amount = itemDto.discount_amount || (itemDto.quantity * (batch.discount_per_unit || 0));
         const net_amount = line_total - discount_amount;
 
         // Calculate discount percent for backward compatibility
