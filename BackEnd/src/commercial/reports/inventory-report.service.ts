@@ -341,19 +341,20 @@ export class InventoryReportService {
     const itemCost = itemQty * unitPrice;
     const itemProfit = itemRevenue - itemCost;
 
-    console.log(`[addExportData] product="${batch.product.name}" (${productName}), qty=${itemQty}, revenue=${itemRevenue}, cost=${itemCost}`);
+    console.log(`[addExportData] BEFORE: product="${batch.product.name}", productNameUP="${productName}", qty=${itemQty}, revenue=${itemRevenue}`);
+    console.log(`  Record state BEFORE: rev_a95=${record.revenue_a95}, rev_do=${record.revenue_do}, rev_e5=${record.revenue_e5}`);
 
     // Match sản phẩm vào category
     // A95/RON95
     if (productName.includes('A95') || productName.includes('95')) {
-      console.log(`  → Export matched to A95`);
+      console.log(`  ✓ Matched to A95: adding revenue=${itemRevenue}`);
       record.quantity_a95 += itemQty;
       record.revenue_a95 += itemRevenue;
       record.profit_a95 += itemProfit;
     }
     // E5
     else if (productName.includes('E5')) {
-      console.log(`  → Export matched to E5`);
+      console.log(`  ✓ Matched to E5: adding revenue=${itemRevenue}`);
       record.quantity_e5 += itemQty;
       record.revenue_e5 += itemRevenue;
       record.profit_e5 += itemProfit;
@@ -361,19 +362,21 @@ export class InventoryReportService {
     // DO 0.001 (kiểm tra cụ thể trước DO chung)
     else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
              (productName.includes('0.001') || productName.includes('0,001'))) {
-      console.log(`  → Export matched to DO001`);
+      console.log(`  ✓ Matched to DO001: adding revenue=${itemRevenue}`);
       record.quantity_do001 += itemQty;
       record.revenue_do001 += itemRevenue;
     }
     // DO chung (Diesel Oil)
     else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-      console.log(`  → Export matched to DO`);
+      console.log(`  ✓ Matched to DO: adding revenue=${itemRevenue}`);
       record.quantity_do += itemQty;
       record.revenue_do += itemRevenue;
       record.profit_do += itemProfit;
     } else {
       console.log(`  ⚠ Export NO MATCH - Product unmapped`);
     }
+
+    console.log(`  Record state AFTER: rev_a95=${record.revenue_a95}, rev_do=${record.revenue_do}, rev_e5=${record.revenue_e5}`);
 
     record.total_quantity += itemQty;
     record.revenue += itemRevenue;

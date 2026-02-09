@@ -395,7 +395,7 @@ export class ShiftsService {
       };
     });
 
-    // Server-side validation: ensure readings are valid and quantity > 0.
+    // Server-side validation: ensure readings are valid and quantity >= 0.
     // This prevents malicious or accidental negative values (paste/devtools).
     for (const pr of pumpReadingsData) {
       // Validate numeric presence
@@ -409,9 +409,9 @@ export class ShiftsService {
         );
       }
 
-      if (qty <= 0) {
+      if (qty < 0) {
         throw new BadRequestException(
-          `Số lượng bán phải lớn hơn 0 cho vòi ${pr.pumpCode || pr.pumpId}`,
+          `Số lượng bán không thể âm cho vòi ${pr.pumpCode || pr.pumpId}`,
         );
       }
     }
