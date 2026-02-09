@@ -228,38 +228,31 @@ export class ReportsService {
       throw new Error('Shift not found');
     }
 
-    // Lấy phiếu thu tiền (thanh toán nợ)
-    const receipts = await this.cashLedgerRepository.find({
-      where: {
-        refType: 'RECEIPT',
-        // refId sẽ là receipt_id, cần join với receipts table
-      },
-      relations: ['store'],
+    // Lấy phiếu thu tiền (thanh toán nợ) từ receiptRepository thay vì cashLedgerRepository
+    // Vì cash_ledger không có shift_id, nên không thể filter chính xác
+    const receiptsInShiftData = await this.receiptRepository.find({
+      where: { shiftId },
+      relations: ['receiptDetails', 'receiptDetails.customer'],
     });
 
-    const totalReceipts = receipts
-      .filter((r) => {
-        // Chỉ lấy receipts trong ca này
-        // TODO: Cần thêm shift_id vào receipts table
-        return true;
-      })
-      .reduce((sum, r) => sum + Number(r.cashIn), 0);
+    // Tính tiền thu theo phương thức thanh toán
+    const totalReceiptsCash = receiptsInShiftData
+      .filter((r) => r.paymentMethod === 'CASH')
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-    // Lấy phiếu nộp tiền
-    const deposits = await this.cashLedgerRepository.find({
-      where: {
-        refType: 'CASH_DEPOSIT',
-        storeId: shift.storeId,
-      },
+    const totalReceiptsBankTransfer = receiptsInShiftData
+      .filter((r) => r.paymentMethod === 'BANK_TRANSFER')
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+    // Tổng tiền thu (dùng cho báo cáo)
+    const totalReceipts = totalReceiptsCash + totalReceiptsBankTransfer;
+
+    // Lấy phiếu nộp tiền từ cashDepositRepository (có shift_id)
+    const depositsInShift = await this.cashDepositRepository.find({
+      where: { shiftId },
     });
 
-    const totalDeposits = deposits
-      .filter((d) => {
-        // Chỉ lấy deposits trong ca này
-        // TODO: Cần thêm shift_id vào cash_deposits table
-        return true;
-      })
-      .reduce((sum, d) => sum + Number(d.cashOut), 0);
+    const totalDeposits = depositsInShift.reduce((sum, d) => sum + Number(d.amount || 0), 0);
 
     // Tính toán
     const totalFromPumps = shift.pumpReadings.reduce((sum, reading) => {
@@ -287,11 +280,8 @@ export class ReportsService {
       relations: ['items', 'items.product'],
     });
 
-    // Lấy Receipts trong ca
-    const receiptsInShift = await this.receiptRepository.find({
-      where: { shiftId },
-      relations: ['receiptDetails', 'receiptDetails.customer'],
-    });
+    // *** Note: receiptsInShift đã được query ở trên (line 233) ***
+    // Dùng biến receiptsInShiftData (được tính từ receiptRepository)
 
     // Tính toán dữ liệu tồn kho theo sản phẩm
     const inventoryMap = new Map<number, any>();
@@ -344,6 +334,84 @@ export class ReportsService {
 
     const inventoryByProduct = Array.from(inventoryMap.values());
 
+    // Calculate carry-over cash from previous shift
+    let carryOverCash = 0;
+    
+    // Try to find previous shift on the same day
+    let previousShift = await this.shiftRepository.findOne({
+      where: {
+        storeId: shift.storeId,
+        shiftDate: shift.shiftDate,
+        shiftNo: shift.shiftNo - 1,
+        status: 'CLOSED', // Only closed shifts have valid cash balance
+      },
+      relations: ['pumpReadings', 'pumpReadings.product'],
+    });
+
+    // If no previous shift on same day, find last shift from previous day
+    if (!previousShift) {
+      const previousDate = new Date(shift.shiftDate);
+      previousDate.setDate(previousDate.getDate() - 1);
+      
+      previousShift = await this.shiftRepository.findOne({
+        where: {
+          storeId: shift.storeId,
+          shiftDate: previousDate,
+          status: 'CLOSED',
+        },
+        order: { shiftNo: 'DESC' }, // Get the last shift of previous day
+        relations: ['pumpReadings', 'pumpReadings.product'],
+      });
+    }
+
+    // Calculate previous shift's cash balance if found
+    if (previousShift) {
+      // Get previous shift receipts and deposits (same logic as current shift)
+      const prevReceiptsData = await this.receiptRepository.find({
+        where: { shiftId: previousShift.id },
+      });
+
+      const prevReceiptsCash = prevReceiptsData
+        .filter((r) => r.paymentMethod === 'CASH')
+        .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+      const prevReceiptsBankTransfer = prevReceiptsData
+        .filter((r) => r.paymentMethod === 'BANK_TRANSFER')
+        .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+      // Get previous shift deposits
+      const prevDepositsData = await this.cashDepositRepository.find({
+        where: { shiftId: previousShift.id },
+      });
+
+      const prevTotalDeposits = prevDepositsData.reduce(
+        (sum, d) => sum + Number(d.amount || 0),
+        0,
+      );
+
+      // Calculate previous shift's retail sales
+      const prevTotalFromPumps = previousShift.pumpReadings.reduce((sum, reading) => {
+        return sum + Math.round(Number(reading.quantity) * Number(reading.unitPrice || 0));
+      }, 0);
+
+      const prevDebtSalesData = await this.shiftDebtSaleRepository.find({
+        where: { shiftId: previousShift.id },
+      });
+
+      const prevTotalDebtSales = prevDebtSalesData.reduce(
+        (sum, sale) => sum + Number(sale.amount || 0),
+        0,
+      );
+
+      const prevRetailSales = prevTotalFromPumps - prevTotalDebtSales;
+
+      // Calculate previous shift's cash balance
+      carryOverCash =
+        prevRetailSales +
+        prevReceiptsCash -
+        (prevTotalDeposits + prevReceiptsBankTransfer);
+    }
+
     return {
       shift: {
         id: shift.id,
@@ -390,11 +458,16 @@ export class ReportsService {
         totalPumpAmount: totalFromPumps, // Tổng từ vòi bơm
         totalDebtAmount: totalDebtSales, // Bán công nợ
         totalRetailAmount: totalRetailSales, // Bán lẻ = Tổng - Công nợ
-        totalReceiptAmount: totalReceipts, // Thu tiền nợ
+        totalReceiptAmount: totalReceipts, // Thu tiền nợ (cả tiền mặt + chuyển khoản)
         totalDepositAmount: totalDeposits, // Nộp về công ty
-        cashBalance: totalRetailSales + totalReceipts - totalDeposits, // Số dư quỹ
+        // Quỹ = Bán lẻ (tiền mặt) + Thu nợ bằng tiền mặt - (Nộp tiền + Thu nợ bằng chuyển khoản)
+        // Giải thích:
+        // - Bán lẻ & thu nợ tiền mặt = tiền mặt thực tế trong quỹ
+        // - Nộp tiền = tiền được nộp ra khỏi quỹ
+        // - Thu nợ chuyển khoản = tiền được chuyển vào tk ngân hàng, không còn trong quỹ
+        cashBalance: totalRetailSales + totalReceiptsCash - (totalDeposits + totalReceiptsBankTransfer),
       },
-      receipts: receiptsInShift.map((receipt) => ({
+      receipts: receiptsInShiftData.map((receipt) => ({
         id: receipt.id,
         receiptType: receipt.receiptType || '',
         amount: Number(receipt.amount || 0),
@@ -408,10 +481,17 @@ export class ReportsService {
           amount: Number(d.amount || 0),
         })) || [],
       })),
-      deposits: [],
+      deposits: depositsInShift.map((d) => ({
+        id: d.id,
+        amount: Number(d.amount || 0),
+        depositAt: d.depositAt || new Date(),
+        receiverName: d.receiverName || '',
+        paymentMethod: d.paymentMethod || 'CASH',
+        notes: d.notes,
+      })),
       inventory: [],
       inventoryByProduct,
-      carryOverCash: 0,
+      carryOverCash: carryOverCash,
     };
   }
 
