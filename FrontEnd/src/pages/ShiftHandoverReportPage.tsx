@@ -208,12 +208,12 @@ const ShiftHandoverReportPage: React.FC = () => {
         worksheet.getCell(`A${row}`).value = stt;
         worksheet.getCell(`B${row}`).value = reading.productName;
         worksheet.getCell(`C${row}`).value = 'Số điện tử / Số cơ';
-        worksheet.getCell(`D${row}`).value = reading.startValue;
-        worksheet.getCell(`E${row}`).value = reading.endValue;
-        worksheet.getCell(`F${row}`).value = reading.quantity;
-        worksheet.getCell(`G${row}`).value = reading.quantity - reading.testExport;
-        worksheet.getCell(`H${row}`).value = reading.unitPrice;
-        worksheet.getCell(`I${row}`).value = reading.amount;
+        worksheet.getCell(`D${row}`).value = reading.startValue ?? 0;
+        worksheet.getCell(`E${row}`).value = reading.endValue ?? 0;
+        worksheet.getCell(`F${row}`).value = reading.quantity ?? 0;
+        worksheet.getCell(`G${row}`).value = (reading.quantity ?? 0) - (reading.testExport ?? 0);
+        worksheet.getCell(`H${row}`).value = reading.unitPrice ?? 0;
+        worksheet.getCell(`I${row}`).value = reading.amount ?? 0;
 
         for (let i = 0; i < 9; i++) {
           const col = String.fromCharCode(65 + i);
@@ -311,7 +311,7 @@ const ShiftHandoverReportPage: React.FC = () => {
 
       worksheet.mergeCells(`A${row}:I${row}`);
       cell = worksheet.getCell(`A${row}`);
-      cell.value = `Tiền ca trước chuyển sang: ${report.carryOverCash.toLocaleString('vi-VN')}`;
+      cell.value = `Tiền ca trước chuyển sang: ${(report.carryOverCash ?? 0).toLocaleString('vi-VN')}`;
       row += 2;
 
       // Summary items with table borders
@@ -484,12 +484,12 @@ const ShiftHandoverReportPage: React.FC = () => {
                 <td>${idx + 1}</td>
                 <td>${reading.productName}</td>
                 <td>Số độn tư / Số cơ</td>
-                <td class="text-right">${reading.startValue.toFixed(2)}</td>
-                <td class="text-right">${reading.endValue.toFixed(2)}</td>
-                <td class="text-right">${reading.quantity.toFixed(3)}</td>
-                <td class="text-right">${(reading.quantity - reading.testExport).toFixed(3)}</td>
-                <td class="text-right">${reading.unitPrice.toLocaleString('vi-VN')}</td>
-                <td class="text-right">${reading.amount.toLocaleString('vi-VN')}</td>
+                <td class="text-right">${(reading.startValue ?? 0).toFixed(2)}</td>
+                <td class="text-right">${(reading.endValue ?? 0).toFixed(2)}</td>
+                <td class="text-right">${(reading.quantity ?? 0).toFixed(3)}</td>
+                <td class="text-right">${((reading.quantity ?? 0) - (reading.testExport ?? 0)).toFixed(3)}</td>
+                <td class="text-right">${(reading.unitPrice ?? 0).toLocaleString('vi-VN')}</td>
+                <td class="text-right">${(reading.amount ?? 0).toLocaleString('vi-VN')}</td>
               </tr>
             `
               )
@@ -611,10 +611,10 @@ const ShiftHandoverReportPage: React.FC = () => {
                 (item) => `
               <tr>
                 <td>${item.productName}</td>
-                <td class="text-right">${(item.openingStock || 0).toFixed(3)}</td>
-                <td class="text-right">${(item.importQuantity || 0).toFixed(3)}</td>
-                <td class="text-right">${(item.exportQuantity || 0).toFixed(3)}</td>
-                <td class="text-right font-bold">${(item.closingStock || 0).toFixed(3)}</td>
+                <td class="text-right">${((item.openingStock ?? 0) || 0).toFixed(3)}</td>
+                <td class="text-right">${((item.importQuantity ?? 0) || 0).toFixed(3)}</td>
+                <td class="text-right">${((item.exportQuantity ?? 0) || 0).toFixed(3)}</td>
+                <td class="text-right font-bold">${((item.closingStock ?? 0) || 0).toFixed(3)}</td>
                 <td></td>
               </tr>
             `
@@ -759,12 +759,12 @@ const ShiftHandoverReportPage: React.FC = () => {
                       <td className="border p-2">{idx + 1}</td>
                       <td className="border p-2">{reading.productName}</td>
                       <td className="border p-2">Số điện tử / Số cơ</td>
-                      <td className="border p-2 text-right">{reading.startValue.toFixed(2)}</td>
-                      <td className="border p-2 text-right">{reading.endValue.toFixed(2)}</td>
-                      <td className="border p-2 text-right">{reading.quantity.toFixed(3)}</td>
-                      <td className="border p-2 text-right">{(reading.quantity - reading.testExport).toFixed(3)}</td>
-                      <td className="border p-2 text-right">{reading.unitPrice.toLocaleString('vi-VN')}</td>
-                      <td className="border p-2 text-right font-medium">{reading.amount.toLocaleString('vi-VN')}</td>
+                      <td className="border p-2 text-right">{(reading.startValue ?? 0).toFixed(2)}</td>
+                      <td className="border p-2 text-right">{(reading.endValue ?? 0).toFixed(2)}</td>
+                      <td className="border p-2 text-right">{(reading.quantity ?? 0).toFixed(3)}</td>
+                      <td className="border p-2 text-right">{((reading.quantity ?? 0) - (reading.testExport ?? 0)).toFixed(3)}</td>
+                      <td className="border p-2 text-right">{(reading.unitPrice ?? 0).toLocaleString('vi-VN')}</td>
+                      <td className="border p-2 text-right font-medium">{(reading.amount ?? 0).toLocaleString('vi-VN')}</td>
                     </tr>
                   ))}
                   <tr className="font-bold bg-yellow-50">
@@ -835,8 +835,8 @@ const ShiftHandoverReportPage: React.FC = () => {
                     {report.receipts.map((receipt, idx) => (
                       <tr key={receipt.id}>
                         <td className="border p-2">{idx + 1}</td>
-                        <td className="border p-2">{receipt.details.map((d) => d.customerName).join(', ')}</td>
-                        <td className="border p-2 text-right">{receipt.amount.toLocaleString('vi-VN')}</td>
+                        <td className="border p-2">{receipt.details?.map((d) => d.customerName).join(', ') || '-'}</td>
+                        <td className="border p-2 text-right">{(receipt.amount ?? 0).toLocaleString('vi-VN')}</td>
                         <td className="border p-2">{formatPaymentMethod(receipt.paymentMethod)}</td>
                         <td className="border p-2"></td>
                       </tr>
@@ -845,7 +845,7 @@ const ShiftHandoverReportPage: React.FC = () => {
                       <td colSpan={2} className="border p-2 text-right">
                         CỘNG THU CÓ NGÀY
                       </td>
-                      <td className="border p-2 text-right">{report.summary.totalReceiptAmount.toLocaleString('vi-VN')}</td>
+                      <td className="border p-2 text-right">{(report.summary.totalReceiptAmount ?? 0).toLocaleString('vi-VN')}</td>
                       <td colSpan={2} className="border p-2"></td>
                     </tr>
                   </tbody>
@@ -915,16 +915,16 @@ const ShiftHandoverReportPage: React.FC = () => {
                       <tr key={item.productId}>
                         <td className="border p-2">{item.productName}</td>
                         <td className="border p-2 text-right">
-                          {item.openingStock ? item.openingStock.toFixed(3) : '0.000'}
+                          {((item.openingStock ?? 0) > 0 ? item.openingStock : 0).toFixed(3)}
                         </td>
                         <td className="border p-2 text-right">
-                          {item.importQuantity ? item.importQuantity.toFixed(3) : '0.000'}
+                          {((item.importQuantity ?? 0) > 0 ? item.importQuantity : 0).toFixed(3)}
                         </td>
                         <td className="border p-2 text-right">
-                          {item.exportQuantity ? item.exportQuantity.toFixed(3) : '0.000'}
+                          {((item.exportQuantity ?? 0) > 0 ? item.exportQuantity : 0).toFixed(3)}
                         </td>
                         <td className="border p-2 text-right font-bold">
-                          {item.closingStock ? item.closingStock.toFixed(3) : '0.000'}
+                          {((item.closingStock ?? 0) > 0 ? item.closingStock : 0).toFixed(3)}
                         </td>
                         <td className="border p-2"></td>
                       </tr>

@@ -278,6 +278,72 @@ export class ReportsService {
     );
     const totalRetailSales = totalFromPumps - totalDebtSales;
 
+    // Lấy dữ liệu tồn kho
+    const openingStockData = shift.openingStockJson || [];
+
+    // Lấy các phiếu nhập/xuất kho trong ca này
+    const inventoryDocs = await this.inventoryDocumentRepository.find({
+      where: { refShiftId: shiftId },
+      relations: ['items', 'items.product'],
+    });
+
+    // Lấy Receipts trong ca
+    const receiptsInShift = await this.receiptRepository.find({
+      where: { shiftId },
+      relations: ['receiptDetails', 'receiptDetails.customer'],
+    });
+
+    // Tính toán dữ liệu tồn kho theo sản phẩm
+    const inventoryMap = new Map<number, any>();
+
+    // Khởi tạo với giá trị mở đầu
+    if (Array.isArray(openingStockData)) {
+      openingStockData.forEach((item) => {
+        inventoryMap.set(item.productId, {
+          productId: item.productId,
+          productCode: item.productCode || '',
+          productName: item.productName || '',
+          openingStock: Number(item.openingStock || 0),
+          importQuantity: 0,
+          exportQuantity: 0,
+          closingStock: Number(item.openingStock || 0),
+        });
+      });
+    }
+
+    // Tính toán import/export từ inventory documents
+    inventoryDocs.forEach((doc) => {
+      if (doc.items && Array.isArray(doc.items)) {
+        doc.items.forEach((item) => {
+          const prodId = item.product?.id || item.productId;
+          if (!inventoryMap.has(prodId)) {
+            inventoryMap.set(prodId, {
+              productId: prodId,
+              productCode: item.product?.code || '',
+              productName: item.product?.name || '',
+              openingStock: 0,
+              importQuantity: 0,
+              exportQuantity: 0,
+              closingStock: 0,
+            });
+          }
+
+          const inv = inventoryMap.get(prodId);
+          const qty = Number(item.quantity || 0);
+
+          if (doc.docType === 'IMPORT') {
+            inv.importQuantity += qty;
+          } else if (doc.docType === 'EXPORT') {
+            inv.exportQuantity += qty;
+          }
+
+          inv.closingStock = inv.openingStock + inv.importQuantity - inv.exportQuantity;
+        });
+      }
+    });
+
+    const inventoryByProduct = Array.from(inventoryMap.values());
+
     return {
       shift: {
         id: shift.id,
@@ -286,39 +352,66 @@ export class ReportsService {
         status: shift.status,
         openedAt: shift.openedAt,
         closedAt: shift.closedAt,
+        handoverName: shift.handoverName || '',
+        receiverName: shift.receiverName || '',
         store: {
           id: shift.store.id,
           code: shift.store.code,
           name: shift.store.name,
+          region: shift.store.region || '',
         },
       },
       pumpReadings: shift.pumpReadings.map((reading) => ({
-        pumpCode: reading.pump.pumpCode,
-        pumpName: reading.pump.name,
-        productName: reading.product.name,
-        startReading: Number(reading.startValue || reading.startReading || 0),
-        endReading: Number(reading.endValue || reading.endReading || 0),
-        testExport: Number(reading.testExport || 0), // Xuất kiểm thử/Quay kho
-        quantity: Number(reading.quantity), // Số lượng BÁN (đã trừ testExport)
-        unitPrice: Number(reading.unitPrice),
-        amount: Math.round(Number(reading.quantity) * Number(reading.unitPrice)), // Làm tròn để tránh phần thập phân
+        pumpId: reading.pumpId || reading.pump?.id,
+        pumpCode: reading.pump?.pumpCode || reading.pumpCode || '',
+        pumpName: reading.pump?.name || reading.pumpName || '',
+        productId: reading.productId || reading.product?.id,
+        productName: reading.product?.name || reading.productName || '',
+        startValue: Number(reading.startValue ?? reading.startReading ?? 0),
+        endValue: Number(reading.endValue ?? reading.endReading ?? 0),
+        testExport: Number(reading.testExport ?? 0), // Xuất kiểm thử/Quay kho
+        quantity: Number(reading.quantity ?? 0), // Số lượng BÁN (đã trừ testExport)
+        unitPrice: Number(reading.unitPrice ?? 0),
+        amount: Math.round(Number(reading.quantity ?? 0) * Number(reading.unitPrice ?? 0)), // Làm tròn để tránh phần thập phân
       })),
       debtSales: debtSalesData.map((sale) => ({
-        customerCode: sale.customer?.code,
-        customerName: sale.customer?.name,
-        productName: sale.product?.name,
-        quantity: Number(sale.quantity),
-        unitPrice: Number(sale.unitPrice),
-        amount: Number(sale.amount),
+        id: sale.id,
+        customerId: sale.customerId,
+        customerCode: sale.customer?.code || '',
+        customerName: sale.customer?.name || '',
+        productId: sale.productId,
+        productName: sale.product?.name || '',
+        quantity: Number(sale.quantity ?? 0),
+        unitPrice: Number(sale.unitPrice ?? 0),
+        amount: Number(sale.amount ?? 0),
+        notes: sale.notes,
       })),
       summary: {
-        totalFromPumps, // Tổng từ vòi bơm
-        totalDebtSales, // Bán công nợ
-        totalRetailSales, // Bán lẻ = Tổng - Công nợ
-        totalReceipts, // Thu tiền nợ
-        totalDeposits, // Nộp về công ty
+        totalPumpAmount: totalFromPumps, // Tổng từ vòi bơm
+        totalDebtAmount: totalDebtSales, // Bán công nợ
+        totalRetailAmount: totalRetailSales, // Bán lẻ = Tổng - Công nợ
+        totalReceiptAmount: totalReceipts, // Thu tiền nợ
+        totalDepositAmount: totalDeposits, // Nộp về công ty
         cashBalance: totalRetailSales + totalReceipts - totalDeposits, // Số dư quỹ
       },
+      receipts: receiptsInShift.map((receipt) => ({
+        id: receipt.id,
+        receiptType: receipt.receiptType || '',
+        amount: Number(receipt.amount || 0),
+        paymentMethod: receipt.paymentMethod || '',
+        receiptAt: receipt.receiptAt || new Date(),
+        notes: receipt.notes,
+        details: receipt.receiptDetails?.map((d) => ({
+          id: d.id,
+          customerId: d.customerId,
+          customerName: d.customer?.name || '',
+          amount: Number(d.amount || 0),
+        })) || [],
+      })),
+      deposits: [],
+      inventory: [],
+      inventoryByProduct,
+      carryOverCash: 0,
     };
   }
 
