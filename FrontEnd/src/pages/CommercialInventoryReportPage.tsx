@@ -292,14 +292,16 @@ const CommercialInventoryReportPage: React.FC = () => {
                         <td className="px-4 py-2 text-right border">{isNaN(item.quantity_e5) ? '0' : item.quantity_e5.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do001) ? '0' : item.quantity_do001.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.total_quantity) ? '0' : item.total_quantity.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.total_quantity) ? '0' : item.total_quantity.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">-</td>
-                        <td className="px-4 py-2 text-right border">-</td>
-                        <td className="px-4 py-2 text-right border">-</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_a95) ? '0' : item.revenue_a95.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_do) ? '0' : item.revenue_do.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_e5) ? '0' : item.revenue_e5.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.revenue) ? '0' : item.revenue.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">-</td>
                         <td className="px-4 py-2 text-right border">-</td>
                         <td className="px-4 py-2 text-right border">-</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_a95) ? '0' : item.profit_a95.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_do) ? '0' : item.profit_do.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_e5) ? '0' : item.profit_e5.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border font-semibold text-green-600">{isNaN(item.profit) ? '0' : item.profit.toLocaleString('vi-VN')}</td>
                       </tr>
                     );
@@ -334,13 +336,43 @@ const CommercialInventoryReportPage: React.FC = () => {
                       {isNaN(Number(reportData.summary.total_export_quantity)) ? '0' : Number(reportData.summary.total_export_quantity).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-4 py-2 text-right border">{isNaN(Number(reportData.summary.total_export_quantity)) ? '0' : Number(reportData.summary.total_export_quantity).toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border">-</td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_a95, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_do, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_e5, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
                     <td className="px-4 py-2 text-right border">{isNaN(Number(reportData.summary.total_revenue)) ? '0' : Number(reportData.summary.total_revenue).toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border">-</td>
-                    <td className="px-4 py-2 text-right border">-</td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_a95, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_do, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_e5, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
                     <td className="px-4 py-2 text-right border text-green-600">{isNaN(Number(reportData.summary.total_profit)) ? '0' : Number(reportData.summary.total_profit).toLocaleString('vi-VN')}</td>
                   </tr>
                 </tbody>
