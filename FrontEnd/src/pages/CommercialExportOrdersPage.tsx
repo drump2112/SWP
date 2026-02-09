@@ -5,7 +5,7 @@ import { exportOrdersAPI, type ExportOrder, type CreateExportOrderDto } from '..
 import { warehousesAPI } from '../api/commercial-warehouses';
 import { commercialCustomersAPI } from '../api/commercial-customers';
 import { importBatchesAPI, type ImportBatch } from '../api/commercial-import-batches';
-import { MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, ShoppingCartIcon, EyeIcon, PlusIcon, XMarkIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ChevronLeftIcon, ChevronRightIcon, ShoppingCartIcon, EyeIcon, PlusIcon, XMarkIcon, TrashIcon, PencilIcon } from '@heroicons/react/24/outline';
 import Select2 from '../components/Select2';
 import Swal from 'sweetalert2';
 
@@ -21,6 +21,8 @@ const CommercialExportOrdersPage: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<ExportOrder | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editOrderId, setEditOrderId] = useState<number | null>(null);
 
   interface OrderItem {
     warehouse_id: number;
@@ -106,6 +108,25 @@ const CommercialExportOrdersPage: React.FC = () => {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: number; payload: Partial<Omit<CreateExportOrderDto, 'items'>> }) =>
+      exportOrdersAPI.update(data.id, data.payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['commercial-export-orders'] });
+      Swal.fire('Thành công!', 'Cập nhật đơn hàng thành công', 'success');
+      handleCloseEditModal();
+    },
+    onError: (error: any) => {
+      console.error('Error updating order:', error.response?.data);
+      const errorMsg = typeof error.response?.data?.message === 'string'
+        ? error.response.data.message
+        : Array.isArray(error.response?.data?.message)
+        ? error.response.data.message.join(', ')
+        : JSON.stringify(error.response?.data?.message || error.response?.data || 'Có lỗi xảy ra');
+      Swal.fire('Lỗi!', errorMsg, 'error');
+    },
+  });
+
   const handleOpenCreateModal = () => {
     setFormData({
       warehouse_id: 0,
@@ -125,6 +146,55 @@ const CommercialExportOrdersPage: React.FC = () => {
 
   const handleCloseCreateModal = () => {
     setIsCreateModalOpen(false);
+  };
+
+  const handleOpenEditModal = async (order: ExportOrder) => {
+    try {
+      const response = await exportOrdersAPI.getOne(order.id);
+      const order_data = response.data;
+      setFormData({
+        warehouse_id: order_data.warehouse_id || 0,
+        order_number: order_data.order_number || '',
+        order_date: order_data.order_date?.split('T')[0] || '',
+        vehicle_number: order_data.vehicle_number || '',
+        driver_name: order_data.driver_name || '',
+        driver_phone: order_data.driver_phone || '',
+        vat_percent: order_data.vat_percent || 0,
+        payment_method: order_data.payment_method || '',
+        payment_status: order_data.payment_status || 'UNPAID',
+        notes: order_data.notes || '',
+      });
+      setEditOrderId(order_data.id);
+      setIsEditModalOpen(true);
+    } catch (error) {
+      console.error('Error loading order for edit:', error);
+      Swal.fire('Lỗi!', 'Không thể tải thông tin đơn hàng', 'error');
+    }
+  };
+
+  const handleCloseEditModal = () => {
+    setIsEditModalOpen(false);
+    setEditOrderId(null);
+  };
+
+  const handleUpdateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editOrderId) return;
+
+    const updateData: Partial<Omit<CreateExportOrderDto, 'items'>> = {
+      warehouse_id: formData.warehouse_id,
+      order_number: formData.order_number,
+      order_date: formData.order_date,
+      vehicle_number: formData.vehicle_number,
+      driver_name: formData.driver_name,
+      driver_phone: formData.driver_phone,
+      vat_percent: formData.vat_percent,
+      payment_method: formData.payment_method,
+      payment_status: formData.payment_status,
+      notes: formData.notes,
+    };
+
+    updateMutation.mutate({ id: editOrderId, payload: updateData });
   };
 
   const handleAddItem = () => {
@@ -412,10 +482,17 @@ const CommercialExportOrdersPage: React.FC = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {getPaymentStatusBadge(order.payment_status)}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
+                        <button
+                          onClick={() => handleOpenEditModal(order)}
+                          className="text-yellow-600 hover:text-yellow-900 inline-block"
+                          title="Sửa đơn hàng"
+                        >
+                          <PencilIcon className="h-5 w-5" />
+                        </button>
                         <button
                           onClick={() => handleViewDetail(order)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 inline-block"
                           title="Xem chi tiết"
                         >
                           <EyeIcon className="h-5 w-5" />
@@ -985,6 +1062,174 @@ const CommercialExportOrdersPage: React.FC = () => {
                 Đóng
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal */}
+      {isEditModalOpen && (
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-xl font-semibold text-gray-900">Sửa thông tin đơn hàng</h2>
+              <button onClick={handleCloseEditModal} className="text-gray-400 hover:text-gray-500">
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateOrder} className="p-6 space-y-6">
+              {/* Order Info */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Kho chính (Tùy chọn)
+                  </label>
+                  <Select2
+                    value={formData.warehouse_id || ''}
+                    onChange={(val) => {
+                      setFormData({ ...formData, warehouse_id: Number(val) });
+                    }}
+                    options={[
+                      { value: 0, label: '-- Nhiều kho --' },
+                      ...warehouses.map((warehouse) => ({
+                        value: warehouse.id,
+                        label: warehouse.name,
+                      })),
+                    ]}
+                    placeholder="Chọn kho (nếu chỉ 1 kho)"
+                    isClearable
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày xuất hàng</label>
+                  <input
+                    type="date"
+                    value={formData.order_date}
+                    onChange={(e) => setFormData({ ...formData, order_date: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Mã đơn hàng</label>
+                  <input
+                    type="text"
+                    value={formData.order_number}
+                    onChange={(e) => setFormData({ ...formData, order_number: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {/* Vehicle Info */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Biển số xe</label>
+                  <input
+                    type="text"
+                    value={formData.vehicle_number}
+                    onChange={(e) => setFormData({ ...formData, vehicle_number: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="VD: 29C-12345"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên lái xe</label>
+                  <input
+                    type="text"
+                    value={formData.driver_name}
+                    onChange={(e) => setFormData({ ...formData, driver_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Họ tên lái xe"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">SĐT lái xe</label>
+                  <input
+                    type="text"
+                    value={formData.driver_phone}
+                    onChange={(e) => setFormData({ ...formData, driver_phone: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Số điện thoại"
+                  />
+                </div>
+              </div>
+
+              {/* Other Info */}
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">% VAT</label>
+                  <input
+                    type="number"
+                    value={formData.vat_percent}
+                    onChange={(e) => setFormData({ ...formData, vat_percent: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phương thức TT</label>
+                  <Select2
+                    value={formData.payment_method || ''}
+                    onChange={(val) => setFormData({ ...formData, payment_method: String(val || '') })}
+                    options={[
+                      { value: '', label: '-- Chọn ptts --' },
+                      { value: 'CASH', label: 'Tiền mặt' },
+                      { value: 'TRANSFER', label: 'Chuyển khoản' },
+                      { value: 'CHECK', label: 'Séc' },
+                    ]}
+                    isClearable
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái TT</label>
+                  <Select2
+                    value={formData.payment_status}
+                    onChange={(val) => setFormData({ ...formData, payment_status: String(val || 'UNPAID') })}
+                    options={[
+                      { value: 'UNPAID', label: 'Chưa thanh toán' },
+                      { value: 'PARTIAL', label: 'Thanh toán 1 phần' },
+                      { value: 'PAID', label: 'Đã thanh toán' },
+                    ]}
+                    isSearchable={false}
+                  />
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                  placeholder="Ghi chú về đơn hàng"
+                />
+              </div>
+
+              {/* Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={handleCloseEditModal}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={updateMutation.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
