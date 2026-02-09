@@ -185,9 +185,14 @@ export class ReportsService {
         const closingBalance = openingBalance + totalDebit - totalCredit;
 
         return {
-          customerId: customer.id,
-          customerCode: customer.code,
-          customerName: customer.name,
+          customer: {
+            id: customer.id,
+            code: customer.code,
+            name: customer.name,
+            phone: customer.phone,
+            address: customer.address,
+            creditLimit: customer.creditLimit,
+          },
           openingBalance,
           totalDebit,
           totalCredit,
