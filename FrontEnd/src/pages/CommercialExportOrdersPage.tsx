@@ -246,7 +246,7 @@ const CommercialExportOrdersPage: React.FC = () => {
   };
 
   const calculateItemTotal = (item: OrderItem) => {
-    return item.quantity * item.unit_price - item.quantity * item.discount_amount;
+    return item.quantity * item.unit_price - item.discount_amount;
   };
 
   const calculateOrderTotals = () => {
@@ -770,8 +770,9 @@ const CommercialExportOrdersPage: React.FC = () => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lô hàng</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Giá bán lẻ</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chiết khấu</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">CK/ĐV</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
                           <th className="px-4 py-3"></th>
                         </tr>
@@ -879,6 +880,9 @@ const CommercialExportOrdersPage: React.FC = () => {
                                 className="w-32 px-2 py-1 border border-gray-300 rounded text-right"
                                 placeholder="0"
                               />
+                            </td>
+                            <td className="px-4 py-3 text-right font-medium">
+                              {item.quantity > 0 ? ((item.unit_price - (item.discount_amount / item.quantity)) * 1).toFixed(2) : '0'} ₫
                             </td>
                             <td className="px-4 py-3 text-right font-medium">
                               {calculateItemTotal(item).toLocaleString('vi-VN')} ₫
@@ -1017,8 +1021,9 @@ const CommercialExportOrdersPage: React.FC = () => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mã lô</th>
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sản phẩm</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">SL</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Giá bán lẻ</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Chiết khấu</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
                       </tr>
                     </thead>
@@ -1036,9 +1041,15 @@ const CommercialExportOrdersPage: React.FC = () => {
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-gray-900">
                             {item.discount_amount > 0
-                              ? `${item.discount_amount.toLocaleString('vi-VN')} ₫/ĐV`
+                              ? `${item.discount_amount.toLocaleString('vi-VN')} ₫`
                               : '-'
                             }
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-900">
+                            {item.quantity > 0
+                              ? (item.selling_price - (item.discount_amount / item.quantity)).toFixed(2)
+                              : '0'
+                            } ₫
                           </td>
                           <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">
                             {item.total_amount.toLocaleString('vi-VN')} ₫
