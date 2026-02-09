@@ -4,6 +4,7 @@ import { usePageTitle } from '../hooks/usePageTitle';
 import { inventoryReportAPI, type DetailedInventoryReport } from '../api/inventory-report';
 import { warehousesAPI } from '../api/commercial-warehouses';
 import { suppliersAPI } from '../api/commercial-suppliers';
+import { productsApi } from '../api/products';
 import Select2 from '../components/Select2';
 import { DocumentChartBarIcon, PrinterIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
@@ -12,6 +13,7 @@ const CommercialInventoryReportPage: React.FC = () => {
 
   const [warehouseFilter, setWarehouseFilter] = useState<number | null>(null);
   const [supplierFilter, setSupplierFilter] = useState<number | null>(null);
+  const [productFilter, setProductFilter] = useState<number | null>(null);
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setDate(1);
@@ -35,8 +37,15 @@ const CommercialInventoryReportPage: React.FC = () => {
     },
   });
 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      return await productsApi.getAll();
+    },
+  });
+
   const { data: reportData, isLoading, refetch, error } = useQuery({
-    queryKey: ['inventory-report-detailed', startDate, endDate, warehouseFilter, supplierFilter],
+    queryKey: ['inventory-report-detailed', startDate, endDate, warehouseFilter, supplierFilter, productFilter],
     queryFn: async () => {
       try {
         const response = await inventoryReportAPI.getDetailedReport({
@@ -44,6 +53,7 @@ const CommercialInventoryReportPage: React.FC = () => {
           end_date: endDate,
           warehouse_id: warehouseFilter || undefined,
           supplier_id: supplierFilter || undefined,
+          product_id: productFilter || undefined,
         });
         return response.data;
       } catch (err) {
@@ -130,6 +140,23 @@ const CommercialInventoryReportPage: React.FC = () => {
             />
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm</label>
+            <Select2
+              value={productFilter}
+              onChange={(val) => setProductFilter(val ? Number(val) : null)}
+              options={[
+                { value: '', label: 'Tất cả sản phẩm' },
+                ...products.map((product) => ({
+                  value: product.id,
+                  label: product.name,
+                })),
+              ]}
+              placeholder="Chọn sản phẩm"
+              isClearable
+            />
+          </div>
+
           <div className="flex items-end">
             <button
               onClick={() => refetch()}
@@ -166,7 +193,7 @@ const CommercialInventoryReportPage: React.FC = () => {
         <div className="space-y-6">
           {/* Header */}
           <div className="bg-white p-6 text-center print:block">
-            <h2 className="text-xl font-bold">CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CHI NHÁNH ĐÔNG ĐA</h2>
+            <h2 className="text-xl font-bold">CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CHI NHÁNH ĐỐNG ĐA</h2>
             <h3 className="text-lg font-semibold mt-2">
               TỔNG HỢP BÁN HÀNG THÁNG {new Date(startDate).getMonth() + 1}/{new Date(startDate).getFullYear()} (CÁC KHO)
             </h3>
@@ -255,7 +282,7 @@ const CommercialInventoryReportPage: React.FC = () => {
                   <tr>
                     <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">STT</th>
                     <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">KHÁCH HÀNG</th>
-                    <th colSpan={5} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">SỐ LƯỢNG (lít)</th>
+                    <th colSpan={4} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">SỐ LƯỢNG (lít)</th>
                     <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG</th>
                     <th colSpan={3} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DOANH THU (đồng)</th>
                     <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG DT</th>
@@ -265,9 +292,7 @@ const CommercialInventoryReportPage: React.FC = () => {
                   <tr>
                     <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 001</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">SL</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 001</th>                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 001</th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO</th>
                     <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
@@ -293,10 +318,10 @@ const CommercialInventoryReportPage: React.FC = () => {
                         <td className="px-4 py-2 text-right border">{isNaN(item.quantity_e5) ? '0' : item.quantity_e5.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do001) ? '0' : item.quantity_do001.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.total_quantity) ? '0' : item.total_quantity.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.revenue) ? '0' : item.revenue.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.revenue_a95) ? '0' : item.revenue_a95.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.revenue_do) ? '0' : item.revenue_do.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.revenue_e5) ? '0' : item.revenue_e5.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_do001) ? '0' : item.revenue_do001.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.revenue) ? '0' : item.revenue.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.profit_a95) ? '0' : item.profit_a95.toLocaleString('vi-VN')}</td>
                         <td className="px-4 py-2 text-right border">{isNaN(item.profit_do) ? '0' : item.profit_do.toLocaleString('vi-VN')}</td>
@@ -349,6 +374,12 @@ const CommercialInventoryReportPage: React.FC = () => {
                     <td className="px-4 py-2 text-right border">
                       {(() => {
                         const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_e5, 0));
+                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_do001, 0));
                         return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
                       })()}
                     </td>

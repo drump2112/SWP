@@ -79,6 +79,7 @@ export class ReportsController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
     @Query('refType') refType?: string,
+    @Query('groupBy') groupBy?: string,
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
     const effectiveStoreId =
@@ -88,6 +89,7 @@ export class ReportsController {
       storeId: effectiveStoreId,
       fromDate: fromDate ? new Date(fromDate) : undefined,
       toDate: toDate ? new Date(toDate) : undefined,
+      groupBy: groupBy === 'shift' ? 'shift' : 'day',
     });
   }
 

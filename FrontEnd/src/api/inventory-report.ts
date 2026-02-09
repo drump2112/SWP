@@ -53,7 +53,7 @@ export interface DetailedInventoryReport {
 }
 
 export const inventoryReportAPI = {
-  getDetailedReport: async (params: { start_date: string; end_date: string; warehouse_id?: number; supplier_id?: number }) => {
+  getDetailedReport: async (params: { start_date: string; end_date: string; warehouse_id?: number; supplier_id?: number; product_id?: number }) => {
     try {
       const response = await api.get<DetailedInventoryReport>(`/commercial/reports/inventory/detailed`, { params });
       console.log('[inventoryReportAPI] getDetailedReport success:', response.data);

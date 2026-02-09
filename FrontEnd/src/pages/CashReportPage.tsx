@@ -644,18 +644,39 @@ const CashReportPage: React.FC = () => {
 
                           {ledger.details.type === 'SHIFT_CLOSE_DEPOSIT' && (
                             <div className="space-y-3">
-                              {/* Thông tin chốt ca */}
-                              <div className="bg-white rounded-lg p-4 border border-green-200">
-                                <div className="text-xs font-semibold text-green-700 mb-2">📥 Thu tiền bán lẻ</div>
-                                <div className="grid grid-cols-2 gap-3 text-sm">
-                                  <div>
-                                    <span className="text-gray-600">Số tiền thu:</span>{' '}
-                                    <span className="font-bold text-green-600 tabular-nums">
-                                      {ledger.details.shiftClose?.cashIn?.toLocaleString('vi-VN')}đ
-                                    </span>
+                              {/* Thông tin chốt ca - Hiển thị tất cả shifts */}
+                              {ledger.details.shiftCloses && ledger.details.shiftCloses.length > 0 ? (
+                                ledger.details.shiftCloses.map((shift: any, idx: number) => (
+                                  <div key={idx} className="bg-white rounded-lg p-4 border border-green-200">
+                                    <div className="text-xs font-semibold text-green-700 mb-2">📥 Thu tiền bán lẻ (Ca {idx + 1})</div>
+                                    <div className="grid grid-cols-2 gap-3 text-sm">
+                                      <div>
+                                        <span className="text-gray-600">Số tiền thu:</span>{' '}
+                                        <span className="font-bold text-green-600 tabular-nums">
+                                          {shift.cashIn?.toLocaleString('vi-VN')}đ
+                                        </span>
+                                      </div>
+                                      {shift.notes && (
+                                        <div className="col-span-2">
+                                          <span className="text-gray-600">Ghi chú:</span> <span className="font-medium">{shift.notes}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))
+                              ) : (
+                                <div className="bg-white rounded-lg p-4 border border-green-200">
+                                  <div className="text-xs font-semibold text-green-700 mb-2">📥 Thu tiền bán lẻ</div>
+                                  <div className="grid grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">Số tiền thu:</span>{' '}
+                                      <span className="font-bold text-green-600 tabular-nums">
+                                        {ledger.details.shiftClose?.cashIn?.toLocaleString('vi-VN')}đ
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
+                              )}
 
                               {/* Hiển thị các phiếu thu (nếu có) */}
                               {ledger.details.receipts && ledger.details.receipts.length > 0 && (
@@ -715,10 +736,10 @@ const CashReportPage: React.FC = () => {
                                   <span className="text-gray-600">Tồn quỹ sau giao dịch:</span>
                                   <span className="font-bold text-purple-600 tabular-nums">
                                     {(() => {
-                                      const shiftIn = ledger.details.shiftClose?.cashIn || 0;
+                                      const shiftInTotal = (ledger.details.shiftCloses || []).reduce((s: number, shift: any) => s + (shift.cashIn || 0), 0);
                                       const receiptsTotal = (ledger.details.receipts || []).reduce((s: number, r: any) => s + (r.amount || 0), 0);
                                       const depositsTotal = (ledger.details.deposits || []).reduce((s: number, d: any) => s + (d.amount || 0), 0);
-                                      const result = shiftIn + receiptsTotal - depositsTotal;
+                                      const result = shiftInTotal + receiptsTotal - depositsTotal;
                                       return (result ?? 0).toLocaleString('vi-VN') + 'đ';
                                     })()}
                                   </span>

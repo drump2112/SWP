@@ -112,6 +112,7 @@ export class InventoryReportService {
     endDate: string,
     warehouseId?: number,
     supplierId?: number,
+    productId?: number,
   ): Promise<DetailedInventoryReportDto> {
     try {
       // Get imports with supplier info
@@ -130,6 +131,10 @@ export class InventoryReportService {
       importsQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
     }
 
+    if (productId) {
+      importsQuery.andWhere('batch.product_id = :productId', { productId });
+    }
+
     const imports = await importsQuery.getMany();
     console.log(`[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`);
 
@@ -146,6 +151,10 @@ export class InventoryReportService {
 
     if (warehouseId) {
       exportsQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
+    }
+
+    if (productId) {
+      exportsQuery.andWhere('batch.product_id = :productId', { productId });
     }
 
     const exports = await exportsQuery.getMany();
@@ -181,26 +190,34 @@ export class InventoryReportService {
       const productName = batch.product.name.toUpperCase();
       const importQty = Number(batch.import_quantity) || 0;
       const unitPrice = Number(batch.unit_price) || 0;
+      const productCategory = batch.product.category;
 
-      console.log(`[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}" (${productName}), quantity=${importQty}, price=${unitPrice}`);
+      console.log(`[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}", category="${productCategory}", quantity=${importQty}`);
 
-      // Match sản phẩm vào category - ĐÚNG THỨ TỰ (kiểm tra cụ thể trước chung chung)
-      // E5 (check trước vì nó có 95% trong tên)
-      if (productName.includes('E5')) {
-        console.log(`  → Matched to E5`);
-        record.quantity_e5 += importQty;
-      } else if (productName.includes('A95') || productName.includes('RON95')) {
-        console.log(`  → Matched to A95`);
-        record.quantity_a95 += importQty;
-      } else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
-                 (productName.includes('0.001') || productName.includes('0,001'))) {
-        console.log(`  → Matched to DO001`);
-        record.quantity_do001 += importQty;
-      } else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-        console.log(`  → Matched to DO`);
-        record.quantity_do += importQty;
+      // Match sản phẩm vào category dựa vào product.category
+      if (productCategory === 'GASOLINE') {
+        // Xăng: A95 hoặc E5
+        if (productName.includes('E5')) {
+          console.log(`  → Matched to E5 (GASOLINE E5)`);
+          record.quantity_e5 += importQty;
+        } else if (productName.includes('A95') || productName.includes('95') || productName.includes('RON')) {
+          console.log(`  → Matched to A95 (GASOLINE A95)`);
+          record.quantity_a95 += importQty;
+        } else {
+          console.log(`  → Default to A95 (GASOLINE, no E5 match)`);
+          record.quantity_a95 += importQty;
+        }
+      } else if (productCategory === 'DIESEL') {
+        // Dầu: DO hoặc DO001
+        if (productName.includes('0.001') || productName.includes('0,001')) {
+          console.log(`  → Matched to DO001 (DIESEL 0.001S)`);
+          record.quantity_do001 += importQty;
+        } else {
+          console.log(`  → Matched to DO (DIESEL)`);
+          record.quantity_do += importQty;
+        }
       } else {
-        console.log(`  ⚠ NO MATCH - Product will be unmapped`);
+        console.log(`  ⚠ Unknown category: ${productCategory}`);
       }
 
       record.total_quantity += importQty;
@@ -338,46 +355,48 @@ export class InventoryReportService {
     const productName = batch.product.name.toUpperCase();
     const itemQty = Number(item.quantity) || 0;
     const itemRevenue = Number(item.total_amount) || 0;
-    const unitPrice = Number(batch.unit_price) || 0;
-    const itemCost = itemQty * unitPrice;
+    // Use final_unit_price (giá sau trừ chiết khấu) để tính lợi nhuận chính xác
+    const unitCost = Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
+    const itemCost = itemQty * unitCost;
     const itemProfit = itemRevenue - itemCost;
+    const productCategory = batch.product.category;
 
-    console.log(`[addExportData] BEFORE: product="${batch.product.name}", productNameUP="${productName}", qty=${itemQty}, revenue=${itemRevenue}`);
-    console.log(`  Record state BEFORE: rev_a95=${record.revenue_a95}, rev_do=${record.revenue_do}, rev_e5=${record.revenue_e5}`);
+    console.log(`[addExportData] product="${batch.product.name}", category="${productCategory}", qty=${itemQty}, revenue=${itemRevenue}`);
 
-    // Match sản phẩm vào category - ĐÚNG THỨ TỰ (kiểm tra cụ thể trước chung chung)
-    // E5 (check trước vì nó có 95% trong tên)
-    if (productName.includes('E5')) {
-      console.log(`  ✓ Matched to E5: adding revenue=${itemRevenue}`);
-      record.quantity_e5 += itemQty;
-      record.revenue_e5 += itemRevenue;
-      record.profit_e5 += itemProfit;
-    }
-    // A95/RON95 (kiểm tra A95 cụ thể, không match 95 chung chung)
-    else if (productName.includes('A95') || productName.includes('RON95')) {
-      console.log(`  ✓ Matched to A95: adding revenue=${itemRevenue}`);
-      record.quantity_a95 += itemQty;
-      record.revenue_a95 += itemRevenue;
-      record.profit_a95 += itemProfit;
-    }
-    // DO 0.001 (kiểm tra cụ thể trước DO chung)
-    else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
-             (productName.includes('0.001') || productName.includes('0,001'))) {
-      console.log(`  ✓ Matched to DO001: adding revenue=${itemRevenue}`);
-      record.quantity_do001 += itemQty;
-      record.revenue_do001 += itemRevenue;
-    }
-    // DO chung (Diesel Oil)
-    else if (productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) {
-      console.log(`  ✓ Matched to DO: adding revenue=${itemRevenue}`);
-      record.quantity_do += itemQty;
-      record.revenue_do += itemRevenue;
-      record.profit_do += itemProfit;
+    // Match sản phẩm vào category dựa vào product.category
+    if (productCategory === 'GASOLINE') {
+      // Xăng: A95 hoặc E5
+      if (productName.includes('E5')) {
+        console.log(`  ✓ Matched to E5 (GASOLINE E5)`);
+        record.quantity_e5 += itemQty;
+        record.revenue_e5 += itemRevenue;
+        record.profit_e5 += itemProfit;
+      } else if (productName.includes('A95') || productName.includes('95') || productName.includes('RON')) {
+        console.log(`  ✓ Matched to A95 (GASOLINE A95)`);
+        record.quantity_a95 += itemQty;
+        record.revenue_a95 += itemRevenue;
+        record.profit_a95 += itemProfit;
+      } else {
+        console.log(`  → Default to A95 (GASOLINE, no E5 match)`);
+        record.quantity_a95 += itemQty;
+        record.revenue_a95 += itemRevenue;
+        record.profit_a95 += itemProfit;
+      }
+    } else if (productCategory === 'DIESEL') {
+      // Dầu: DO hoặc DO001
+      if (productName.includes('0.001') || productName.includes('0,001')) {
+        console.log(`  ✓ Matched to DO001 (DIESEL 0.001S)`);
+        record.quantity_do001 += itemQty;
+        record.revenue_do001 += itemRevenue;
+      } else {
+        console.log(`  ✓ Matched to DO (DIESEL)`);
+        record.quantity_do += itemQty;
+        record.revenue_do += itemRevenue;
+        record.profit_do += itemProfit;
+      }
     } else {
-      console.log(`  ⚠ Export NO MATCH - Product unmapped`);
+      console.log(`  ⚠ Unknown category: ${productCategory}`);
     }
-
-    console.log(`  Record state AFTER: rev_a95=${record.revenue_a95}, rev_do=${record.revenue_do}, rev_e5=${record.revenue_e5}`);
 
     record.total_quantity += itemQty;
     record.revenue += itemRevenue;
@@ -441,7 +460,9 @@ export class InventoryReportService {
       // Calculate export totals
       const exportQuantity = batchExports.reduce((sum, item) => sum + Number(item.quantity), 0);
       const exportTotal = batchExports.reduce((sum, item) => sum + Number(item.total_amount), 0);
-      const exportCost = batchExports.reduce((sum, item) => sum + (Number(item.quantity) * Number(batch.unit_price)), 0);
+      // Use final_unit_price (giá sau trừ chiết khấu) để tính lợi nhuận chính xác
+      const unitCost = Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
+      const exportCost = batchExports.reduce((sum, item) => sum + (Number(item.quantity) * unitCost), 0);
       const exportProfit = exportTotal - exportCost;
 
       // Calculate closing inventory

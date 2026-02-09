@@ -68,10 +68,7 @@ export class ReportsService {
     private productPriceRepository: Repository<ProductPrice>,
   ) {}
 
-  // ==================== BÁO CÁO CÔNG NỢ ====================
-
-  /**
-   * Báo cáo công nợ chi tiết theo khách hàng
+  /*
    * - Kế toán: Xem tất cả cửa hàng
    * - Cửa hàng: Chỉ xem khách nợ tại cửa hàng của mình
    */
@@ -90,7 +87,7 @@ export class ReportsService {
       toDateInclusive.setHours(23, 59, 59, 999);
     }
 
-    // Lấy danh sách ID khách hàng có giao dịch công nợ
+    // Get list of customer IDs that have debt ledger entries
     const customerIdsQuery = this.debtLedgerRepository
       .createQueryBuilder('dl')
       .select('DISTINCT dl.customer_id', 'customerId');
@@ -101,9 +98,7 @@ export class ReportsService {
 
     if (customerId) {
       if (storeId) {
-        customerIdsQuery.andWhere('dl.customer_id = :customerId', {
-          customerId,
-        });
+        customerIdsQuery.andWhere('dl.customer_id = :customerId', { customerId });
       } else {
         customerIdsQuery.where('dl.customer_id = :customerId', { customerId });
       }
@@ -116,27 +111,20 @@ export class ReportsService {
       return [];
     }
 
-    // Lấy thông tin khách hàng
+    // Fetch customer info
     const customers = await this.customerRepository
       .createQueryBuilder('c')
       .where('c.id IN (:...customerIds)', { customerIds })
       .orderBy('c.code', 'ASC')
       .getMany();
 
-    // Lấy chi tiết công nợ cho từng khách hàng
+    // For each customer, compute opening balance, transactions and closing balance
     const results = await Promise.all(
       customers.map(async (customer) => {
-        // Lấy dư đầu kỳ (trước fromDate)
         const openingBalance = fromDate
-          ? await this.getCustomerBalance(
-              customer.id,
-              storeId,
-              new Date(0),
-              fromDate,
-            )
+          ? await this.getCustomerBalance(customer.id, storeId, new Date(0), fromDate)
           : 0;
 
-        // Lấy phát sinh trong kỳ
         const ledgerQuery = this.debtLedgerRepository
           .createQueryBuilder('dl')
           .where('dl.customer_id = :customerId', { customerId: customer.id });
@@ -146,25 +134,14 @@ export class ReportsService {
         }
 
         if (fromDate && toDateInclusive) {
-          // ⏰ Dùng ledger_at (thời điểm nghiệp vụ) thay vì created_at
           ledgerQuery.andWhere('dl.ledger_at BETWEEN :fromDate AND :toDate', {
             fromDate,
             toDate: toDateInclusive,
           });
         }
 
-        const ledgers = await ledgerQuery
-          .orderBy('dl.ledger_at', 'ASC')
-          .getMany();
+        const ledgers = await ledgerQuery.orderBy('dl.ledger_at', 'ASC').getMany();
 
-        const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
-        const totalCredit = ledgers.reduce(
-          (sum, l) => sum + Number(l.credit),
-          0,
-        );
-        const closingBalance = openingBalance + totalDebit - totalCredit;
-
-        // Lấy chi tiết từ shift_debt_sales để hiển thị sản phẩm, số lượng, giá
         const ledgersWithDetails = await Promise.all(
           ledgers.map(async (l) => {
             let productDetails: null | {
@@ -192,319 +169,38 @@ export class ReportsService {
 
             return {
               id: l.id,
-              date: l.ledgerAt || l.createdAt, // ⏰ Ưu tiên ledgerAt
+              date: l.ledgerAt || l.createdAt,
               refType: l.refType,
               refId: l.refId,
               debit: Number(l.debit),
               credit: Number(l.credit),
               notes: l.notes,
-              productDetails, // Thông tin sản phẩm nếu là DEBT_SALE
+              productDetails,
             };
           }),
         );
 
+        const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
+        const totalCredit = ledgers.reduce((sum, l) => sum + Number(l.credit), 0);
+        const closingBalance = openingBalance + totalDebit - totalCredit;
+
         return {
-          customer: {
-            id: customer.id,
-            code: customer.code,
-            name: customer.name,
-            phone: customer.phone,
-            address: customer.address,
-            creditLimit: customer.creditLimit,
-          },
-          openingBalance, // Dư đầu kỳ
-          totalDebit, // Phát sinh nợ (bán công nợ)
-          totalCredit, // Phát sinh có (thu tiền)
-          closingBalance, // Dư cuối kỳ
+          customerId: customer.id,
+          customerCode: customer.code,
+          customerName: customer.name,
+          openingBalance,
+          totalDebit,
+          totalCredit,
+          closingBalance,
           ledgers: ledgersWithDetails,
         };
       }),
     );
 
-    // Lọc chỉ hiển thị khách có phát sinh hoặc dư cuối kỳ
+    // Only show customers with activity or non-zero balances
     return results.filter(
-      (r) =>
-        r.openingBalance !== 0 ||
-        r.totalDebit !== 0 ||
-        r.totalCredit !== 0 ||
-        r.closingBalance !== 0,
+      (r) => r.openingBalance !== 0 || r.totalDebit !== 0 || r.totalCredit !== 0 || r.closingBalance !== 0,
     );
-  }
-
-  /**
-   * Tính số dư công nợ của khách hàng tại 1 thời điểm
-   * ⏰ Sử dụng ledger_at (thời điểm nghiệp vụ) thay vì created_at
-   */
-  private async getCustomerBalance(
-    customerId: number,
-    storeId: number | undefined,
-    fromDate: Date,
-    toDate: Date,
-  ): Promise<number> {
-    const query = this.debtLedgerRepository
-      .createQueryBuilder('dl')
-      .select('SUM(dl.debit - dl.credit)', 'balance')
-      .where('dl.customer_id = :customerId', { customerId })
-      .andWhere('dl.ledger_at < :toDate', { toDate }); // ⏰ Dùng ledger_at
-
-    if (storeId) {
-      query.andWhere('dl.store_id = :storeId', { storeId });
-    }
-
-    const result = await query.getRawOne();
-    return result?.balance ? Number(result.balance) : 0;
-  }
-
-  // ==================== BÁO CÁO CA ====================
-
-  /**
-   * Báo cáo sổ giao ca - Dùng cho mục đích giao ca với đầy đủ dữ liệu từ 5 tab
-   * Bao gồm: Pump readings, Debt sales, Receipts, Deposits, Inventory documents
-   */
-  async getShiftHandoverReport(shiftId: number) {
-    const shift = await this.shiftRepository.findOne({
-      where: { id: shiftId },
-      relations: [
-        'store',
-        'store.region',
-        'pumpReadings',
-        'pumpReadings.pump',
-        'pumpReadings.product',
-      ],
-    });
-
-    if (!shift) {
-      throw new Error('Shift not found');
-    }
-
-    // 1. LẤY DỮ LIỆU TẬP TÍNH BƠM (Tab 1 - Pump Readings)
-    const pumpReadings = shift.pumpReadings.map((reading) => ({
-      pumpId: reading.pumpId,
-      pumpCode: reading.pumpCode || reading.pump?.pumpCode || '',
-      pumpName: reading.pump?.name || '',
-      productId: reading.productId,
-      productName: reading.product?.name || '',
-      startValue: Number(reading.startValue || 0),
-      endValue: Number(reading.endValue || 0),
-      testExport: Number(reading.testExport || 0),
-      quantity: Number(reading.quantity || 0),
-      unitPrice: Number(reading.unitPrice || 0),
-      amount: Math.round(Number(reading.quantity || 0) * Number(reading.unitPrice || 0)),
-    }));
-
-    // 2. LẤY DỮ LIỆU BÁN CÔNG NỢ (Tab 2 - Debt Sales)
-    const debtSales = await this.shiftDebtSaleRepository.find({
-      where: { shiftId },
-      relations: ['customer', 'product'],
-    });
-
-    const formattedDebtSales = debtSales.map((sale) => ({
-      id: sale.id,
-      customerId: sale.customerId,
-      customerCode: sale.customer?.code || '',
-      customerName: sale.customer?.name || '',
-      productId: sale.productId,
-      productName: sale.product?.name || '',
-      quantity: Number(sale.quantity),
-      unitPrice: Number(sale.unitPrice),
-      amount: Number(sale.amount),
-      notes: sale.notes || '',
-    }));
-
-    // 3. LẤY DỮ LIỆU PHIẾU THU NỢ (Tab 3 - Receipts)
-    const receipts = await this.receiptRepository.find({
-      where: { shiftId },
-      relations: ['receiptDetails', 'receiptDetails.customer'],
-    });
-
-    const formattedReceipts = receipts.map((receipt) => ({
-      id: receipt.id,
-      receiptType: receipt.receiptType || '',
-      amount: Number(receipt.amount || 0),
-      paymentMethod: receipt.paymentMethod || 'CASH',
-      receiptAt: receipt.receiptAt,
-      notes: receipt.notes || '',
-      details: receipt.receiptDetails?.map((rd) => ({
-        id: rd.id,
-        customerId: rd.customerId,
-        customerName: rd.customer?.name || '',
-        amount: Number(rd.amount),
-      })) || [],
-    }));
-
-    // 4. LẤY DỮ LIỆU PHIẾU NộP TIỀN (Tab 4 - Cash Deposits)
-    const deposits = await this.cashDepositRepository.find({
-      where: { shiftId },
-    });
-
-    const formattedDeposits = deposits.map((deposit) => ({
-      id: deposit.id,
-      amount: Number(deposit.amount),
-      depositAt: deposit.depositAt,
-      receiverName: deposit.receiverName || '',
-      paymentMethod: deposit.paymentMethod || 'CASH',
-      notes: deposit.notes || '',
-    }));
-
-    // 5. LẤY DỮ LIỆU KIỂM KÊ HÀNG (Tab 5 - Inventory Documents)
-    const inventoryDocs = await this.inventoryDocumentRepository.find({
-      where: { refShiftId: shiftId },
-      relations: ['items', 'items.product', 'items.tank'],
-    });
-
-    const formattedInventory = inventoryDocs.flatMap((doc) =>
-      doc.items.map((item) => ({
-        docId: doc.id,
-        docType: doc.docType || '',
-        docDate: doc.docDate,
-        productId: item.productId,
-        productCode: item.product?.code || '',
-        productName: item.product?.name || '',
-        tankId: item.tankId,
-        tankCode: item.tank?.tankCode || '',
-        tankName: item.tank?.name || '',
-        quantity: Number(item.quantity),
-        unitPrice: Number(item.unitPrice || 0),
-        amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)),
-      })),
-    );
-
-    // 6. LẤY DỮ LIỆU NHẬP XUẤT TỒN TRONG CÁ (Tab 5 - Inventory Summary by Product)
-    // Nhóm dữ liệu từ inventory ledger theo mặt hàng để tính nhập, xuất
-    const inventorySummaryByProduct = await this.inventoryLedgerRepository
-      .createQueryBuilder('il')
-      .where('il.shift_id = :shiftId', { shiftId })
-      .leftJoin('il.product', 'product')
-      .select('il.product_id', 'productId')
-      .addSelect('product.code', 'productCode')
-      .addSelect('product.name', 'productName')
-      .addSelect('SUM(il.quantity_in)', 'totalImport')
-      .addSelect('SUM(il.quantity_out)', 'totalExport')
-      .groupBy('il.product_id')
-      .addGroupBy('product.code')
-      .addGroupBy('product.name')
-      .getRawMany();
-
-    // Lấy tồn đầu ca từ Shift.openingStockJson (ghi nhận lúc mở ca)
-    const inventoryOpeningByProduct = await Promise.all(
-      inventorySummaryByProduct.map(async (item) => {
-        // Kiểm tra openingStockJson đã được lưu lúc mở ca chưa
-        let openingStock = 0;
-
-        if (shift.openingStockJson && Array.isArray(shift.openingStockJson)) {
-          const found = shift.openingStockJson.find((x: any) => x.productId === item.productId);
-          if (found) {
-            openingStock = Number(found.openingStock);
-          }
-        }
-
-        // Nếu chưa có trong openingStockJson (ca đầu tiên chưa được ghi nhận), lấy từ Tank
-        if (openingStock === 0 && !shift.openingStockJson) {
-          const tankSum = await this.shiftRepository.manager
-            .getRepository('Tank')
-            .createQueryBuilder('t')
-            .select('SUM(t.current_stock)', 'totalCurrentStock')
-            .where('t.product_id = :productId', { productId: item.productId })
-            .andWhere('t.store_id = :storeId', { storeId: shift.storeId })
-            .getRawOne();
-
-          openingStock = tankSum?.totalCurrentStock ? Number(tankSum.totalCurrentStock) : 0;
-        }
-
-        const importQuantity = Number(item.totalImport || 0);
-        const exportQuantity = Number(item.totalExport || 0);
-        const closingStock = openingStock + importQuantity - exportQuantity;
-
-        console.log(`DEBUG Inventory - Product: ${item.productName}, Opening: ${openingStock}, Import: ${importQuantity}, Export: ${exportQuantity}, Closing: ${closingStock}`);
-
-        return {
-          productId: item.productId,
-          productCode: item.productCode,
-          productName: item.productName,
-          openingStock,
-          importQuantity,
-          exportQuantity,
-          closingStock,
-        };
-      }),
-    );
-
-    // 7. TÍNH TOÁN TỔNG HỢP
-    const totalPumpAmount = pumpReadings.reduce((sum, r) => sum + r.amount, 0);
-    const totalDebtAmount = formattedDebtSales.reduce((sum, s) => sum + s.amount, 0);
-    const totalRetailAmount = totalPumpAmount - totalDebtAmount;
-    const totalReceiptAmount = formattedReceipts.reduce((sum, r) => sum + r.amount, 0);
-    const totalDepositAmount = formattedDeposits.reduce((sum, d) => sum + d.amount, 0);
-
-    // 7.1. ✅ Lấy tồn quỹ THỰC TẾ từ cash_ledger (tích lũy từ đầu đến hết ca hiện tại)
-    const cashBalanceResult = await this.cashLedgerRepository
-      .createQueryBuilder('cl')
-      .select('SUM(cl.cash_in - cl.cash_out)', 'totalBalance')
-      .where('cl.store_id = :storeId', { storeId: shift.storeId })
-      .andWhere('cl.shift_id <= :shiftId', { shiftId })
-      .getRawOne();
-
-    const cashBalance = Number(cashBalanceResult?.totalBalance) || 0;
-
-    // 7.2. ✅ Lấy tiền ca trước chuyển sang (để hiển thị riêng)
-    let carryOverCash = 0;
-    const prevShift = await this.shiftRepository
-      .createQueryBuilder('s')
-      .where('s.store_id = :storeId', { storeId: shift.storeId })
-      .andWhere('(s.shift_date < :shiftDate OR (s.shift_date = :shiftDate AND s.shift_no < :shiftNo))', {
-        shiftDate: shift.shiftDate,
-        shiftNo: shift.shiftNo,
-      })
-      .orderBy('s.shift_date', 'DESC')
-      .addOrderBy('s.shift_no', 'DESC')
-      .limit(1)
-      .getOne();
-
-    if (prevShift) {
-      // Lấy cash_balance của shift trước từ cash_ledger (tích lũy đến hết ca trước)
-      const prevCashLedger = await this.cashLedgerRepository
-        .createQueryBuilder('cl')
-        .select('SUM(cl.cash_in - cl.cash_out)', 'totalBalance')
-        .where('cl.store_id = :storeId', { storeId: shift.storeId })
-        .andWhere('cl.shift_id <= :shiftId', { shiftId: prevShift.id })
-        .getRawOne();
-
-      carryOverCash = Number(prevCashLedger?.totalBalance) || 0;
-    }
-
-    return {
-      shift: {
-        id: shift.id,
-        shiftNo: shift.shiftNo,
-        shiftDate: shift.shiftDate,
-        status: shift.status,
-        openedAt: shift.openedAt,
-        closedAt: shift.closedAt,
-        handoverName: shift.handoverName,
-        receiverName: shift.receiverName,
-        store: {
-          id: shift.store.id,
-          code: shift.store.code,
-          name: shift.store.name,
-          region: shift.store.region?.name || '',
-        },
-      },
-      pumpReadings,
-      debtSales: formattedDebtSales,
-      receipts: formattedReceipts,
-      deposits: formattedDeposits,
-      inventory: formattedInventory,
-      inventoryByProduct: inventoryOpeningByProduct,
-      carryOverCash,
-      summary: {
-        totalPumpAmount,
-        totalDebtAmount,
-        totalRetailAmount,
-        totalReceiptAmount,
-        totalDepositAmount,
-        cashBalance,
-      },
-    };
   }
 
   /**
@@ -672,6 +368,7 @@ export class ReportsService {
     storeId?: number;
     fromDate?: Date;
     toDate?: Date;
+    groupBy?: 'shift' | 'day';
   }) {
     const { storeId, fromDate, toDate } = params;
 
@@ -855,9 +552,9 @@ export class ReportsService {
             notes: `Chốt ca & nộp tiền: ${totalCashIn.toLocaleString()}đ`,
             details: {
               type: 'SHIFT_CLOSE_DEPOSIT',
-              shiftClose: shiftCloseEntry
-                ? { cashIn: shiftCloseEntry.cashIn, notes: shiftCloseEntry.details?.notes }
-                : null,
+              shiftCloses: shiftCloseEntry
+                ? [{ cashIn: shiftCloseEntry.cashIn, notes: shiftCloseEntry.details?.notes }]
+                : [],
               receipts: receiptEntries.map((r) => ({
                 id: r.id,
                 amount: r.cashIn,
@@ -897,7 +594,27 @@ export class ReportsService {
         const existing = dailyMap.get(dateKey)!;
         existing.cashIn += ledger.cashIn;
         existing.cashOut += ledger.cashOut;
-        // Gộp details nếu cần (hoặc để null vì đã tổng hợp)
+        // ✅ FIX: Gộp details từ tất cả shifts trong cùng ngày
+        if (ledger.details && existing.details) {
+          // Nếu cả hai đều có details, gộp receipts và deposits
+          if (existing.details.type === 'SHIFT_CLOSE_DEPOSIT' && ledger.details.type === 'SHIFT_CLOSE_DEPOSIT') {
+            existing.details.shiftCloses = [
+              ...(existing.details.shiftCloses || []),
+              ...(ledger.details.shiftCloses || []),
+            ];
+            existing.details.receipts = [
+              ...(existing.details.receipts || []),
+              ...(ledger.details.receipts || []),
+            ];
+            existing.details.deposits = [
+              ...(existing.details.deposits || []),
+              ...(ledger.details.deposits || []),
+            ];
+          }
+        } else if (ledger.details && !existing.details) {
+          // Nếu existing chưa có details nhưng ledger có, copy details từ ledger
+          existing.details = ledger.details;
+        }
         existing.notes = `Tổng hợp ${dateKey}`;
       } else {
         dailyMap.set(dateKey, {
@@ -1023,8 +740,7 @@ export class ReportsService {
   }) {
     const { warehouseId, storeId, fromDate, toDate, docType } = params;
 
-    // Build query for inventory documents
-    const query = this.inventoryDocumentRepository
+    const qb = this.inventoryDocumentRepository
       .createQueryBuilder('doc')
       .leftJoinAndSelect('doc.warehouse', 'warehouse')
       .leftJoinAndSelect('warehouse.store', 'store')
@@ -1034,49 +750,33 @@ export class ReportsService {
       .orderBy('doc.docDate', 'DESC')
       .addOrderBy('doc.id', 'DESC');
 
-    // Filter by warehouse
     if (warehouseId) {
-      query.andWhere('doc.warehouseId = :warehouseId', { warehouseId });
+      qb.andWhere('doc.warehouseId = :warehouseId', { warehouseId });
     }
 
-    // Filter by store
     if (storeId) {
-      query.andWhere('warehouse.storeId = :storeId', { storeId });
+      qb.andWhere('warehouse.storeId = :storeId', { storeId });
     }
 
-    // Filter by date range
     if (fromDate) {
-      query.andWhere('doc.docDate >= :fromDate', { fromDate });
+      qb.andWhere('doc.docDate >= :fromDate', { fromDate });
     }
+
     if (toDate) {
       const nextDay = new Date(toDate);
       nextDay.setDate(nextDay.getDate() + 1);
-      query.andWhere('doc.docDate < :toDate', { toDate: nextDay });
+      qb.andWhere('doc.docDate < :toDate', { toDate: nextDay });
     }
 
-    // Filter by document type (IMPORT, EXPORT, TRANSFER_IN, TRANSFER_OUT, ADJUSTMENT)
     if (docType) {
-      query.andWhere('doc.docType = :docType', { docType });
-    } else {
-      // Mặc định chỉ lấy phiếu nhập (IMPORT, TRANSFER_IN)
-      query.andWhere('doc.docType IN (:...docTypes)', {
-        docTypes: ['IMPORT', 'TRANSFER_IN'],
-      });
+      qb.andWhere('doc.docType = :docType', { docType });
     }
 
-    const documents = await query.getMany();
+    const documents = await qb.getMany();
 
-    // Format response
     return documents.map((doc) => {
-      const totalQuantity = doc.items.reduce(
-        (sum, item) => sum + Number(item.quantity),
-        0,
-      );
-      const totalAmount = doc.items.reduce(
-        (sum, item) =>
-          sum + Number(item.quantity) * Number(item.unitPrice || 0),
-        0,
-      );
+      const totalQuantity = (doc.items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+      const totalAmount = (doc.items || []).reduce((sum: number, item: any) => sum + Math.round(Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
 
       return {
         id: doc.id,
@@ -1088,19 +788,19 @@ export class ReportsService {
         invoiceNumber: doc.invoiceNumber,
         licensePlate: doc.licensePlate,
         warehouse: {
-          id: doc.warehouse.id,
-          type: doc.warehouse.type,
-          storeName: doc.warehouse.store?.name || 'N/A',
-          storeCode: doc.warehouse.store?.code || 'N/A',
+          id: doc.warehouse?.id,
+          type: doc.warehouse?.type,
+          storeName: doc.warehouse?.store?.name || 'N/A',
+          storeCode: doc.warehouse?.store?.code || 'N/A',
         },
-        items: doc.items.map((item) => ({
+        items: (doc.items || []).map((item: any) => ({
           id: item.id,
-          productId: item.product.id,
-          productCode: item.product.code,
-          productName: item.product.name,
+          productId: item.product?.id,
+          productCode: item.product?.code || '',
+          productName: item.product?.name || '',
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice || 0),
-          amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)), // Làm tròn để tránh phần thập phân
+          amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)),
           tankCode: item.tank?.tankCode || null,
           tankName: item.tank?.name || null,
         })),
@@ -1729,4 +1429,44 @@ export class ReportsService {
 
     return query.getRawMany();
   }
+
+  /**
+   * Compatibility wrapper: frontend expects `getShiftHandoverReport`
+   * Delegate to `getShiftDetailReport` which provides the same data.
+   */
+  async getShiftHandoverReport(shiftId: number) {
+    return this.getShiftDetailReport(shiftId);
+  }
+
+  /**
+   * Compute customer balance between two dates (inclusive start, exclusive end)
+   */
+  async getCustomerBalance(
+    customerId: number,
+    storeId?: number,
+    fromDate?: Date,
+    toDate?: Date,
+  ): Promise<number> {
+    const qb = this.debtLedgerRepository
+      .createQueryBuilder('dl')
+      .select('SUM(dl.debit - dl.credit)', 'balance')
+      .where('dl.customer_id = :customerId', { customerId });
+
+    if (storeId) {
+      qb.andWhere('dl.store_id = :storeId', { storeId });
+    }
+
+    if (fromDate) {
+      qb.andWhere('dl.ledger_at >= :fromDate', { fromDate });
+    }
+    if (toDate) {
+      const toDateInclusive = new Date(toDate);
+      toDateInclusive.setHours(23, 59, 59, 999);
+      qb.andWhere('dl.ledger_at <= :toDate', { toDate: toDateInclusive });
+    }
+
+    const res = await qb.getRawOne();
+    return Number(res?.balance || 0);
+  }
 }
+

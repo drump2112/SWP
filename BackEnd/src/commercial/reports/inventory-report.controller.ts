@@ -11,12 +11,13 @@ export class InventoryReportController {
     @Query('end_date') endDate: string,
     @Query('warehouse_id') warehouseId?: number,
     @Query('supplier_id') supplierId?: number,
+    @Query('product_id') productId?: number,
   ) {
     try {
       if (!startDate || !endDate) {
         throw new BadRequestException('start_date and end_date are required');
       }
-      return await this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId);
+      return await this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId, productId);
     } catch (error) {
       console.error('[InventoryReportController] Error in getDetailedReport:', error);
       throw error;

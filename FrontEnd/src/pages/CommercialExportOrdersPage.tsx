@@ -127,6 +127,23 @@ const CommercialExportOrdersPage: React.FC = () => {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => exportOrdersAPI.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['commercial-export-orders'] });
+      Swal.fire('Thành công!', 'Xóa đơn hàng thành công', 'success');
+    },
+    onError: (error: any) => {
+      console.error('Error deleting order:', error.response?.data);
+      const errorMsg = typeof error.response?.data?.message === 'string'
+        ? error.response.data.message
+        : Array.isArray(error.response?.data?.message)
+        ? error.response.data.message.join(', ')
+        : JSON.stringify(error.response?.data?.message || error.response?.data || 'Có lỗi xảy ra');
+      Swal.fire('Lỗi!', errorMsg, 'error');
+    },
+  });
+
   const handleOpenCreateModal = () => {
     setFormData({
       warehouse_id: 0,
@@ -195,6 +212,23 @@ const CommercialExportOrdersPage: React.FC = () => {
     };
 
     updateMutation.mutate({ id: editOrderId, payload: updateData });
+  };
+
+  const handleDeleteOrder = async (order: ExportOrder) => {
+    const result = await Swal.fire({
+      title: 'Xóa đơn hàng?',
+      text: `Bạn có chắc chắn muốn xóa đơn hàng ${order.order_number}? Hành động này không thể hoàn tác.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy',
+    });
+
+    if (result.isConfirmed) {
+      deleteMutation.mutate(order.id);
+    }
   };
 
   const handleAddItem = () => {
@@ -496,6 +530,14 @@ const CommercialExportOrdersPage: React.FC = () => {
                           title="Xem chi tiết"
                         >
                           <EyeIcon className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteOrder(order)}
+                          disabled={deleteMutation.isPending}
+                          className="text-red-600 hover:text-red-900 inline-block disabled:opacity-50"
+                          title="Xóa đơn hàng"
+                        >
+                          <TrashIcon className="h-5 w-5" />
                         </button>
                       </td>
                     </tr>
