@@ -875,11 +875,6 @@ export class ReportsService {
 
           processedShiftIds.add(ledger.shiftId);
           continue;
-        } else if (depositsInSameShift.length > 0 && totalDeposit > 0) {
-          // ✅ Không cân bằng: Hiển thị từng RECEIPT và DEPOSIT riêng biệt
-          // Điều này đảm bảo không ẩn bất kỳ khoản nộp tiền nào
-          // Các hàng sẽ được xử lý bên dưới trong logic "Các trường hợp khác"
-          processedShiftIds.add(ledger.shiftId);
         }
       }
 

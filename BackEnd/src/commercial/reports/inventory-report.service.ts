@@ -184,13 +184,14 @@ export class InventoryReportService {
 
       console.log(`[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}" (${productName}), quantity=${importQty}, price=${unitPrice}`);
 
-      // Match sản phẩm vào category
-      if (productName.includes('A95') || productName.includes('95')) {
-        console.log(`  → Matched to A95`);
-        record.quantity_a95 += importQty;
-      } else if (productName.includes('E5')) {
+      // Match sản phẩm vào category - ĐÚNG THỨ TỰ (kiểm tra cụ thể trước chung chung)
+      // E5 (check trước vì nó có 95% trong tên)
+      if (productName.includes('E5')) {
         console.log(`  → Matched to E5`);
         record.quantity_e5 += importQty;
+      } else if (productName.includes('A95') || productName.includes('RON95')) {
+        console.log(`  → Matched to A95`);
+        record.quantity_a95 += importQty;
       } else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&
                  (productName.includes('0.001') || productName.includes('0,001'))) {
         console.log(`  → Matched to DO001`);
@@ -344,20 +345,20 @@ export class InventoryReportService {
     console.log(`[addExportData] BEFORE: product="${batch.product.name}", productNameUP="${productName}", qty=${itemQty}, revenue=${itemRevenue}`);
     console.log(`  Record state BEFORE: rev_a95=${record.revenue_a95}, rev_do=${record.revenue_do}, rev_e5=${record.revenue_e5}`);
 
-    // Match sản phẩm vào category
-    // A95/RON95
-    if (productName.includes('A95') || productName.includes('95')) {
-      console.log(`  ✓ Matched to A95: adding revenue=${itemRevenue}`);
-      record.quantity_a95 += itemQty;
-      record.revenue_a95 += itemRevenue;
-      record.profit_a95 += itemProfit;
-    }
-    // E5
-    else if (productName.includes('E5')) {
+    // Match sản phẩm vào category - ĐÚNG THỨ TỰ (kiểm tra cụ thể trước chung chung)
+    // E5 (check trước vì nó có 95% trong tên)
+    if (productName.includes('E5')) {
       console.log(`  ✓ Matched to E5: adding revenue=${itemRevenue}`);
       record.quantity_e5 += itemQty;
       record.revenue_e5 += itemRevenue;
       record.profit_e5 += itemProfit;
+    }
+    // A95/RON95 (kiểm tra A95 cụ thể, không match 95 chung chung)
+    else if (productName.includes('A95') || productName.includes('RON95')) {
+      console.log(`  ✓ Matched to A95: adding revenue=${itemRevenue}`);
+      record.quantity_a95 += itemQty;
+      record.revenue_a95 += itemRevenue;
+      record.profit_a95 += itemProfit;
     }
     // DO 0.001 (kiểm tra cụ thể trước DO chung)
     else if ((productName.includes('DO') || productName.includes('DẦU') || productName.includes('DIESEL')) &&

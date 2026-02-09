@@ -292,13 +292,25 @@ export class ShiftsService {
     let shift: Shift | null = _shift || null;
     if (!shift) {
       // Lock the shift row to prevent concurrent closes (SELECT ... FOR UPDATE)
+      // NOTE: Postgres does not allow FOR UPDATE on the nullable side of an OUTER JOIN.
+      // To avoid the "FOR UPDATE cannot be applied to the nullable side of an outer join" error,
+      // first lock the `shift` row alone, then load relations in a separate query.
       shift = await manager
         .createQueryBuilder(Shift, 'shift')
         .setLock('pessimistic_write')
-        .leftJoinAndSelect('shift.store', 'store')
-        .leftJoinAndSelect('store.region', 'region')
         .where('shift.id = :id', { id: closeShiftDto.shiftId })
         .getOne();
+
+      if (shift) {
+        // Load relations without lock to avoid outer-join FOR UPDATE issues
+        const shiftWithRelations = await manager.findOne(Shift, {
+          where: { id: shift.id },
+          relations: ['store', 'store.region'],
+        });
+        if (shiftWithRelations) {
+          shift = shiftWithRelations;
+        }
+      }
     }
 
     if (!shift) {
@@ -486,18 +498,20 @@ export class ShiftsService {
     // Tiền bán lẻ THỰC THU = Tổng từ vòi bơm - Bán công nợ
     const totalRetailAmount = totalFromPumps - totalDebtSalesAmount;
 
-    if (totalRetailAmount > 0) {
-      await manager.save(CashLedger, {
-        shiftId: shift.id,
-        storeId: shift.storeId,
-        refType: 'SHIFT_CLOSE',
-        refId: shift.id,
-        cashIn: totalRetailAmount, // ✅ Thu tiền vào quỹ (CHỈ TIỀN MẶT, KHÔNG BAO GỒM NỢ)
-        cashOut: 0,
-        ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
-        notes: `Thu tiền bán lẻ: ${totalFromPumps.toLocaleString()} - công nợ ${totalDebtSalesAmount.toLocaleString()} = ${totalRetailAmount.toLocaleString()}`,
-      });
-    }
+    // Always record a SHIFT_CLOSE ledger row (cashIn may be 0).
+    // This ensures a visible shift-close entry even when retail collections are zero
+    // (e.g., when deposits were entered manually and exceed retail amounts).
+    const safeRetailAmount = Math.max(0, Math.round(totalRetailAmount));
+    await manager.save(CashLedger, {
+      shiftId: shift.id,
+      storeId: shift.storeId,
+      refType: 'SHIFT_CLOSE',
+      refId: shift.id,
+      cashIn: safeRetailAmount,
+      cashOut: 0,
+      ledgerAt: closedAt, // ⏰ Dùng thời gian chốt ca
+      notes: `Thu tiền bán lẻ: ${totalFromPumps.toLocaleString()} - công nợ ${totalDebtSalesAmount.toLocaleString()} = ${safeRetailAmount.toLocaleString()}`,
+    });
 
     // 6. Xử lý DRAFT DATA: Debt Sales, Receipts, Deposits
     // 6.1. ✅ Xử lý Debt Sales (bán công nợ - KHÁC VỚI BÁN LẺ!)
