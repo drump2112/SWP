@@ -768,6 +768,26 @@ export class ShiftsService {
 
       for (const deposit of closeShiftDto.deposits) {
         // Lưu deposit record
+        // ⚠️ Phát hiện tự động refType từ notes hoặc receiverName
+        // Nếu detectThuNợ → RECEIPT (từ phiếu thu nợ)
+        // Nếu không → RETAIL (bán lẻ)
+        let refType = deposit.sourceType || 'RETAIL';
+        
+        // Phát hiện từ notes và receiverName
+        const notesLower = (deposit.notes || '').toLowerCase();
+        const receiverLower = (deposit.receiverName || '').toLowerCase();
+        
+        // Keywords cho phiếu thu nợ
+        const receiptKeywords = ['phiếu thu', 'thu nợ', 'từ khách', 'thanh toán nợ', 'trả nợ', 'thu tiền khách'];
+        
+        const isReceiptDeposit = receiptKeywords.some(keyword => 
+          notesLower.includes(keyword) || receiverLower.includes(keyword)
+        );
+        
+        if (isReceiptDeposit) {
+          refType = 'RECEIPT';
+        }
+
         const depositRecord = await manager.save(CashDeposit, {
           storeId: deposit.storeId,
           shiftId: shift.id,
@@ -775,7 +795,7 @@ export class ShiftsService {
           depositAt: deposit.depositAt ? new Date(deposit.depositAt) : new Date(),
           receiverName: deposit.receiverName,
           paymentMethod: deposit.paymentMethod || 'CASH',
-          refType: deposit.sourceType || 'RETAIL', // Mặc định là RETAIL (bán lẻ)
+          refType: refType, // Từ sourceType hoặc phát hiện
           notes: deposit.notes,
         });
 
