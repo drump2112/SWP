@@ -722,6 +722,8 @@ export class ShiftsService {
         }
 
         // ✅ Ghi sổ quỹ CHỈ nếu thu tiền mặt (không ghi nếu chuyển khoản)
+        // ✅ FIX: KHÔNG ghi công nợ cho khách nội bộ (vì phiếu thu không liên quan đến công nợ nội bộ)
+        // Tiền từ phiếu thu đi trực tiếp vào sổ quỹ, khi nộp tiền mới ghi DEBIT-CREDIT cho khách nội bộ
         if (receiptRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             shiftId: shift.id,
@@ -733,32 +735,6 @@ export class ShiftsService {
             ledgerAt: receiptRecord.receiptAt || closedAt, // ⏰ Dùng thời gian phiếu thu hoặc thời gian chốt ca
             notes: receipt.notes || 'Thu tiền thanh toán nợ',
           });
-
-          // ✅ Ghi DEBIT cho khách hàng nội bộ (tiền mặt vào quỹ = nợ cửa hàng tăng)
-          // Điều này đảm bảo: Công nợ cửa hàng = Sổ quỹ
-          // Khi nộp tiền về công ty sẽ ghi CREDIT tương ứng
-          const internalCustomerForReceipt = await manager
-            .createQueryBuilder()
-            .select('cs.customerId', 'customerId')
-            .from('customer_stores', 'cs')
-            .innerJoin('customers', 'c', 'c.id = cs.customerId')
-            .where('cs.storeId = :storeId', { storeId: shift.storeId })
-            .andWhere('c.type = :type', { type: 'INTERNAL' })
-            .getRawOne();
-
-          if (internalCustomerForReceipt?.customerId) {
-            await manager.save(DebtLedger, {
-              customerId: internalCustomerForReceipt.customerId,
-              storeId: shift.storeId,
-              refType: 'RECEIPT_CASH_IN',
-              refId: receiptRecord.id,
-              debit: receipt.amount,
-              credit: 0,
-              notes: `Thu tiền mặt từ khách nợ - Tiền vào quỹ`,
-              shiftId: shift.id,
-              ledgerAt: receiptRecord.receiptAt || closedAt,
-            });
-          }
         }
       }
     }
@@ -814,9 +790,9 @@ export class ShiftsService {
           });
 
           // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
-          // Ghi cho TẤT CẢ các loại nộp tiền (RETAIL và RECEIPT)
-          // Vì khi thu tiền mặt từ phiếu thu đã ghi DEBIT cho INTERNAL (RECEIPT_CASH_IN)
-          // → Nộp tiền sẽ ghi CREDIT để cân bằng: Công nợ cửa hàng = Sổ quỹ
+          // QUAN TRỌNG: Offset DEBIT từ bán lẻ để cân bằng
+          // Công nợ khách nội bộ = Bán lẻ (DEBIT) - Nộp tiền (CREDIT)
+          // Phiếu thu tiền mặt KHÔNG ghi vào công nợ khách nội bộ, chỉ ghi sổ quỹ
           if (internalCustomer) {
             await manager.save(DebtLedger, {
               customerId: internalCustomer,
@@ -825,7 +801,7 @@ export class ShiftsService {
               refId: depositRecord.id,
               debit: 0,
               credit: deposit.amount,
-              notes: deposit.notes || 'Nộp tiền về công ty - Giảm nợ',
+              notes: deposit.notes || 'Nộp tiền về công ty - Giảm nợ bán lẻ',
               shiftId: shift.id,
               ledgerAt: depositRecord.depositAt || closedAt, // ⏰ Dùng thời gian nộp tiền hoặc chốt ca
             });
