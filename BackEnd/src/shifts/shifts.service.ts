@@ -777,7 +777,6 @@ export class ShiftsService {
         // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
         // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
         // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
-        // ✅ FIX: Phiếu nộp KHÔNG ghi công nợ khách nội bộ (chỉ ghi sổ quỹ)
         if (depositRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             storeId: deposit.storeId,
@@ -789,6 +788,24 @@ export class ShiftsService {
             notes: deposit.notes || 'Nộp tiền về công ty',
             shiftId: shift.id,
           });
+
+          // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
+          // QUAN TRỌNG: Phiếu nộp bao gồm tiền bán lẻ + thu nợ tiền mặt
+          // Chỉ tiền bán lẻ đi qua công nợ (DEBIT) → Nộp tiền offset lại (CREDIT)
+          // Kết quả: Công nợ khách nội bộ = Bán lẻ - Nộp tiền = 0 (nếu nộp hết)
+          if (internalCustomer) {
+            await manager.save(DebtLedger, {
+              customerId: internalCustomer,
+              storeId: shift.storeId,
+              refType: 'DEPOSIT',
+              refId: depositRecord.id,
+              debit: 0,
+              credit: deposit.amount,
+              notes: deposit.notes || 'Nộp tiền về công ty - Offset nợ bán lẻ',
+              shiftId: shift.id,
+              ledgerAt: depositRecord.depositAt || closedAt, // ⏰ Dùng thời gian nộp tiền hoặc chốt ca
+            });
+          }
         }
       }
     }
@@ -1224,12 +1241,21 @@ export class ShiftsService {
         .andWhere('shift_id = :shiftId', { shiftId })
         .execute();
 
+      // ✅ Xóa DEPOSIT CashLedger
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('cash_ledger')
+        .where('ref_type = :refType', { refType: 'DEPOSIT' })
+        .andWhere('shift_id = :shiftId', { shiftId })
+        .execute();
+
       await manager
         .createQueryBuilder()
         .delete()
         .from('debt_ledger')
         .where('ref_type IN (:...refTypes)', {
-          refTypes: ['RECEIPT', 'RECEIPT_CASH_IN'],
+          refTypes: ['RECEIPT', 'RECEIPT_CASH_IN', 'DEPOSIT'],
         })
         .andWhere('shift_id = :shiftId', { shiftId })
         .execute();
