@@ -39,6 +39,9 @@ export class CashDeposit {
   @Column({ name: 'payment_method', length: 20, default: 'CASH' })
   paymentMethod: string; // CASH (nộp tiền mặt), BANK_TRANSFER (chuyển khoản)
 
+  @Column({ name: 'ref_type', length: 50, nullable: true })
+  refType: string; // 'RETAIL' = nộp tiền bán lẻ, 'RECEIPT' = nộp tiền từ phiếu thu nợ
+
   @Column({ name: 'created_by', nullable: true })
   createdBy: number;
 

@@ -771,6 +771,7 @@ export class ShiftsService {
           depositAt: deposit.depositAt ? new Date(deposit.depositAt) : new Date(),
           receiverName: deposit.receiverName,
           paymentMethod: deposit.paymentMethod || 'CASH',
+          refType: deposit.sourceType || 'RETAIL', // Mặc định là RETAIL (bán lẻ)
           notes: deposit.notes,
         });
 
@@ -790,10 +791,9 @@ export class ShiftsService {
           });
 
           // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
-          // QUAN TRỌNG: Phiếu nộp bao gồm tiền bán lẻ + thu nợ tiền mặt
-          // Chỉ tiền bán lẻ đi qua công nợ (DEBIT) → Nộp tiền offset lại (CREDIT)
-          // Kết quả: Công nợ khách nội bộ = Bán lẻ - Nộp tiền = 0 (nếu nộp hết)
-          if (internalCustomer) {
+          // ⚠️ CHỈ ghi nếu là nộp tiền bán lẻ (refType = 'RETAIL')
+          // Phiếu nộp từ phiếu thu nợ (refType = 'RECEIPT') KHÔNG ghi công nợ khách nội bộ
+          if (depositRecord.refType === 'RETAIL' && internalCustomer) {
             await manager.save(DebtLedger, {
               customerId: internalCustomer,
               storeId: shift.storeId,
