@@ -210,6 +210,11 @@ export class ShiftsService {
             refType: 'RECEIPT',
             refId: In(receiptIds),
           });
+          // ✅ Xóa cả DebtLedger của RECEIPT_CASH_IN (quan trọng!)
+          await manager.delete(DebtLedger, {
+            refType: 'RECEIPT_CASH_IN',
+            refId: In(receiptIds),
+          });
         }
 
         // ✅ Xóa CashLedger và DebtLedger của DEPOSIT (QUAN TRỌNG!)
@@ -1250,6 +1255,25 @@ export class ShiftsService {
           .andWhere('ref_id IN (:...refIds)', { refIds: debtSaleIds })
           .execute();
       }
+
+      // ✅ Xóa RECEIPT-related ledger (vì sẽ được tạo lại khi chốt ca lại)
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('cash_ledger')
+        .where('ref_type = :refType', { refType: 'RECEIPT' })
+        .andWhere('shift_id = :shiftId', { shiftId })
+        .execute();
+
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('debt_ledger')
+        .where('ref_type IN (:...refTypes)', {
+          refTypes: ['RECEIPT', 'RECEIPT_CASH_IN'],
+        })
+        .andWhere('shift_id = :shiftId', { shiftId })
+        .execute();
 
       // Note: pump_readings và sales không có field supersededByShiftId
       // Dữ liệu sẽ được xử lý khi chốt ca lại
