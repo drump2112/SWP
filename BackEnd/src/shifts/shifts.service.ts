@@ -772,18 +772,18 @@ export class ShiftsService {
         // Nếu detectThuNợ → RECEIPT (từ phiếu thu nợ)
         // Nếu không → RETAIL (bán lẻ)
         let refType = deposit.sourceType || 'RETAIL';
-        
+
         // Phát hiện từ notes và receiverName
         const notesLower = (deposit.notes || '').toLowerCase();
         const receiverLower = (deposit.receiverName || '').toLowerCase();
-        
+
         // Keywords cho phiếu thu nợ
         const receiptKeywords = ['phiếu thu', 'thu nợ', 'từ khách', 'thanh toán nợ', 'trả nợ', 'thu tiền khách'];
-        
-        const isReceiptDeposit = receiptKeywords.some(keyword => 
+
+        const isReceiptDeposit = receiptKeywords.some(keyword =>
           notesLower.includes(keyword) || receiverLower.includes(keyword)
         );
-        
+
         if (isReceiptDeposit) {
           refType = 'RECEIPT';
         }
