@@ -217,11 +217,15 @@ export class ShiftsService {
           });
         }
 
-        // ✅ Xóa CashLedger và DebtLedger của DEPOSIT (QUAN TRỌNG!)
+        // ✅ Xóa CashLedger của DEPOSIT
         await manager.delete(CashLedger, {
           refType: 'DEPOSIT',
           shiftId: id,
         });
+
+        // ✅ Xóa DebtLedger của DEPOSIT - CHỈ nếu refType='RETAIL'
+        // Vì phiếu nộp từ phiếu thu nợ (refType='RECEIPT') không ghi DebtLedger
+        // Để an toàn, xóa cả 2 trường hợp (RECEIPT deposits chưa qua DebtLedger)
         await manager.delete(DebtLedger, {
           refType: 'DEPOSIT',
           shiftId: id,
