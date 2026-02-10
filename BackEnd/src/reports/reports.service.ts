@@ -336,7 +336,7 @@ export class ReportsService {
 
     // Calculate carry-over cash from previous shift
     let carryOverCash = 0;
-    
+
     // Try to find previous shift on the same day
     let previousShift = await this.shiftRepository.findOne({
       where: {
@@ -352,7 +352,7 @@ export class ReportsService {
     if (!previousShift) {
       const previousDate = new Date(shift.shiftDate);
       previousDate.setDate(previousDate.getDate() - 1);
-      
+
       previousShift = await this.shiftRepository.findOne({
         where: {
           storeId: shift.storeId,

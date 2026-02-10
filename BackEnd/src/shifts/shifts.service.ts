@@ -667,6 +667,10 @@ export class ShiftsService {
     }
 
     // 6.3. Xử lý Receipts (phiếu thu tiền - thanh toán nợ)
+    // ✅ THAY ĐỔI: Phiếu thu không ghi vào công nợ của khách nội bộ
+    // - Chỉ ghi công nợ cho khách hàng EXTERNAL (nợ thương mại)
+    // - Chỉ đi qua sổ quỹ nếu hình thức là TIỀN MẶT
+    // - Chuyển khoản không đi qua sổ quỹ (tiền đã vào tài khoản ngân hàng)
     if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
       for (const receipt of closeShiftDto.receipts) {
         // Lưu receipt với thời gian thu tiền do người dùng chọn
@@ -689,21 +693,30 @@ export class ShiftsService {
             amount: detail.amount,
           });
 
-          // Ghi công nợ (credit customer - giảm nợ)
-          await manager.save(DebtLedger, {
-            shiftId: shift.id,
-            customerId: detail.customerId,
-            storeId: receipt.storeId,
-            refType: 'RECEIPT',
-            refId: receiptRecord.id,
-            debit: 0,
-            credit: detail.amount,
-            notes: receipt.notes || 'Thanh toán nợ',
-            ledgerAt: receiptRecord.receiptAt || closedAt, // ⏰ Dùng thời gian phiếu thu hoặc chốt ca
+          // ✅ FIX: Chỉ ghi công nợ nếu khách hàng KHÔNG phải loại INTERNAL
+          // Khách hàng nội bộ không ghi công nợ (vì không phải công nợ thương mại)
+          const customer = await manager.findOne(Customer, {
+            where: { id: detail.customerId },
+            select: ['id', 'type'],
           });
+
+          if (customer && customer.type !== 'INTERNAL') {
+            // Ghi công nợ (credit customer - giảm nợ) - Chỉ cho EXTERNAL customers
+            await manager.save(DebtLedger, {
+              shiftId: shift.id,
+              customerId: detail.customerId,
+              storeId: receipt.storeId,
+              refType: 'RECEIPT',
+              refId: receiptRecord.id,
+              debit: 0,
+              credit: detail.amount,
+              notes: receipt.notes || 'Thanh toán nợ',
+              ledgerAt: receiptRecord.receiptAt || closedAt, // ⏰ Dùng thời gian phiếu thu hoặc chốt ca
+            });
+          }
         }
 
-        // Ghi sổ quỹ (chỉ nếu thu tiền mặt)
+        // ✅ Ghi sổ quỹ CHỈ nếu thu tiền mặt (không ghi nếu chuyển khoản)
         if (receiptRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             shiftId: shift.id,
