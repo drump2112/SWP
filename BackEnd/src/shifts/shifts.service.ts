@@ -777,6 +777,7 @@ export class ShiftsService {
         // ✅ Ghi sổ quỹ: Tiền RA (nộp về công ty)
         // Công thức: Tồn cuối = Tồn đầu + Thu (cashIn) - Nộp (cashOut)
         // Chỉ ghi nếu nộp tiền mặt (không ghi nếu chuyển khoản đã nộp trước)
+        // ✅ FIX: Phiếu nộp KHÔNG ghi công nợ khách nội bộ (chỉ ghi sổ quỹ)
         if (depositRecord.paymentMethod === 'CASH') {
           await manager.save(CashLedger, {
             storeId: deposit.storeId,
@@ -788,24 +789,6 @@ export class ShiftsService {
             notes: deposit.notes || 'Nộp tiền về công ty',
             shiftId: shift.id,
           });
-
-          // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
-          // QUAN TRỌNG: Offset DEBIT từ bán lẻ để cân bằng
-          // Công nợ khách nội bộ = Bán lẻ (DEBIT) - Nộp tiền (CREDIT)
-          // Phiếu thu tiền mặt KHÔNG ghi vào công nợ khách nội bộ, chỉ ghi sổ quỹ
-          if (internalCustomer) {
-            await manager.save(DebtLedger, {
-              customerId: internalCustomer,
-              storeId: shift.storeId,
-              refType: 'DEPOSIT',
-              refId: depositRecord.id,
-              debit: 0,
-              credit: deposit.amount,
-              notes: deposit.notes || 'Nộp tiền về công ty - Giảm nợ bán lẻ',
-              shiftId: shift.id,
-              ledgerAt: depositRecord.depositAt || closedAt, // ⏰ Dùng thời gian nộp tiền hoặc chốt ca
-            });
-          }
         }
       }
     }
