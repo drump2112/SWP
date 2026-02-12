@@ -121,9 +121,14 @@ export class ReportsService {
     // For each customer, compute opening balance, transactions and closing balance
     const results = await Promise.all(
       customers.map(async (customer) => {
-        const openingBalance = fromDate
-          ? await this.getCustomerBalance(customer.id, storeId, new Date(0), fromDate)
-          : 0;
+        // Opening balance = sum từ đầu đến HÔM TRƯỚC ngày fromDate
+        // (Để không tính nhầm giao dịch ngày fromDate)
+        let openingBalance = 0;
+        if (fromDate) {
+          const dayBefore = new Date(fromDate);
+          dayBefore.setDate(dayBefore.getDate() - 1);
+          openingBalance = await this.getCustomerBalance(customer.id, storeId, new Date(0), dayBefore);
+        }
 
         const ledgerQuery = this.debtLedgerRepository
           .createQueryBuilder('dl')
@@ -139,6 +144,9 @@ export class ReportsService {
             toDate: toDateInclusive,
           });
         }
+
+        // Loại OPENING_BALANCE khỏi report (không tính vào phát sinh nợ)
+        ledgerQuery.andWhere('dl.ref_type != :refType', { refType: 'OPENING_BALANCE' });
 
         const ledgers = await ledgerQuery.orderBy('dl.ledger_at', 'ASC').getMany();
 
