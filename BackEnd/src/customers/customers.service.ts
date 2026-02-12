@@ -1234,6 +1234,7 @@ export class CustomersService {
     }
     if (createdAt !== undefined) {
       record.createdAt = new Date(createdAt);
+      record.ledgerAt = new Date(createdAt); // ✅ Cập nhật ledger_at khi thay đổi ngày
     }
 
     await this.debtLedgerRepository.save(record);
