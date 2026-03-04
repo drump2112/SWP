@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { usePageTitle } from '../hooks/usePageTitle';
+import { usePageTitle } from "../hooks/usePageTitle";
 import {
   shiftsApi,
   type ShiftDebtSaleDto,
@@ -15,7 +15,12 @@ import { usersApi } from "../api/users";
 import { productsApi } from "../api/products";
 import { pumpsApi } from "../api/pumps";
 import { storesApi } from "../api/stores";
-import { inventoryApi, inventoryCheckApi, type TankDataDto, type PumpDataDto } from "../api/inventory";
+import {
+  inventoryApi,
+  inventoryCheckApi,
+  type TankDataDto,
+  type PumpDataDto,
+} from "../api/inventory";
 import { tanksApi } from "../api/tanks"; // ✅ Import tanksApi
 import { useAuth } from "../contexts/AuthContext";
 import { showConfirm } from "../utils/sweetalert";
@@ -40,14 +45,22 @@ import {
   DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
 import dayjs from "dayjs";
-import { exportInventoryCheckExcel, type InventoryCheckRow, type InventoryCheckExportData } from "../utils/excel";
+import {
+  exportInventoryCheckExcel,
+  type InventoryCheckRow,
+  type InventoryCheckExportData,
+} from "../utils/excel";
 
 // Helper function để xử lý phím Enter - chuyển focus sang input tiếp theo
 const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
   if (e.key === "Enter") {
     const target = e.target as HTMLElement;
     // Không xử lý nếu đang ở textarea hoặc button submit
-    if (target.tagName === "TEXTAREA" || (target.tagName === "BUTTON" && (target as HTMLButtonElement).type === "submit")) {
+    if (
+      target.tagName === "TEXTAREA" ||
+      (target.tagName === "BUTTON" &&
+        (target as HTMLButtonElement).type === "submit")
+    ) {
       return;
     }
 
@@ -57,12 +70,16 @@ const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
     // Lấy tất cả các input, select, textarea có thể focus được
     const focusableElements = Array.from(
       form.querySelectorAll<HTMLElement>(
-        'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'
-      )
+        'input:not([type="hidden"]):not([disabled]):not([readonly]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])',
+      ),
     ).filter((el) => {
       // Loại bỏ các element bị ẩn
       const style = window.getComputedStyle(el);
-      return style.display !== "none" && style.visibility !== "hidden" && el.offsetParent !== null;
+      return (
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        el.offsetParent !== null
+      );
     });
 
     const currentIndex = focusableElements.indexOf(target as HTMLElement);
@@ -77,7 +94,9 @@ const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
       }
     } else if (currentIndex === focusableElements.length - 1) {
       // Nếu đang ở element cuối cùng, submit form
-      const submitBtn = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+      const submitBtn = form.querySelector<HTMLButtonElement>(
+        'button[type="submit"]',
+      );
       if (submitBtn) {
         submitBtn.click();
       }
@@ -86,7 +105,7 @@ const handleFormKeyDown = (e: React.KeyboardEvent<HTMLFormElement>) => {
 };
 
 const ShiftOperationsPage: React.FC = () => {
-  usePageTitle('Thao tác ca');
+  usePageTitle("Thao tác ca");
   const { shiftId } = useParams<{ shiftId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const isEditModeFromUrl = searchParams.get("mode") === "edit";
@@ -103,7 +122,8 @@ const ShiftOperationsPage: React.FC = () => {
   const [showDebtSaleForm, setShowDebtSaleForm] = useState(false);
   const [debtSaleFormQuantity, setDebtSaleFormQuantity] = useState<number>(0);
   const [debtSaleFormAmount, setDebtSaleFormAmount] = useState<number>(0);
-  const [debtSaleFormAmountFormatted, setDebtSaleFormAmountFormatted] = useState<string>("");
+  const [debtSaleFormAmountFormatted, setDebtSaleFormAmountFormatted] =
+    useState<string>("");
   const [isAmountManuallyEntered, setIsAmountManuallyEntered] = useState(false); // Flag để biết người dùng đã nhập thành tiền thủ công
   const [showReceiptForm, setShowReceiptForm] = useState(false);
   const [showDepositForm, setShowDepositForm] = useState(false);
@@ -111,18 +131,30 @@ const ShiftOperationsPage: React.FC = () => {
   const [showExportForm, setShowExportForm] = useState(false);
   const [showInventoryForm, setShowInventoryForm] = useState(false);
   const [showCashCheckingModal, setShowCashCheckingModal] = useState(false);
-  const [pumpReadings, setPumpReadings] = useState<Record<number, PumpReadingDto>>({});
-  const [productPrices, setProductPrices] = useState<Record<number, number>>({});
+  const [pumpReadings, setPumpReadings] = useState<
+    Record<number, PumpReadingDto>
+  >({});
+  const [productPrices, setProductPrices] = useState<Record<number, number>>(
+    {},
+  );
   const [debtSaleFormPrice, setDebtSaleFormPrice] = useState<number>(0);
-  const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<Record<number, number>>({});
+  const [declaredRetailQuantities, setDeclaredRetailQuantities] = useState<
+    Record<number, number>
+  >({});
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [hasPreviousShift, setHasPreviousShift] = useState(false);
   const [hasInitializedData, setHasInitializedData] = useState(false); // Flag để track đã init/restore data chưa
 
   // State cho SearchableSelect
-  const [selectedDebtCustomer, setSelectedDebtCustomer] = useState<number | null>(null);
-  const [selectedDebtProduct, setSelectedDebtProduct] = useState<number | null>(null);
-  const [selectedReceiptCustomer, setSelectedReceiptCustomer] = useState<number | null>(null);
+  const [selectedDebtCustomer, setSelectedDebtCustomer] = useState<
+    number | null
+  >(null);
+  const [selectedDebtProduct, setSelectedDebtProduct] = useState<number | null>(
+    null,
+  );
+  const [selectedReceiptCustomer, setSelectedReceiptCustomer] = useState<
+    number | null
+  >(null);
 
   // State cho Người Giao và Người Nhận
   const [handoverUserId, setHandoverUserId] = useState<number | null>(null);
@@ -132,34 +164,53 @@ const ShiftOperationsPage: React.FC = () => {
   const [editingReceiptId, setEditingReceiptId] = useState<string | null>(null);
   const [editingDepositId, setEditingDepositId] = useState<string | null>(null);
   const [editingImportId, setEditingImportId] = useState<string | null>(null);
-  const [editingDebtSaleId, setEditingDebtSaleId] = useState<string | null>(null);
+  const [editingDebtSaleId, setEditingDebtSaleId] = useState<string | null>(
+    null,
+  );
   const [hasLoadedReportData, setHasLoadedReportData] = useState(false); // Flag để track đã load data từ report chưa
 
   // Draft Mode: Store all data until shift close
-  const [draftDebtSales, setDraftDebtSales] = useState<Array<ShiftDebtSaleDto & { id: string }>>([]);
-  const [draftReceipts, setDraftReceipts] = useState<Array<CreateReceiptDto & { id: string }>>([]);
-  const [draftDeposits, setDraftDeposits] = useState<Array<CashDepositDto & { id: string }>>([]);
+  const [draftDebtSales, setDraftDebtSales] = useState<
+    Array<ShiftDebtSaleDto & { id: string }>
+  >([]);
+  const [draftReceipts, setDraftReceipts] = useState<
+    Array<CreateReceiptDto & { id: string }>
+  >([]);
+  const [draftDeposits, setDraftDeposits] = useState<
+    Array<CashDepositDto & { id: string }>
+  >([]);
   // TODO: Define types for Import/Export
   const [draftImports, setDraftImports] = useState<any[]>([]);
   const [draftExports, setDraftExports] = useState<any[]>([]);
   const [draftInventoryChecks, setDraftInventoryChecks] = useState<any[]>([]);
 
   // State cho kiểm kê tồn kho - form mới theo mẫu Excel
-  const [inventoryCheckData, setInventoryCheckData] = useState<Record<number, {
-    heightTotal: number;        // Chiều cao chung (mm)
-    heightWater: number;        // Chiều cao nước (mm)
-    actualStock: number;        // Tồn thực tế (lít)
-    bookStock?: number;         // Tồn sổ sách (có thể sửa)
-  }>>({}); // tankId -> data bể
-  const [pumpMeterReadings, setPumpMeterReadings] = useState<Record<number, number>>({}); // pumpId -> số máy điện tử
-  const [inventoryReason, setInventoryReason] = useState("");      // Nguyên nhân
+  const [inventoryCheckData, setInventoryCheckData] = useState<
+    Record<
+      number,
+      {
+        heightTotal: number; // Chiều cao chung (mm)
+        heightWater: number; // Chiều cao nước (mm)
+        actualStock: number; // Tồn thực tế (lít)
+        bookStock?: number; // Tồn sổ sách (có thể sửa)
+      }
+    >
+  >({}); // tankId -> data bể
+  const [pumpMeterReadings, setPumpMeterReadings] = useState<
+    Record<number, number>
+  >({}); // pumpId -> số máy điện tử
+  const [inventoryReason, setInventoryReason] = useState(""); // Nguyên nhân
   const [inventoryConclusion, setInventoryConclusion] = useState(""); // Kiến nghị/kết luận
-  const [inventoryMember1, setInventoryMember1] = useState("");    // Thành viên 1
-  const [inventoryMember2, setInventoryMember2] = useState("");    // Thành viên 2
+  const [inventoryMember1, setInventoryMember1] = useState(""); // Thành viên 1
+  const [inventoryMember2, setInventoryMember2] = useState(""); // Thành viên 2
 
   // Legacy state (giữ lại để tương thích)
-  const [checkpointReadings, setCheckpointReadings] = useState<Record<number, number>>({}); // pumpId -> meterValue
-  const [checkpointStocks, setCheckpointStocks] = useState<Record<number, number>>({}); // tankId -> actualQuantity
+  const [checkpointReadings, setCheckpointReadings] = useState<
+    Record<number, number>
+  >({}); // pumpId -> meterValue
+  const [checkpointStocks, setCheckpointStocks] = useState<
+    Record<number, number>
+  >({}); // tankId -> actualQuantity
   const [checkpointNotes, setCheckpointNotes] = useState("");
 
   // Fetch shift report
@@ -192,15 +243,20 @@ const ShiftOperationsPage: React.FC = () => {
   const debtCustomers = React.useMemo(() => {
     if (!customers) return [];
 
-    const externalCustomers = customers.filter((c: any) => c.type === 'EXTERNAL' || !c.type);
-    const internalCustomers = storeCustomers?.filter((c: any) => c.type === 'INTERNAL') || [];
+    const externalCustomers = customers.filter(
+      (c: any) => (c.type === "EXTERNAL" || !c.type) && c.isActive !== false,
+    );
+    const internalCustomers =
+      storeCustomers?.filter(
+        (c: any) => c.type === "INTERNAL" && c.isActive !== false,
+      ) || [];
 
     return [...externalCustomers, ...internalCustomers];
   }, [customers, storeCustomers]);
 
   // Tìm khách hàng INTERNAL (cửa hàng trưởng) để gán bán lẻ thực tế
   const retailCustomer = React.useMemo(() => {
-    return storeCustomers?.find((c: any) => c.type === 'INTERNAL') || null;
+    return storeCustomers?.find((c: any) => c.type === "INTERNAL") || null;
   }, [storeCustomers]);
 
   // Fetch products
@@ -250,7 +306,11 @@ const ShiftOperationsPage: React.FC = () => {
   });
 
   // Fetch users cho select Người Giao/Nhận
-  const { data: storeUsers, isLoading: isLoadingUsers, error: usersError } = useQuery({
+  const {
+    data: storeUsers,
+    isLoading: isLoadingUsers,
+    error: usersError,
+  } = useQuery({
     queryKey: ["users", report?.shift.storeId],
     queryFn: async () => {
       if (!report?.shift.storeId) return [];
@@ -301,7 +361,7 @@ const ShiftOperationsPage: React.FC = () => {
     }
 
     const hasPumpData = Object.values(pumpReadings).some(
-      (reading) => reading.startValue !== 0 || reading.endValue !== 0
+      (reading) => reading.startValue !== 0 || reading.endValue !== 0,
     );
     const hasDraftData =
       draftDebtSales.length > 0 ||
@@ -358,7 +418,9 @@ const ShiftOperationsPage: React.FC = () => {
     // Auto-open deposit form in Tab B4 if empty or only has auto-generated deposits
     // Nếu chỉ có phiếu nộp từ Receipts (auto-generated), vẫn mở form để gợi ý nộp doanh thu bán lẻ
     if (activeTab === "deposit") {
-      const hasManualDeposit = draftDeposits.some((d) => !String(d.id).startsWith("receipt-"));
+      const hasManualDeposit = draftDeposits.some(
+        (d) => !String(d.id).startsWith("receipt-"),
+      );
       if (!hasManualDeposit) {
         setShowDepositForm(true);
       } else {
@@ -384,7 +446,7 @@ const ShiftOperationsPage: React.FC = () => {
 
     const totalDebtSales = draftDebtSales.reduce(
       (sum, ds) => sum + (ds.amount ?? Math.round(ds.quantity * ds.unitPrice)),
-      0
+      0,
     );
     const totalRetail = Math.max(0, totalPumpSales - totalDebtSales);
 
@@ -432,7 +494,8 @@ const ShiftOperationsPage: React.FC = () => {
       try {
         const parsed = JSON.parse(savedData);
         // Kiểm tra có BẤT KỲ data nào để restore không
-        const hasSavedPumpReadings = parsed.pumpReadings && Object.keys(parsed.pumpReadings).length > 0;
+        const hasSavedPumpReadings =
+          parsed.pumpReadings && Object.keys(parsed.pumpReadings).length > 0;
         const hasSavedDraftData =
           (parsed.debtSales && parsed.debtSales.length > 0) ||
           (parsed.receipts && parsed.receipts.length > 0) ||
@@ -459,7 +522,10 @@ const ShiftOperationsPage: React.FC = () => {
             const validImports = parsed.imports
               .map((imp: any) => ({
                 ...imp,
-                items: imp.items?.filter((item: any) => item.productId && item.productId > 0) || [],
+                items:
+                  imp.items?.filter(
+                    (item: any) => item.productId && item.productId > 0,
+                  ) || [],
               }))
               .filter((imp: any) => imp.items.length > 0);
             setDraftImports(validImports);
@@ -469,7 +535,10 @@ const ShiftOperationsPage: React.FC = () => {
             const validExports = parsed.exports
               .map((exp: any) => ({
                 ...exp,
-                items: exp.items?.filter((item: any) => item.productId && item.productId > 0) || [],
+                items:
+                  exp.items?.filter(
+                    (item: any) => item.productId && item.productId > 0,
+                  ) || [],
               }))
               .filter((exp: any) => exp.items.length > 0);
             setDraftExports(validExports);
@@ -489,11 +558,17 @@ const ShiftOperationsPage: React.FC = () => {
               setHasPreviousShift(parsed.hasPreviousShift);
             }
             setHasInitializedData(true); // ✅ Đánh dấu đã init xong
-            toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", { position: "top-right", autoClose: 3000 });
+            toast.success("Đã khôi phục dữ liệu chưa lưu từ lần trước", {
+              position: "top-right",
+              autoClose: 3000,
+            });
             return;
           } else {
             // Có draft data nhưng chưa có pumpReadings -> tiếp tục fetch từ ca trước
-            toast.info("Đã khôi phục dữ liệu nhập liệu, đang tải số đầu ca...", { position: "top-right", autoClose: 3000 });
+            toast.info(
+              "Đã khôi phục dữ liệu nhập liệu, đang tải số đầu ca...",
+              { position: "top-right", autoClose: 3000 },
+            );
           }
         }
       } catch (e) {
@@ -504,7 +579,9 @@ const ShiftOperationsPage: React.FC = () => {
     // Lấy số đọc của ca trước (nếu có)
     const fetchPreviousReadings = async () => {
       try {
-        const previousData = await shiftsApi.getPreviousShiftReadings(Number(shiftId));
+        const previousData = await shiftsApi.getPreviousShiftReadings(
+          Number(shiftId),
+        );
         console.log("📊 Previous shift readings:", previousData);
 
         // Set state để biết có ca trước hay không
@@ -513,7 +590,9 @@ const ShiftOperationsPage: React.FC = () => {
         // Init pump readings với số đầu từ ca trước (nếu có)
         const initialReadings: Record<number, PumpReadingDto> = {};
         pumps.forEach((pump: any) => {
-          const previousEndValue = previousData.hasPreviousShift ? previousData.readings[pump.pumpCode] || 0 : 0;
+          const previousEndValue = previousData.hasPreviousShift
+            ? previousData.readings[pump.pumpCode] || 0
+            : 0;
 
           initialReadings[pump.id] = {
             pumpId: pump.id, // ✅ Thêm pumpId để query tankId
@@ -530,7 +609,7 @@ const ShiftOperationsPage: React.FC = () => {
         if (previousData.hasPreviousShift) {
           toast.success(
             `Đã tự động điền số đầu từ ca ${previousData.previousShiftNo} ngày ${previousData.previousShiftDate}`,
-            { position: "top-right", autoClose: 3000 }
+            { position: "top-right", autoClose: 3000 },
           );
         }
       } catch (error) {
@@ -559,8 +638,12 @@ const ShiftOperationsPage: React.FC = () => {
   useEffect(() => {
     if (report?.shift) {
       // Tìm user tương ứng để set value cho select
-      const handoverUser = storeUsers?.find((u) => u.fullName === report.shift.handoverName);
-      const receiverUser = storeUsers?.find((u) => u.fullName === report.shift.receiverName);
+      const handoverUser = storeUsers?.find(
+        (u) => u.fullName === report.shift.handoverName,
+      );
+      const receiverUser = storeUsers?.find(
+        (u) => u.fullName === report.shift.receiverName,
+      );
       setHandoverUserId(handoverUser?.id || null);
       setReceiverUserId(receiverUser?.id || null);
     }
@@ -596,13 +679,15 @@ const ShiftOperationsPage: React.FC = () => {
 
     console.log("📦 Loading data from report for edit/view mode...", {
       cashDeposits: report.cashDeposits?.length || 0,
-      receipts: report.receipts?.length || 0
+      receipts: report.receipts?.length || 0,
     });
 
     // 1. Pump Readings
     const initialReadings: Record<number, PumpReadingDto> = {};
     pumps.forEach((pump: any) => {
-      const reportReading = report.pumpReadings.find((r: any) => r.pumpCode === pump.pumpCode);
+      const reportReading = report.pumpReadings.find(
+        (r: any) => r.pumpCode === pump.pumpCode,
+      );
       initialReadings[pump.id] = {
         pumpId: pump.id, // ✅ Thêm pumpId để query tankId
         pumpCode: pump.pumpCode,
@@ -620,7 +705,8 @@ const ShiftOperationsPage: React.FC = () => {
     // Nếu có ca trước → khóa số đầu (vì đã lấy từ ca trước)
     if (wasClosedBefore && isEditMode) {
       // Gọi API để kiểm tra có ca trước hay không
-      shiftsApi.getPreviousShiftReadings(Number(shiftId))
+      shiftsApi
+        .getPreviousShiftReadings(Number(shiftId))
         .then((previousData) => {
           console.log("📊 Edit Mode - Previous shift check:", previousData);
           setHasPreviousShift(previousData.hasPreviousShift);
@@ -645,9 +731,11 @@ const ShiftOperationsPage: React.FC = () => {
           productId: ds.productId,
           quantity: Number(ds.quantity),
           unitPrice: Number(ds.unitPrice),
-          amount: ds.amount ? Number(ds.amount) : Math.round(Number(ds.quantity) * Number(ds.unitPrice)), // Lấy amount đã lưu hoặc tính lại
+          amount: ds.amount
+            ? Number(ds.amount)
+            : Math.round(Number(ds.quantity) * Number(ds.unitPrice)), // Lấy amount đã lưu hoặc tính lại
           notes: ds.notes,
-        }))
+        })),
       );
     }
 
@@ -670,7 +758,7 @@ const ShiftOperationsPage: React.FC = () => {
             paymentMethod: r.paymentMethod || "CASH",
             receiptAt: r.receiptAt, // ⏰ Thời gian thu tiền đã lưu
           };
-        })
+        }),
       );
     }
 
@@ -686,7 +774,7 @@ const ShiftOperationsPage: React.FC = () => {
           receiverName: d.receiverName,
           notes: d.notes,
           paymentMethod: d.paymentMethod || "CASH",
-        }))
+        })),
       );
     }
 
@@ -697,7 +785,8 @@ const ShiftOperationsPage: React.FC = () => {
     // Sum pump readings by product
     const pumpSums: Record<number, number> = {};
     report.pumpReadings.forEach((r: any) => {
-      const qty = Number(r.endValue) - Number(r.startValue) - (Number(r.testExport) || 0);
+      const qty =
+        Number(r.endValue) - Number(r.startValue) - (Number(r.testExport) || 0);
       pumpSums[r.productId] = (pumpSums[r.productId] || 0) + qty;
       productIds.add(r.productId);
     });
@@ -706,7 +795,8 @@ const ShiftOperationsPage: React.FC = () => {
     const debtSums: Record<number, number> = {};
     if (report.debtSales) {
       report.debtSales.forEach((ds: any) => {
-        debtSums[ds.productId] = (debtSums[ds.productId] || 0) + Number(ds.quantity);
+        debtSums[ds.productId] =
+          (debtSums[ds.productId] || 0) + Number(ds.quantity);
         productIds.add(ds.productId);
       });
     }
@@ -726,7 +816,10 @@ const ShiftOperationsPage: React.FC = () => {
     setHasInitializedData(true); // ✅ Đánh dấu đã init xong (cho view/edit mode)
 
     if (isEditMode) {
-      toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", { position: "top-center", autoClose: 3000 });
+      toast.info("Đang ở chế độ chỉnh sửa ca đã chốt", {
+        position: "top-center",
+        autoClose: 3000,
+      });
     }
   }, [isEditMode, report, pumps, shiftId, hasLoadedReportData]);
 
@@ -744,14 +837,23 @@ const ShiftOperationsPage: React.FC = () => {
         ? new Date(report.shift.openedAt)
         : undefined;
 
-      console.log(`📊 Lấy giá tại thời điểm: ${priceReferenceTime?.toISOString() || 'hiện tại'}`);
+      console.log(
+        `📊 Lấy giá tại thời điểm: ${priceReferenceTime?.toISOString() || "hiện tại"}`,
+      );
 
       for (const productId of uniqueProductIds) {
         try {
-          const priceData = await productsApi.getCurrentPrice(productId, store.regionId, priceReferenceTime);
+          const priceData = await productsApi.getCurrentPrice(
+            productId,
+            store.regionId,
+            priceReferenceTime,
+          );
           prices[productId] = Number(priceData.price);
         } catch (error) {
-          console.error(`❌ Failed to fetch price for product ${productId}:`, error);
+          console.error(
+            `❌ Failed to fetch price for product ${productId}:`,
+            error,
+          );
           prices[productId] = 0;
         }
       }
@@ -771,13 +873,17 @@ const ShiftOperationsPage: React.FC = () => {
     // Nếu không phải edit mode và ca đang OPEN thì không load (chưa có gì trong DB)
     const shouldLoad = isEditModeFromUrl || report.shift.status !== "OPEN";
     if (!shouldLoad) {
-      console.log("📦 Skip loading imports - shift is OPEN and not in edit mode");
+      console.log(
+        "📦 Skip loading imports - shift is OPEN and not in edit mode",
+      );
       return;
     }
 
     const loadImportDocuments = async () => {
       try {
-        const documents = await inventoryApi.getDocumentsByShift(Number(shiftId));
+        const documents = await inventoryApi.getDocumentsByShift(
+          Number(shiftId),
+        );
         console.log("📦 API returned documents:", documents);
         if (documents && documents.length > 0) {
           // Map từ format DB sang format đơn giản
@@ -791,14 +897,25 @@ const ShiftOperationsPage: React.FC = () => {
               supplierName: doc.supplierName,
               licensePlate: doc.licensePlate,
               driverName: doc.driverName,
-              productId: firstItem?.productId || firstCompartment?.productId || doc.productId,
-              tankId: firstItem?.tankId || firstCompartment?.tankId || doc.tankId, // ✅ Thêm tankId
-              quantity: firstItem?.quantity || doc.totalVolume || firstCompartment?.receivedVolume || 0,
+              productId:
+                firstItem?.productId ||
+                firstCompartment?.productId ||
+                doc.productId,
+              tankId:
+                firstItem?.tankId || firstCompartment?.tankId || doc.tankId, // ✅ Thêm tankId
+              quantity:
+                firstItem?.quantity ||
+                doc.totalVolume ||
+                firstCompartment?.receivedVolume ||
+                0,
               notes: doc.notes,
             };
           });
           setDraftImports(mappedImports);
-          console.log(`✅ Loaded ${mappedImports.length} import document(s) for shift ${shiftId}`, mappedImports);
+          console.log(
+            `✅ Loaded ${mappedImports.length} import document(s) for shift ${shiftId}`,
+            mappedImports,
+          );
         } else {
           console.log("📦 No import documents found for shift", shiftId);
           setDraftImports([]);
@@ -844,7 +961,8 @@ const ShiftOperationsPage: React.FC = () => {
 
   // Update shift mutation
   const updateShiftMutation = useMutation({
-    mutationFn: (data: CloseShiftDto) => shiftsApi.update(Number(shiftId), data),
+    mutationFn: (data: CloseShiftDto) =>
+      shiftsApi.update(Number(shiftId), data),
     onSuccess: async () => {
       // Reset flag để cho phép load lại data từ report mới
       setHasLoadedReportData(false);
@@ -877,7 +995,11 @@ const ShiftOperationsPage: React.FC = () => {
   // NOTE: Các mutations dưới đây không còn cần thiết vì đã chuyển sang Draft Mode
   // Tất cả dữ liệu lưu trong state và chỉ gửi API khi chốt ca
 
-  const handlePumpReadingChange = (pumpId: number, field: "startValue" | "endValue" | "testExport", value: string) => {
+  const handlePumpReadingChange = (
+    pumpId: number,
+    field: "startValue" | "endValue" | "testExport",
+    value: string,
+  ) => {
     setPumpReadings((prev) => {
       const currentReading = prev[pumpId];
       if (!currentReading) return prev;
@@ -917,7 +1039,12 @@ const ShiftOperationsPage: React.FC = () => {
     const price = productPrices[reading.productId];
 
     if (!price || isNaN(price)) {
-      console.warn("⚠️ Price not found for productId:", reading.productId, "Available prices:", productPrices);
+      console.warn(
+        "⚠️ Price not found for productId:",
+        reading.productId,
+        "Available prices:",
+        productPrices,
+      );
       return 0;
     }
 
@@ -930,18 +1057,29 @@ const ShiftOperationsPage: React.FC = () => {
     const readingsArray = Object.values(pumpReadings);
 
     // Tính toán trước để dùng cho validation
-    const totalLiters = readingsArray.reduce((sum, r) => sum + (r.endValue - r.startValue), 0);
+    const totalLiters = readingsArray.reduce(
+      (sum, r) => sum + (r.endValue - r.startValue),
+      0,
+    );
     const totalAmount = calculateTotalFromPumps();
     const draftDebtTotal = draftDebtSales.reduce(
       (sum, ds) => sum + (ds.amount ?? Math.round(ds.quantity * ds.unitPrice)),
-      0
+      0,
     );
-    const draftReceiptTotal = draftReceipts.reduce((sum, r) => sum + r.amount, 0);
-    const draftDepositTotal = draftDeposits.reduce((sum, d) => sum + d.amount, 0);
+    const draftReceiptTotal = draftReceipts.reduce(
+      (sum, r) => sum + r.amount,
+      0,
+    );
+    const draftDepositTotal = draftDeposits.reduce(
+      (sum, d) => sum + d.amount,
+      0,
+    );
     const totalRetailCalc = totalAmount - draftDebtTotal;
 
     // Validation 1: Số cuối >= số đầu
-    const hasInvalidReadings = readingsArray.some((r) => r.endValue < r.startValue);
+    const hasInvalidReadings = readingsArray.some(
+      (r) => r.endValue < r.startValue,
+    );
     if (hasInvalidReadings) {
       toast.error("Số cuối phải lớn hơn hoặc bằng số đầu!", {
         position: "top-right",
@@ -963,20 +1101,28 @@ const ShiftOperationsPage: React.FC = () => {
           return `Vòi ${r.pumpCode}: Xuất KT ${r.testExport?.toFixed(3)} > Bơm ${grossQty.toFixed(3)}`;
         })
         .join("; ");
-      toast.error(`Xuất kiểm thử/quay kho không được lớn hơn lượng bơm! ${errorMsg}`, {
-        position: "top-right",
-        autoClose: 5000,
-      });
+      toast.error(
+        `Xuất kiểm thử/quay kho không được lớn hơn lượng bơm! ${errorMsg}`,
+        {
+          position: "top-right",
+          autoClose: 5000,
+        },
+      );
       return;
     }
 
     // Validation 1.5: Kiểm tra có giá cho tất cả mặt hàng
-    const missingPrices = readingsArray.filter((r) => !productPrices[r.productId] || productPrices[r.productId] === 0);
+    const missingPrices = readingsArray.filter(
+      (r) => !productPrices[r.productId] || productPrices[r.productId] === 0,
+    );
     if (missingPrices.length > 0) {
-      toast.error("Có mặt hàng chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.", {
-        position: "top-right",
-        autoClose: 3000,
-      });
+      toast.error(
+        "Có mặt hàng chưa có giá bán. Vui lòng cập nhật bảng giá trước khi chốt ca.",
+        {
+          position: "top-right",
+          autoClose: 3000,
+        },
+      );
       return;
     }
 
@@ -998,18 +1144,22 @@ const ShiftOperationsPage: React.FC = () => {
     }
 
     // Validation 2: Kiểm tra có vòi nào chưa nhập
-    const hasEmptyReadings = readingsArray.some((r) => r.startValue === 0 && r.endValue === 0);
+    const hasEmptyReadings = readingsArray.some(
+      (r) => r.startValue === 0 && r.endValue === 0,
+    );
     if (hasEmptyReadings) {
       const confirmed = await showConfirm(
         "Có vòi chưa nhập số liệu. Bạn có chắc muốn chốt ca?",
         "Xác nhận chốt ca",
-        "warning"
+        "warning",
       );
       if (!confirmed) return;
     }
 
     // Validation 2.5: Kiểm tra đối chiếu lượng hàng bán (BẮT BUỘC)
-    const productIds = Array.from(new Set(readingsArray.map((r) => r.productId)));
+    const productIds = Array.from(
+      new Set(readingsArray.map((r) => r.productId)),
+    );
     const invalidProducts: string[] = [];
 
     for (const productId of productIds) {
@@ -1021,16 +1171,21 @@ const ShiftOperationsPage: React.FC = () => {
         .reduce((sum, r) => sum + calculateQuantity(r), 0);
 
       // 2. Total Debt Quantity
-      const debtQty = draftDebtSales.filter((s) => s.productId === productId).reduce((sum, s) => sum + s.quantity, 0);
+      const debtQty = draftDebtSales
+        .filter((s) => s.productId === productId)
+        .reduce((sum, s) => sum + s.quantity, 0);
 
       // 3. Declared Retail Quantity
       const declaredQty = declaredRetailQuantities[productId];
 
       if (declaredQty === undefined || declaredQty === null) {
-        toast.error(`Vui lòng nhập "Bán lẻ thực tế" cho mặt hàng ${product?.name || productId} ở Tab 2!`, {
-          position: "top-right",
-          autoClose: 5000,
-        });
+        toast.error(
+          `Vui lòng nhập "Bán lẻ thực tế" cho mặt hàng ${product?.name || productId} ở Tab 2!`,
+          {
+            position: "top-right",
+            autoClose: 5000,
+          },
+        );
         setActiveTab("debt");
         return;
       }
@@ -1040,15 +1195,20 @@ const ShiftOperationsPage: React.FC = () => {
 
       if (diff > 0.1) {
         // Allow 0.1 liter tolerance
-        invalidProducts.push(`${product?.name || productId} (Lệch ${diff.toFixed(3)} lít)`);
+        invalidProducts.push(
+          `${product?.name || productId} (Lệch ${diff.toFixed(3)} lít)`,
+        );
       }
     }
 
     if (invalidProducts.length > 0) {
-      toast.error(`Lượng hàng bán không khớp:\n${invalidProducts.join("\n")}\nVui lòng kiểm tra lại!`, {
-        position: "top-right",
-        autoClose: 7000,
-      });
+      toast.error(
+        `Lượng hàng bán không khớp:\n${invalidProducts.join("\n")}\nVui lòng kiểm tra lại!`,
+        {
+          position: "top-right",
+          autoClose: 7000,
+        },
+      );
       return; // CHẶN KHÔNG CHO CHỐT
     }
 
@@ -1099,7 +1259,9 @@ const ShiftOperationsPage: React.FC = () => {
     `;
 
     const swalTitle = isEditMode ? "Xác nhận cập nhật ca" : "Xác nhận chốt ca";
-    const swalConfirmButton = isEditMode ? "Xác nhận cập nhật" : "Xác nhận chốt ca";
+    const swalConfirmButton = isEditMode
+      ? "Xác nhận cập nhật"
+      : "Xác nhận chốt ca";
 
     const result = await Swal.fire({
       title: swalTitle,
@@ -1108,8 +1270,8 @@ const ShiftOperationsPage: React.FC = () => {
         <div class="mt-4 text-left">
           <label class="block text-sm font-medium text-gray-700 mb-1">Thời gian chốt ca</label>
           <input type="datetime-local" step="1" id="closedAt" class="swal2-input" style="margin: 0; width: 100%;" value="${dayjs().format(
-        "YYYY-MM-DDTHH:mm"
-      )}">
+            "YYYY-MM-DDTHH:mm",
+          )}">
         </div>
       `,
       icon: "question",
@@ -1119,7 +1281,9 @@ const ShiftOperationsPage: React.FC = () => {
       confirmButtonText: swalConfirmButton,
       cancelButtonText: "Hủy",
       preConfirm: () => {
-        const closedAtInput = document.getElementById("closedAt") as HTMLInputElement;
+        const closedAtInput = document.getElementById(
+          "closedAt",
+        ) as HTMLInputElement;
         if (!closedAtInput.value) {
           Swal.showValidationMessage("Vui lòng chọn thời gian chốt ca");
         }
@@ -1170,7 +1334,11 @@ const ShiftOperationsPage: React.FC = () => {
         receiptAt: r.receiptAt, // ⏰ Thời gian thu tiền do người dùng nhập
       })),
       deposits: draftDeposits.map((d) => ({
-        id: String(d.id).startsWith("draft_") || String(d.id).startsWith("receipt-") ? undefined : d.id,
+        id:
+          String(d.id).startsWith("draft_") ||
+          String(d.id).startsWith("receipt-")
+            ? undefined
+            : d.id,
         storeId: d.storeId || report?.shift.storeId || user?.storeId || 0,
         shiftId: Number(shiftId),
         amount: d.amount,
@@ -1203,8 +1371,12 @@ const ShiftOperationsPage: React.FC = () => {
           notes: imp.notes,
         };
       }),
-      handoverName: handoverUserId ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName : undefined,
-      receiverName: receiverUserId ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName : undefined,
+      handoverName: handoverUserId
+        ? storeUsers?.find((u) => u.id === handoverUserId)?.fullName
+        : undefined,
+      receiverName: receiverUserId
+        ? storeUsers?.find((u) => u.id === receiverUserId)?.fullName
+        : undefined,
     };
 
     console.log("🚀 Submitting shift data:", {
@@ -1235,7 +1407,9 @@ const ShiftOperationsPage: React.FC = () => {
     // Làm tròn amount để tránh số lẻ thập phân
     // Nếu người dùng đã nhập thành tiền thủ công, dùng giá trị đó
     // Nếu không, tính từ quantity * price
-    const amount = Math.round(debtSaleFormAmount) || Math.round(quantity * debtSaleFormPrice);
+    const amount =
+      Math.round(debtSaleFormAmount) ||
+      Math.round(quantity * debtSaleFormPrice);
 
     console.log("💰 Debt Sale Submit:", {
       quantity,
@@ -1259,11 +1433,19 @@ const ShiftOperationsPage: React.FC = () => {
 
     // Lưu vào draft state - update nếu đang sửa, thêm mới nếu không
     if (editingDebtSaleId) {
-      setDraftDebtSales((prev) => prev.map((item) => (item.id === editingDebtSaleId ? data : item)));
-      toast.success("Đã cập nhật doanh số", { position: "top-right", autoClose: 3000 });
+      setDraftDebtSales((prev) =>
+        prev.map((item) => (item.id === editingDebtSaleId ? data : item)),
+      );
+      toast.success("Đã cập nhật doanh số", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } else {
       setDraftDebtSales((prev) => [...prev, data]);
-      toast.success("Đã thêm vào danh sách công nợ", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã thêm vào danh sách công nợ", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
 
     setShowDebtSaleForm(false);
@@ -1288,7 +1470,10 @@ const ShiftOperationsPage: React.FC = () => {
 
     // Validate thời gian
     if (!receiptAt) {
-      toast.error("Vui lòng nhập thời gian thu tiền!", { position: "top-right", autoClose: 3000 });
+      toast.error("Vui lòng nhập thời gian thu tiền!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -1306,7 +1491,7 @@ const ShiftOperationsPage: React.FC = () => {
             };
           }
           return item;
-        })
+        }),
       );
 
       // Đồng bộ update deposit nếu có
@@ -1320,20 +1505,25 @@ const ShiftOperationsPage: React.FC = () => {
           // -> Cố gắng tìm phiếu nộp tương ứng dựa trên nội dung
           if (!exists && !String(editingReceiptId).startsWith("draft_")) {
             // 1. Tìm theo Note có chứa ID phiếu thu
-            const matchByNote = prev.find((d) => d.notes?.includes(`Phiếu thu #${editingReceiptId}`));
+            const matchByNote = prev.find((d) =>
+              d.notes?.includes(`Phiếu thu #${editingReceiptId}`),
+            );
             if (matchByNote) {
               targetId = matchByNote.id;
               exists = true;
             } else {
               // 2. Tìm theo số tiền cũ + keyword trong Note
-              const oldReceipt = draftReceipts.find((r) => r.id === editingReceiptId);
+              const oldReceipt = draftReceipts.find(
+                (r) => r.id === editingReceiptId,
+              );
               if (oldReceipt) {
                 const candidates = prev.filter(
                   (d) =>
                     d.amount === oldReceipt.amount &&
                     d.paymentMethod === "CASH" &&
-                    (d.notes?.includes("Phiếu thu") || d.notes?.includes("thu từ khách hàng")) &&
-                    !String(d.id).startsWith("receipt-") // Không lấy các draft khác
+                    (d.notes?.includes("Phiếu thu") ||
+                      d.notes?.includes("thu từ khách hàng")) &&
+                    !String(d.id).startsWith("receipt-"), // Không lấy các draft khác
                 );
 
                 // Chỉ auto-link nếu tìm thấy chính xác 1 ứng viên để tránh nhầm lẫn
@@ -1349,7 +1539,8 @@ const ShiftOperationsPage: React.FC = () => {
             return prev.map((d) => {
               if (d.id === targetId) {
                 // Sử dụng receiptAt cho depositAt
-                const depositAt = receiptAt || dayjs().format("YYYY-MM-DDTHH:mm");
+                const depositAt =
+                  receiptAt || dayjs().format("YYYY-MM-DDTHH:mm");
                 return {
                   ...d,
                   amount,
@@ -1376,14 +1567,17 @@ const ShiftOperationsPage: React.FC = () => {
               receiverName: "Công ty SWP",
               notes: `Nộp tiền thu từ khách hàng (Phiếu thu #${editingReceiptId})`,
               paymentMethod: "CASH",
-              sourceType: 'RECEIPT', // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
+              sourceType: "RECEIPT", // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
             },
           ];
         });
       }
 
       setEditingReceiptId(null);
-      toast.success("Đã cập nhật phiếu thu và phiếu nộp tương ứng", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã cập nhật phiếu thu và phiếu nộp tương ứng", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } else {
       const receiptId = `draft_${Date.now()}`;
       const data: CreateReceiptDto & { id: string } = {
@@ -1412,12 +1606,18 @@ const ShiftOperationsPage: React.FC = () => {
           receiverName: "Công ty SWP",
           notes: `Nộp tiền thu từ khách hàng (Phiếu thu mới)`,
           paymentMethod: "CASH",
-          sourceType: 'RECEIPT', // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
+          sourceType: "RECEIPT", // Từ phiếu thu - KHÔNG ghi CREDIT cho khách nội bộ
         };
         setDraftDeposits((prev) => [...prev, depositData]);
-        toast.success("Đã tạo phiếu thu và phiếu nộp tương ứng", { position: "top-right", autoClose: 3000 });
+        toast.success("Đã tạo phiếu thu và phiếu nộp tương ứng", {
+          position: "top-right",
+          autoClose: 3000,
+        });
       } else {
-        toast.success("Đã thêm vào danh sách phiếu thu", { position: "top-right", autoClose: 3000 });
+        toast.success("Đã thêm vào danh sách phiếu thu", {
+          position: "top-right",
+          autoClose: 3000,
+        });
       }
     }
 
@@ -1436,11 +1636,21 @@ const ShiftOperationsPage: React.FC = () => {
     const notes = (formData.get("notes") as string) || undefined;
     const paymentMethod = (formData.get("paymentMethod") as string) || "CASH";
 
-    console.log("📝 Deposit data:", { amount, depositAt, receiverName, notes, paymentMethod, editingDepositId });
+    console.log("📝 Deposit data:", {
+      amount,
+      depositAt,
+      receiverName,
+      notes,
+      paymentMethod,
+      editingDepositId,
+    });
 
     // Validate ngày giờ
     if (!depositAt) {
-      toast.error("Vui lòng nhập ngày giờ nộp tiền!", { position: "top-right", autoClose: 3000 });
+      toast.error("Vui lòng nhập ngày giờ nộp tiền!", {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -1458,10 +1668,13 @@ const ShiftOperationsPage: React.FC = () => {
             };
           }
           return item;
-        })
+        }),
       );
       setEditingDepositId(null);
-      toast.success("Đã cập nhật phiếu nộp", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã cập nhật phiếu nộp", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } else {
       const data: CashDepositDto & { id: string } = {
         id: `draft_${Date.now()}`, // Temporary ID
@@ -1472,7 +1685,7 @@ const ShiftOperationsPage: React.FC = () => {
         receiverName,
         notes,
         paymentMethod,
-        sourceType: 'RETAIL', // Phiếu nộp thủ công = từ tiền bán lẻ → ghi CREDIT cho khách nội bộ
+        sourceType: "RETAIL", // Phiếu nộp thủ công = từ tiền bán lẻ → ghi CREDIT cho khách nội bộ
       };
       // Lưu vào draft state thay vì API
       setDraftDeposits((prev) => [...prev, data]);
@@ -1505,10 +1718,16 @@ const ShiftOperationsPage: React.FC = () => {
   };
 
   const handleDeleteDebtSale = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa doanh số này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa doanh số này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftDebtSales((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa khỏi danh sách", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -1518,28 +1737,44 @@ const ShiftOperationsPage: React.FC = () => {
     setSelectedDebtProduct(sale.productId);
     setDebtSaleFormQuantity(sale.quantity);
     setDebtSaleFormPrice(sale.unitPrice);
-    setDebtSaleFormAmount(sale.amount ?? Math.round(sale.quantity * sale.unitPrice));
+    setDebtSaleFormAmount(
+      sale.amount ?? Math.round(sale.quantity * sale.unitPrice),
+    );
     setEditingDebtSaleId(sale.id);
     setShowDebtSaleForm(true);
   };
 
   const handleDeleteReceipt = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu thu này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa phiếu thu này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftReceipts((prev) => prev.filter((item) => item.id !== id));
 
       // Xóa luôn phiếu nộp tương ứng nếu có
-      setDraftDeposits((prev) => prev.filter((item) => item.id !== `receipt-${id}`));
+      setDraftDeposits((prev) =>
+        prev.filter((item) => item.id !== `receipt-${id}`),
+      );
 
-      toast.success("Đã xóa phiếu thu và phiếu nộp tương ứng", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa phiếu thu và phiếu nộp tương ứng", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
   const handleDeleteDeposit = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu nộp này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa phiếu nộp này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftDeposits((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa khỏi danh sách", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -1579,9 +1814,12 @@ const ShiftOperationsPage: React.FC = () => {
             };
           }
           return item;
-        })
+        }),
       );
-      toast.success("Đã cập nhật phiếu nhập", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã cập nhật phiếu nhập", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     } else {
       // Thêm mới vào draft
       const newItem = {
@@ -1613,17 +1851,29 @@ const ShiftOperationsPage: React.FC = () => {
     const receiverName = (formData.get("receiverName") as string) || undefined; // Reusing supplierName field or similar
     const notes = (formData.get("notes") as string) || undefined;
 
-    const productId = formData.get("productId") ? Number(formData.get("productId")) : undefined;
-    const quantity = formData.get("quantity") ? Number(formData.get("quantity")) : 0;
-    const unitPrice = formData.get("unitPrice") ? Number(formData.get("unitPrice")) : 0;
+    const productId = formData.get("productId")
+      ? Number(formData.get("productId"))
+      : undefined;
+    const quantity = formData.get("quantity")
+      ? Number(formData.get("quantity"))
+      : 0;
+    const unitPrice = formData.get("unitPrice")
+      ? Number(formData.get("unitPrice"))
+      : 0;
 
     if (!productId || productId <= 0) {
-      toast.error("Vui lòng chọn mặt hàng", { position: "top-right", autoClose: 3000 });
+      toast.error("Vui lòng chọn mặt hàng", {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
     if (quantity <= 0) {
-      toast.error("Số lượng phải lớn hơn 0", { position: "top-right", autoClose: 3000 });
+      toast.error("Số lượng phải lớn hơn 0", {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -1640,24 +1890,39 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     setDraftExports((prev) => [...prev, newItem]);
-    toast.success("Đã thêm phiếu xuất hàng", { position: "top-right", autoClose: 3000 });
+    toast.success("Đã thêm phiếu xuất hàng", {
+      position: "top-right",
+      autoClose: 3000,
+    });
     setShowExportForm(false);
     e.currentTarget.reset();
   };
 
   const handleDeleteImport = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu nhập này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa phiếu nhập này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftImports((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa phiếu nhập", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa phiếu nhập", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
   const handleDeleteExport = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu xuất này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa phiếu xuất này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftExports((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa khỏi danh sách", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -1670,7 +1935,10 @@ const ShiftOperationsPage: React.FC = () => {
     const notes = (formData.get("notes") as string) || undefined;
 
     if (actualQuantity <= 0) {
-      toast.error("Số lượng thực tế phải lớn hơn 0", { position: "top-right", autoClose: 3000 });
+      toast.error("Số lượng thực tế phải lớn hơn 0", {
+        position: "top-right",
+        autoClose: 3000,
+      });
       return;
     }
 
@@ -1687,16 +1955,25 @@ const ShiftOperationsPage: React.FC = () => {
     };
 
     setDraftInventoryChecks((prev) => [...prev, newItem]);
-    toast.success("Đã thêm phiếu kiểm kê", { position: "top-right", autoClose: 3000 });
+    toast.success("Đã thêm phiếu kiểm kê", {
+      position: "top-right",
+      autoClose: 3000,
+    });
     setShowInventoryForm(false);
     e.currentTarget.reset();
   };
 
   const handleDeleteInventory = async (id: string) => {
-    const confirmed = await showConfirm("Bạn có chắc chắn muốn xóa phiếu kiểm kê này?", "Xác nhận xóa");
+    const confirmed = await showConfirm(
+      "Bạn có chắc chắn muốn xóa phiếu kiểm kê này?",
+      "Xác nhận xóa",
+    );
     if (confirmed) {
       setDraftInventoryChecks((prev) => prev.filter((item) => item.id !== id));
-      toast.success("Đã xóa khỏi danh sách", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa khỏi danh sách", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -1704,7 +1981,7 @@ const ShiftOperationsPage: React.FC = () => {
     const confirmed = await showConfirm(
       "Xóa toàn bộ dữ liệu đã nhập (vòi bơm, công nợ, phiếu thu, nộp tiền) và bắt đầu lại?",
       "Xác nhận xóa",
-      "warning"
+      "warning",
     );
     if (confirmed) {
       setPumpReadings((prev) => {
@@ -1726,7 +2003,10 @@ const ShiftOperationsPage: React.FC = () => {
         const draftKey = `shift_${shiftId}_draft_data`;
         localStorage.removeItem(draftKey);
       }
-      toast.success("Đã xóa toàn bộ dữ liệu chưa lưu", { position: "top-right", autoClose: 3000 });
+      toast.success("Đã xóa toàn bộ dữ liệu chưa lưu", {
+        position: "top-right",
+        autoClose: 3000,
+      });
     }
   };
 
@@ -1762,8 +2042,9 @@ const ShiftOperationsPage: React.FC = () => {
   const totalFromPumps = calculateTotalFromPumps();
   // Sử dụng amount đã lưu (tránh sai số làm tròn), fallback nếu chưa có
   const totalDebtSales = draftDebtSales.reduce(
-    (sum, sale) => sum + (sale.amount ?? Math.round(sale.quantity * sale.unitPrice)),
-    0
+    (sum, sale) =>
+      sum + (sale.amount ?? Math.round(sale.quantity * sale.unitPrice)),
+    0,
   );
   const totalRetailSales = Math.floor(totalFromPumps) - totalDebtSales;
   const totalRevenue = Math.floor(totalFromPumps); // Tổng doanh thu = Tổng từ vòi bơm (bao gồm cả bán lẻ và bán công nợ)
@@ -1797,12 +2078,24 @@ const ShiftOperationsPage: React.FC = () => {
     hasLoadedReportData,
     activeTab,
     shiftStatus: report?.shift.status,
-    receiptsCount: isShiftOpen ? draftReceipts.length : report?.receipts?.length || 0,
-    depositsCount: isShiftOpen ? draftDeposits.length : report?.cashDeposits?.length || 0,
+    receiptsCount: isShiftOpen
+      ? draftReceipts.length
+      : report?.receipts?.length || 0,
+    depositsCount: isShiftOpen
+      ? draftDeposits.length
+      : report?.cashDeposits?.length || 0,
   });
 
   // Tab navigation helpers
-  const tabs = ["pump", "debt", "receipt", "deposit", "import", "export", "inventory"] as const;
+  const tabs = [
+    "pump",
+    "debt",
+    "receipt",
+    "deposit",
+    "import",
+    "export",
+    "inventory",
+  ] as const;
   const currentTabIndex = tabs.indexOf(activeTab);
   const hasPreviousTab = currentTabIndex > 0;
   const hasNextTab = currentTabIndex < tabs.length - 1;
@@ -1815,7 +2108,7 @@ const ShiftOperationsPage: React.FC = () => {
       const confirmed = await showConfirm(
         "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
         "Xác nhận chuyển tab",
-        "warning"
+        "warning",
       );
       if (confirmed) setActiveTab(previousTab);
     } else {
@@ -1845,7 +2138,9 @@ const ShiftOperationsPage: React.FC = () => {
 
         toast.error(
           <div>
-            <div className="font-bold mb-2">⚠️ Số lít tính toán không hợp lệ!</div>
+            <div className="font-bold mb-2">
+              ⚠️ Số lít tính toán không hợp lệ!
+            </div>
             <div className="text-sm">Các vòi bơm sau có số lít âm:</div>
             <div className="text-sm mt-1 space-y-1">
               {errorMessages.map((msg, idx) => (
@@ -1859,7 +2154,7 @@ const ShiftOperationsPage: React.FC = () => {
           {
             position: "top-center",
             autoClose: 8000,
-          }
+          },
         );
         return;
       }
@@ -1869,7 +2164,7 @@ const ShiftOperationsPage: React.FC = () => {
     setActiveTab(nextTab);
   };
 
-  const tabLabels: Record<typeof tabs[number], string> = {
+  const tabLabels: Record<(typeof tabs)[number], string> = {
     pump: "B1 - Số máy cột bơm",
     debt: "B2 - Ghi Nợ/Công Nợ",
     receipt: "B3 - Thu Nợ",
@@ -1899,7 +2194,9 @@ const ShiftOperationsPage: React.FC = () => {
         }`}
       >
         <ArrowLeftIcon className="h-4 sm:h-5 w-4 sm:w-5" />
-        <span className="hidden sm:inline text-sm">{hasPreviousTab && tabLabels[tabs[currentTabIndex - 1]]}</span>
+        <span className="hidden sm:inline text-sm">
+          {hasPreviousTab && tabLabels[tabs[currentTabIndex - 1]]}
+        </span>
         <span className="sm:hidden text-xs">Trước</span>
       </button>
 
@@ -1919,7 +2216,9 @@ const ShiftOperationsPage: React.FC = () => {
             : "bg-gray-50 text-gray-400 cursor-not-allowed"
         }`}
       >
-        <span className="hidden sm:inline text-sm">{hasNextTab && tabLabels[tabs[currentTabIndex + 1]]}</span>
+        <span className="hidden sm:inline text-sm">
+          {hasNextTab && tabLabels[tabs[currentTabIndex + 1]]}
+        </span>
         <span className="sm:hidden text-xs">Tiếp</span>
         <ArrowRightIcon className="h-4 sm:h-5 w-4 sm:w-5" />
       </button>
@@ -1933,13 +2232,20 @@ const ShiftOperationsPage: React.FC = () => {
         <div className="space-y-4 sm:space-y-0">
           {/* Row 1: Back Button + Title */}
           <div className="flex items-start sm:items-center gap-4">
-            <button onClick={() => navigate("/shifts")} className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0">
+            <button
+              onClick={() => navigate("/shifts")}
+              className="p-1.5 sm:p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0"
+            >
               <ArrowLeftIcon className="h-5 sm:h-6 w-5 sm:w-6 text-gray-700" />
             </button>
             <div className="flex-grow">
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Ca #{report?.shift.shiftNo}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+                Ca #{report?.shift.shiftNo}
+              </h1>
               <div className="flex items-center gap-2 sm:gap-3 mt-1 sm:mt-2 flex-wrap">
-                <p className="text-xs sm:text-sm text-gray-600">Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}</p>
+                <p className="text-xs sm:text-sm text-gray-600">
+                  Ngày: {dayjs(report?.shift.shiftDate).format("DD/MM/YYYY")}
+                </p>
                 <span className="text-gray-400 hidden sm:inline">•</span>
                 {isEditMode ? (
                   <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold bg-orange-500 text-white shadow-sm">
@@ -1953,7 +2259,11 @@ const ShiftOperationsPage: React.FC = () => {
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs font-semibold bg-gray-500 text-white shadow-sm">
-                    <svg className="w-3 h-3 mr-1 sm:mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+                    <svg
+                      className="w-3 h-3 mr-1 sm:mr-1.5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
                       <path
                         fillRule="evenodd"
                         d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
@@ -1971,9 +2281,16 @@ const ShiftOperationsPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-3">
             {/* Người Giao */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs sm:text-sm text-gray-700 font-medium">Người Giao</label>
+              <label className="text-xs sm:text-sm text-gray-700 font-medium">
+                Người Giao
+              </label>
               <SearchableSelect
-                options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
+                options={
+                  storeUsers?.map((u) => ({
+                    value: u.id,
+                    label: u.fullName,
+                  })) || []
+                }
                 value={handoverUserId}
                 onChange={(value) => setHandoverUserId(value as number | null)}
                 placeholder="-- Chọn --"
@@ -1984,9 +2301,16 @@ const ShiftOperationsPage: React.FC = () => {
 
             {/* Người Nhận */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs sm:text-sm text-gray-700 font-medium">Người Nhận</label>
+              <label className="text-xs sm:text-sm text-gray-700 font-medium">
+                Người Nhận
+              </label>
               <SearchableSelect
-                options={storeUsers?.map((u) => ({ value: u.id, label: u.fullName })) || []}
+                options={
+                  storeUsers?.map((u) => ({
+                    value: u.id,
+                    label: u.fullName,
+                  })) || []
+                }
                 value={receiverUserId}
                 onChange={(value) => setReceiverUserId(value as number | null)}
                 placeholder="-- Chọn --"
@@ -2000,7 +2324,10 @@ const ShiftOperationsPage: React.FC = () => {
               <div className="flex items-end">
                 <button
                   onClick={handleCloseShift}
-                  disabled={closeShiftMutation.isPending || updateShiftMutation.isPending}
+                  disabled={
+                    closeShiftMutation.isPending ||
+                    updateShiftMutation.isPending
+                  }
                   className="w-full sm:w-auto inline-flex items-center justify-center px-3 sm:px-4 py-2 text-xs sm:text-sm text-white rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100
                   bg-gradient-to-r from-green-500 via-emerald-500 to-teal-600
                   hover:from-green-600 hover:via-emerald-600 hover:to-teal-700
@@ -2008,7 +2335,8 @@ const ShiftOperationsPage: React.FC = () => {
                   disabled:from-gray-400 disabled:via-gray-400 disabled:to-gray-400 disabled:shadow-sm
                   focus:outline-none focus:ring-2 focus:ring-green-300 focus:ring-offset-2"
                 >
-                  {closeShiftMutation.isPending || updateShiftMutation.isPending ? (
+                  {closeShiftMutation.isPending ||
+                  updateShiftMutation.isPending ? (
                     <>
                       <svg
                         className="animate-spin h-3 sm:h-4 w-3 sm:w-4 mr-1 sm:mr-2"
@@ -2030,14 +2358,20 @@ const ShiftOperationsPage: React.FC = () => {
                           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                         ></path>
                       </svg>
-                      <span className="hidden sm:inline">{isEditMode ? "Đang cập nhật..." : "Đang chốt..."}</span>
+                      <span className="hidden sm:inline">
+                        {isEditMode ? "Đang cập nhật..." : "Đang chốt..."}
+                      </span>
                       <span className="sm:hidden">Xử lý...</span>
                     </>
                   ) : (
                     <>
                       <CheckIcon className="h-3 sm:h-4 w-3 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">{isEditMode ? "Cập nhật ca" : "Chốt ca"}</span>
-                      <span className="sm:hidden">{isEditMode ? "Cập nhật" : "Chốt"}</span>
+                      <span className="hidden sm:inline">
+                        {isEditMode ? "Cập nhật ca" : "Chốt ca"}
+                      </span>
+                      <span className="sm:hidden">
+                        {isEditMode ? "Cập nhật" : "Chốt"}
+                      </span>
                     </>
                   )}
                 </button>
@@ -2053,7 +2387,9 @@ const ShiftOperationsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Bán lẻ</p>
-              <p className="text-2xl font-bold text-green-600">{totalRetailSales.toLocaleString("vi-VN")} ₫</p>
+              <p className="text-2xl font-bold text-green-600">
+                {totalRetailSales.toLocaleString("vi-VN")} ₫
+              </p>
             </div>
             <BanknotesIcon className="h-12 w-12 text-green-500 opacity-20" />
           </div>
@@ -2063,7 +2399,9 @@ const ShiftOperationsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Bán công nợ</p>
-              <p className="text-2xl font-bold text-orange-600">{totalDebtSales.toLocaleString("vi-VN")} ₫</p>
+              <p className="text-2xl font-bold text-orange-600">
+                {totalDebtSales.toLocaleString("vi-VN")} ₫
+              </p>
             </div>
             <CreditCardIcon className="h-12 w-12 text-orange-500 opacity-20" />
           </div>
@@ -2073,7 +2411,9 @@ const ShiftOperationsPage: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Tổng doanh thu</p>
-              <p className="text-2xl font-bold text-blue-600">{totalRevenue.toLocaleString("vi-VN")} ₫</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {totalRevenue.toLocaleString("vi-VN")} ₫
+              </p>
             </div>
             <BuildingLibraryIcon className="h-12 w-12 text-blue-500 opacity-20" />
           </div>
@@ -2085,7 +2425,9 @@ const ShiftOperationsPage: React.FC = () => {
         <div className="border-b border-gray-200">
           {/* Mobile Indicator - Hiển thị trên mobile */}
           <div className="hidden sm:flex md:hidden items-center justify-between px-4 py-2 bg-gray-50 text-xs text-gray-600 border-b border-gray-200">
-            <span>Bước {currentTabIndex + 1}/{tabs.length}</span>
+            <span>
+              Bước {currentTabIndex + 1}/{tabs.length}
+            </span>
             <span className="font-medium">{tabLabels[activeTab]}</span>
           </div>
 
@@ -2099,15 +2441,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("pump");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "pump"
+              ${
+                activeTab === "pump"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B1</span>
               <span className="hidden sm:inline">B1 - Số máy cột bơm</span>
@@ -2124,29 +2467,38 @@ const ShiftOperationsPage: React.FC = () => {
 
                   if (invalidReadings.length > 0) {
                     const errorMessages = invalidReadings.map((r) => {
-                      const pump = pumps?.find((p: any) => p.code === r.pumpCode);
-                      const product = products?.find((p) => p.id === r.productId);
+                      const pump = pumps?.find(
+                        (p: any) => p.code === r.pumpCode,
+                      );
+                      const product = products?.find(
+                        (p) => p.id === r.productId,
+                      );
                       const quantity = calculateQuantity(r);
                       return `- Vòi ${r.pumpCode} (${product?.name || "N/A"}): ${quantity.toFixed(3)} lít`;
                     });
 
                     toast.error(
                       <div>
-                        <div className="font-bold mb-2">⚠️ Số lít tính toán không hợp lệ!</div>
-                        <div className="text-sm">Các vòi bơm sau có số lít âm:</div>
+                        <div className="font-bold mb-2">
+                          ⚠️ Số lít tính toán không hợp lệ!
+                        </div>
+                        <div className="text-sm">
+                          Các vòi bơm sau có số lít âm:
+                        </div>
                         <div className="text-sm mt-1 space-y-1">
                           {errorMessages.map((msg, idx) => (
                             <div key={idx}>{msg}</div>
                           ))}
                         </div>
                         <div className="text-sm mt-2 font-medium">
-                          Vui lòng quay lại B1 để kiểm tra: Số cuối, Số đầu, và Xuất kiểm thử/Quay kho
+                          Vui lòng quay lại B1 để kiểm tra: Số cuối, Số đầu, và
+                          Xuất kiểm thử/Quay kho
                         </div>
                       </div>,
                       {
                         position: "top-center",
                         autoClose: 8000,
-                      }
+                      },
                     );
                     return;
                   }
@@ -2156,10 +2508,11 @@ const ShiftOperationsPage: React.FC = () => {
                 setActiveTab("debt");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "debt"
+              ${
+                activeTab === "debt"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B2</span>
               <span className="hidden sm:inline">B2 - Ghi Nợ</span>
@@ -2173,15 +2526,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("receipt");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "receipt"
+              ${
+                activeTab === "receipt"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B3</span>
               <span className="hidden sm:inline">B3 - Thu Nợ</span>
@@ -2195,15 +2549,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("deposit");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "deposit"
+              ${
+                activeTab === "deposit"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B4</span>
               <span className="hidden sm:inline">B4 - Nộp tiền</span>
@@ -2217,15 +2572,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("import");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "import"
+              ${
+                activeTab === "import"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B5</span>
               <span className="hidden sm:inline">B5 - Nhập hàng</span>
@@ -2239,15 +2595,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("export");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "export"
+              ${
+                activeTab === "export"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B6</span>
               <span className="hidden sm:inline">B6 - Xuất hàng</span>
@@ -2261,15 +2618,16 @@ const ShiftOperationsPage: React.FC = () => {
                 const confirmed = await showConfirm(
                   "Bạn có dữ liệu chưa lưu ở tab hiện tại. Chuyển tab sẽ không mất dữ liệu nhưng hãy nhớ lưu trước khi chốt ca.",
                   "Xác nhận chuyển tab",
-                  "warning"
+                  "warning",
                 );
                 if (confirmed) setActiveTab("inventory");
               }}
               className={`py-3 px-3 sm:py-4 sm:px-6 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 whitespace-nowrap relative flex-shrink-0
-              ${activeTab === "inventory"
+              ${
+                activeTab === "inventory"
                   ? "border-blue-500 text-blue-700 bg-blue-50/50 shadow-sm"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                }`}
+              }`}
             >
               <span className="sm:hidden">B7</span>
               <span className="hidden sm:inline">B7 - Kiểm kê</span>
@@ -2287,18 +2645,24 @@ const ShiftOperationsPage: React.FC = () => {
                     <table className="w-full">
                       <thead className="bg-gray-50">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vòi bơm</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                            Vòi bơm
+                          </th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
                             Mặt hàng
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                            Số đầu
+                          </th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                             Số cuối
                           </th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                             Xuất KT/Quay kho
                           </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số lít</th>
+                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                            Số lít
+                          </th>
                           <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                             Đơn giá
                           </th>
@@ -2315,17 +2679,22 @@ const ShiftOperationsPage: React.FC = () => {
                           const quantity = calculateQuantity(reading);
                           const unitPrice = productPrices[pump.productId];
                           const amount = calculateAmount(reading);
-                          const isPriceLoaded = unitPrice && unitPrice > 0 && !isNaN(unitPrice);
+                          const isPriceLoaded =
+                            unitPrice && unitPrice > 0 && !isNaN(unitPrice);
 
                           return (
                             <tr key={pump.id} className="hover:bg-blue-50">
                               <td className="px-4 py-3">
                                 <div className="flex items-center">
                                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-blue-600 font-bold text-sm">{pump.pumpCode}</span>
+                                    <span className="text-blue-600 font-bold text-sm">
+                                      {pump.pumpCode}
+                                    </span>
                                   </div>
                                   <div className="ml-3">
-                                    <div className="text-sm font-medium text-gray-900">{pump.name}</div>
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {pump.name}
+                                    </div>
                                   </div>
                                 </div>
                               </td>
@@ -2338,27 +2707,48 @@ const ShiftOperationsPage: React.FC = () => {
                                   step="0.001"
                                   min="0"
                                   value={reading.startValue}
-                                  onChange={(e) => handlePumpReadingChange(pump.id, "startValue", e.target.value)}
+                                  onChange={(e) =>
+                                    handlePumpReadingChange(
+                                      pump.id,
+                                      "startValue",
+                                      e.target.value,
+                                    )
+                                  }
                                   onKeyDown={(e) => {
                                     // Chặn ký tự âm
-                                    if (e.key === "-" || e.key === "e" || e.key === "E") {
+                                    if (
+                                      e.key === "-" ||
+                                      e.key === "e" ||
+                                      e.key === "E"
+                                    ) {
                                       e.preventDefault();
                                     }
                                     // Nhấn Enter để chuyển sang ô tiếp theo
                                     if (e.key === "Enter") {
                                       e.preventDefault();
                                       const currentInput = e.currentTarget;
-                                      const currentRow = currentInput.closest("tr");
-                                      const allInputs = Array.from(currentRow?.querySelectorAll('input[type="number"]:not([disabled])') || []) as HTMLInputElement[];
-                                      const currentIndex = allInputs.indexOf(currentInput);
-                                      const nextInput = allInputs[currentIndex + 1];
+                                      const currentRow =
+                                        currentInput.closest("tr");
+                                      const allInputs = Array.from(
+                                        currentRow?.querySelectorAll(
+                                          'input[type="number"]:not([disabled])',
+                                        ) || [],
+                                      ) as HTMLInputElement[];
+                                      const currentIndex =
+                                        allInputs.indexOf(currentInput);
+                                      const nextInput =
+                                        allInputs[currentIndex + 1];
                                       if (nextInput) {
                                         nextInput.focus();
                                         nextInput.select();
                                       } else {
                                         // Nếu hết input trong hàng, chuyển sang hàng tiếp theo
-                                        const nextRow = currentRow?.nextElementSibling;
-                                        const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                        const nextRow =
+                                          currentRow?.nextElementSibling;
+                                        const firstInput =
+                                          nextRow?.querySelector(
+                                            'input[type="number"]:not([disabled])',
+                                          ) as HTMLInputElement;
                                         if (firstInput) {
                                           firstInput.focus();
                                           firstInput.select();
@@ -2368,11 +2758,16 @@ const ShiftOperationsPage: React.FC = () => {
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   disabled={hasPreviousShift}
-                                  className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${hasPreviousShift ? "bg-gray-100 cursor-not-allowed text-gray-600" : ""
-                                    }`}
+                                  className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${
+                                    hasPreviousShift
+                                      ? "bg-gray-100 cursor-not-allowed text-gray-600"
+                                      : ""
+                                  }`}
                                   placeholder="0.000"
                                   title={
-                                    hasPreviousShift ? "Số đầu được tự động lấy từ ca trước và không thể thay đổi" : ""
+                                    hasPreviousShift
+                                      ? "Số đầu được tự động lấy từ ca trước và không thể thay đổi"
+                                      : ""
                                   }
                                   data-field="startValue"
                                 />
@@ -2383,38 +2778,62 @@ const ShiftOperationsPage: React.FC = () => {
                                   step="1"
                                   min="0"
                                   value={reading.endValue}
-                                  onChange={(e) => handlePumpReadingChange(pump.id, "endValue", e.target.value)}
+                                  onChange={(e) =>
+                                    handlePumpReadingChange(
+                                      pump.id,
+                                      "endValue",
+                                      e.target.value,
+                                    )
+                                  }
                                   onBlur={() => {
-                                    if (reading.endValue < reading.startValue && reading.endValue > 0) {
+                                    if (
+                                      reading.endValue < reading.startValue &&
+                                      reading.endValue > 0
+                                    ) {
                                       toast.error(
                                         `Số cuối (${reading.endValue}) không được nhỏ hơn số đầu (${reading.startValue})!`,
                                         {
                                           position: "top-right",
                                           autoClose: 3000,
-                                        }
+                                        },
                                       );
                                     }
                                   }}
                                   onKeyDown={(e) => {
                                     // Chặn ký tự âm
-                                    if (e.key === "-" || e.key === "e" || e.key === "E") {
+                                    if (
+                                      e.key === "-" ||
+                                      e.key === "e" ||
+                                      e.key === "E"
+                                    ) {
                                       e.preventDefault();
                                     }
                                     // Nhấn Enter để chuyển sang ô tiếp theo
                                     if (e.key === "Enter") {
                                       e.preventDefault();
                                       const currentInput = e.currentTarget;
-                                      const currentRow = currentInput.closest("tr");
-                                      const allInputs = Array.from(currentRow?.querySelectorAll('input[type="number"]:not([disabled])') || []) as HTMLInputElement[];
-                                      const currentIndex = allInputs.indexOf(currentInput);
-                                      const nextInput = allInputs[currentIndex + 1];
+                                      const currentRow =
+                                        currentInput.closest("tr");
+                                      const allInputs = Array.from(
+                                        currentRow?.querySelectorAll(
+                                          'input[type="number"]:not([disabled])',
+                                        ) || [],
+                                      ) as HTMLInputElement[];
+                                      const currentIndex =
+                                        allInputs.indexOf(currentInput);
+                                      const nextInput =
+                                        allInputs[currentIndex + 1];
                                       if (nextInput) {
                                         nextInput.focus();
                                         nextInput.select();
                                       } else {
                                         // Nếu hết input trong hàng, chuyển sang hàng tiếp theo
-                                        const nextRow = currentRow?.nextElementSibling;
-                                        const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                        const nextRow =
+                                          currentRow?.nextElementSibling;
+                                        const firstInput =
+                                          nextRow?.querySelector(
+                                            'input[type="number"]:not([disabled])',
+                                          ) as HTMLInputElement;
                                         if (firstInput) {
                                           firstInput.focus();
                                           firstInput.select();
@@ -2436,34 +2855,48 @@ const ShiftOperationsPage: React.FC = () => {
                                   max={reading.endValue - reading.startValue}
                                   value={reading.testExport || 0}
                                   onChange={(e) => {
-                                    const value = parseFloat(e.target.value) || 0;
-                                    const grossQuantity = reading.endValue - reading.startValue;
+                                    const value =
+                                      parseFloat(e.target.value) || 0;
+                                    const grossQuantity =
+                                      reading.endValue - reading.startValue;
                                     if (value > grossQuantity) {
                                       toast.error(
                                         `Xuất kiểm thử/quay kho (${value.toFixed(
-                                          3
+                                          3,
                                         )}) không được lớn hơn lượng bơm (${grossQuantity.toFixed(3)})!`,
                                         {
                                           position: "top-right",
                                           autoClose: 3000,
-                                        }
+                                        },
                                       );
                                       return;
                                     }
-                                    handlePumpReadingChange(pump.id, "testExport", e.target.value);
+                                    handlePumpReadingChange(
+                                      pump.id,
+                                      "testExport",
+                                      e.target.value,
+                                    );
                                   }}
                                   onFocus={(e) => e.target.select()}
                                   onKeyDown={(e) => {
-                                    if (e.key === "-" || e.key === "e" || e.key === "E") {
+                                    if (
+                                      e.key === "-" ||
+                                      e.key === "e" ||
+                                      e.key === "E"
+                                    ) {
                                       e.preventDefault();
                                     }
                                     // Nhấn Enter để chuyển sang hàng tiếp theo
                                     if (e.key === "Enter") {
                                       e.preventDefault();
                                       const currentInput = e.currentTarget;
-                                      const currentRow = currentInput.closest("tr");
-                                      const nextRow = currentRow?.nextElementSibling;
-                                      const firstInput = nextRow?.querySelector('input[type="number"]:not([disabled])') as HTMLInputElement;
+                                      const currentRow =
+                                        currentInput.closest("tr");
+                                      const nextRow =
+                                        currentRow?.nextElementSibling;
+                                      const firstInput = nextRow?.querySelector(
+                                        'input[type="number"]:not([disabled])',
+                                      ) as HTMLInputElement;
                                       if (firstInput) {
                                         firstInput.focus();
                                         firstInput.select();
@@ -2478,24 +2911,35 @@ const ShiftOperationsPage: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <span
-                                  className={`text-sm font-bold px-3 py-1 rounded-full ${quantity < 0 ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                                    }`}
+                                  className={`text-sm font-bold px-3 py-1 rounded-full ${
+                                    quantity < 0
+                                      ? "bg-red-100 text-red-700"
+                                      : "bg-blue-100 text-blue-700"
+                                  }`}
                                 >
                                   {quantity.toFixed(3)}
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-medium">
                                 {isPriceLoaded ? (
-                                  <span className="text-gray-700">{formatCurrency(unitPrice)}</span>
+                                  <span className="text-gray-700">
+                                    {formatCurrency(unitPrice)}
+                                  </span>
                                 ) : (
-                                  <span className="text-yellow-600 text-xs">Đang tải...</span>
+                                  <span className="text-yellow-600 text-xs">
+                                    Đang tải...
+                                  </span>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-bold">
                                 {isPriceLoaded ? (
-                                  <span className="text-green-600">{formatCurrency(amount)}</span>
+                                  <span className="text-green-600">
+                                    {formatCurrency(amount)}
+                                  </span>
                                 ) : (
-                                  <span className="text-yellow-600 text-xs">Đang tải...</span>
+                                  <span className="text-yellow-600 text-xs">
+                                    Đang tải...
+                                  </span>
                                 )}
                               </td>
                             </tr>
@@ -2504,13 +2948,19 @@ const ShiftOperationsPage: React.FC = () => {
                       </tbody>
                       <tfoot className="bg-gray-50">
                         <tr>
-                          <td colSpan={4} className="px-4 py-4 text-right font-bold text-gray-800">
+                          <td
+                            colSpan={4}
+                            className="px-4 py-4 text-right font-bold text-gray-800"
+                          >
                             Tổng cộng:
                           </td>
                           <td className="px-4 py-4 text-right">
                             <span className="inline-flex px-3 py-2 bg-purple-600 text-white rounded-lg font-bold text-xs">
                               {Object.values(pumpReadings)
-                                .reduce((sum, r) => sum + (Number(r.testExport) || 0), 0)
+                                .reduce(
+                                  (sum, r) => sum + (Number(r.testExport) || 0),
+                                  0,
+                                )
                                 .toFixed(3)}{" "}
                               lít
                             </span>
@@ -2518,7 +2968,10 @@ const ShiftOperationsPage: React.FC = () => {
                           <td className="px-4 py-4 text-right">
                             <span className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg font-bold">
                               {Object.values(pumpReadings)
-                                .reduce((sum, r) => sum + calculateQuantity(r), 0)
+                                .reduce(
+                                  (sum, r) => sum + calculateQuantity(r),
+                                  0,
+                                )
                                 .toFixed(3)}{" "}
                               lít
                             </span>
@@ -2527,7 +2980,10 @@ const ShiftOperationsPage: React.FC = () => {
                           <td className="px-4 py-4 text-right">
                             <span className="inline-flex px-4 py-2 bg-green-600 text-white rounded-lg font-bold">
                               {formatCurrency(
-                                Object.values(pumpReadings).reduce((sum, r) => sum + calculateAmount(r), 0)
+                                Object.values(pumpReadings).reduce(
+                                  (sum, r) => sum + calculateAmount(r),
+                                  0,
+                                ),
                               )}
                             </span>
                           </td>
@@ -2540,31 +2996,49 @@ const ShiftOperationsPage: React.FC = () => {
                 // Ca đã chốt - Hiển thị pump readings từ report (read-only)
                 <div className="overflow-x-auto rounded-lg border border-gray-200">
                   <div className="bg-blue-50 border-b border-blue-200 px-4 py-3">
-                    <p className="text-sm text-blue-800 font-medium">ℹ️ Ca đã chốt - Dữ liệu chỉ xem (Read-only)</p>
+                    <p className="text-sm text-blue-800 font-medium">
+                      ℹ️ Ca đã chốt - Dữ liệu chỉ xem (Read-only)
+                    </p>
                   </div>
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vòi bơm</th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">mặt hàng</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số đầu</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số cuối</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                          Vòi bơm
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">
+                          mặt hàng
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                          Số đầu
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                          Số cuối
+                        </th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                           Xuất KT/Quay kho
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Số lít</th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">Đơn giá</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                          Số lít
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
+                          Đơn giá
+                        </th>
                         <th className="px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase">
                           Thành tiền
                         </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
-                      {report?.pumpReadings && report.pumpReadings.length > 0 ? (
+                      {report?.pumpReadings &&
+                      report.pumpReadings.length > 0 ? (
                         report.pumpReadings.map((reading: any) => {
                           // Ưu tiên lấy unitPrice đã lưu trong pump_readings (giá tại thời điểm chốt ca)
                           // Nếu không có (dữ liệu cũ), fallback sang productPrices (giá hiện tại - có thể sai)
-                          const unitPrice = reading.unitPrice || productPrices[reading.productId] || 0;
+                          const unitPrice =
+                            reading.unitPrice ||
+                            productPrices[reading.productId] ||
+                            0;
                           const quantity = Number(reading.quantity) || 0;
                           const amount = Math.round(quantity * unitPrice); // Làm tròn để tránh số lẻ thập phân
 
@@ -2573,7 +3047,8 @@ const ShiftOperationsPage: React.FC = () => {
                             productId: reading.productId,
                             quantity,
                             unitPriceFromDB: reading.unitPrice,
-                            unitPriceFromCurrent: productPrices[reading.productId],
+                            unitPriceFromCurrent:
+                              productPrices[reading.productId],
                             unitPriceUsed: unitPrice,
                             amount,
                           });
@@ -2583,7 +3058,9 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-4 py-3">
                                 <div className="flex items-center">
                                   <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-blue-600 font-bold text-sm">{reading.pumpCode}</span>
+                                    <span className="text-blue-600 font-bold text-sm">
+                                      {reading.pumpCode}
+                                    </span>
                                   </div>
                                 </div>
                               </td>
@@ -2591,14 +3068,22 @@ const ShiftOperationsPage: React.FC = () => {
                                 {reading.product?.name || "N/A"}
                               </td>
                               <td className="px-4 py-3 text-right text-sm text-gray-700">
-                                {Number(reading.startValue).toLocaleString("vi-VN", { maximumFractionDigits: 3 })}
+                                {Number(reading.startValue).toLocaleString(
+                                  "vi-VN",
+                                  { maximumFractionDigits: 3 },
+                                )}
                               </td>
                               <td className="px-4 py-3 text-right text-sm text-gray-700">
-                                {Number(reading.endValue).toLocaleString("vi-VN", { maximumFractionDigits: 3 })}
+                                {Number(reading.endValue).toLocaleString(
+                                  "vi-VN",
+                                  { maximumFractionDigits: 3 },
+                                )}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <span className="text-sm font-semibold px-3 py-1 rounded-full bg-purple-100 text-purple-700">
-                                  {(Number(reading.testExport) || 0).toLocaleString("vi-VN", {
+                                  {(
+                                    Number(reading.testExport) || 0
+                                  ).toLocaleString("vi-VN", {
                                     maximumFractionDigits: 3,
                                   })}{" "}
                                   L
@@ -2606,21 +3091,31 @@ const ShiftOperationsPage: React.FC = () => {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <span className="text-sm font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-700">
-                                  {quantity.toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
+                                  {quantity.toLocaleString("vi-VN", {
+                                    maximumFractionDigits: 3,
+                                  })}{" "}
+                                  L
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-medium text-gray-700">
-                                {unitPrice > 0 ? `${unitPrice.toLocaleString("vi-VN")} ₫` : "-"}
+                                {unitPrice > 0
+                                  ? `${unitPrice.toLocaleString("vi-VN")} ₫`
+                                  : "-"}
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-bold text-green-600">
-                                {amount > 0 ? `${amount.toLocaleString("vi-VN")} ₫` : "-"}
+                                {amount > 0
+                                  ? `${amount.toLocaleString("vi-VN")} ₫`
+                                  : "-"}
                               </td>
                             </tr>
                           );
                         })
                       ) : (
                         <tr>
-                          <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
+                          <td
+                            colSpan={8}
+                            className="px-6 py-8 text-center text-sm text-gray-500"
+                          >
                             Không có dữ liệu pump readings
                           </td>
                         </tr>
@@ -2628,25 +3123,37 @@ const ShiftOperationsPage: React.FC = () => {
                     </tbody>
                     <tfoot className="bg-gray-50">
                       <tr>
-                        <td colSpan={4} className="px-4 py-4 text-right font-bold text-gray-800">
+                        <td
+                          colSpan={4}
+                          className="px-4 py-4 text-right font-bold text-gray-800"
+                        >
                           Tổng cộng:
                         </td>
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-3 py-2 bg-purple-600 text-white rounded-lg font-bold text-xs">
                             {(
                               report?.pumpReadings?.reduce(
-                                (sum: number, r: any) => sum + (Number(r.testExport) || 0),
-                                0
+                                (sum: number, r: any) =>
+                                  sum + (Number(r.testExport) || 0),
+                                0,
                               ) || 0
-                            ).toLocaleString("vi-VN", { maximumFractionDigits: 3 })}{" "}
+                            ).toLocaleString("vi-VN", {
+                              maximumFractionDigits: 3,
+                            })}{" "}
                             lít
                           </span>
                         </td>
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-4 py-2 bg-blue-600 text-white rounded-lg font-bold">
                             {(
-                              report?.pumpReadings?.reduce((sum: number, r: any) => sum + Number(r.quantity), 0) || 0
-                            ).toLocaleString("vi-VN", { maximumFractionDigits: 3 })}{" "}
+                              report?.pumpReadings?.reduce(
+                                (sum: number, r: any) =>
+                                  sum + Number(r.quantity),
+                                0,
+                              ) || 0
+                            ).toLocaleString("vi-VN", {
+                              maximumFractionDigits: 3,
+                            })}{" "}
                             lít
                           </span>
                         </td>
@@ -2654,10 +3161,18 @@ const ShiftOperationsPage: React.FC = () => {
                         <td className="px-4 py-4 text-right">
                           <span className="inline-flex px-4 py-2 bg-green-600 text-white rounded-lg font-bold">
                             {formatCurrency(
-                              report?.pumpReadings?.reduce((sum: number, r: any) => {
-                                const amount = Number(r.amount || 0) || Math.round(Number(r.quantity || 0) * Number(r.unitPrice || r.price || 0));
-                                return sum + amount;
-                              }, 0) || 0
+                              report?.pumpReadings?.reduce(
+                                (sum: number, r: any) => {
+                                  const amount =
+                                    Number(r.amount || 0) ||
+                                    Math.round(
+                                      Number(r.quantity || 0) *
+                                        Number(r.unitPrice || r.price || 0),
+                                    );
+                                  return sum + amount;
+                                },
+                                0,
+                              ) || 0,
                             )}
                           </span>
                         </td>
@@ -2678,7 +3193,9 @@ const ShiftOperationsPage: React.FC = () => {
               {canEdit ? (
                 <div className="bg-white border border-blue-200 rounded-lg p-4 shadow-sm overflow-visible">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">⛽ Đối chiếu lượng hàng bán</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      ⛽ Đối chiếu lượng hàng bán
+                    </h3>
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setShowCashCheckingModal(true)}
@@ -2689,12 +3206,18 @@ const ShiftOperationsPage: React.FC = () => {
                       </button>
                       {retailCustomer ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
-                          <span className="text-sm text-gray-600">Khách nội bộ:</span>
-                          <span className="text-sm font-medium text-green-700">{retailCustomer.code} - {retailCustomer.name}</span>
+                          <span className="text-sm text-gray-600">
+                            Khách nội bộ:
+                          </span>
+                          <span className="text-sm font-medium text-green-700">
+                            {retailCustomer.code} - {retailCustomer.name}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 border border-yellow-200 rounded-lg">
-                          <span className="text-sm text-yellow-700">⚠️ Chưa có khách hàng nội bộ cho cửa hàng này</span>
+                          <span className="text-sm text-yellow-700">
+                            ⚠️ Chưa có khách hàng nội bộ cho cửa hàng này
+                          </span>
                         </div>
                       )}
                     </div>
@@ -2704,26 +3227,45 @@ const ShiftOperationsPage: React.FC = () => {
                       <thead>
                         <tr className="bg-gray-50 text-xs uppercase text-gray-500">
                           <th className="px-4 py-2 text-left">mặt hàng</th>
-                          <th className="px-4 py-2 text-right">Tổng vòi bơm (1)</th>
+                          <th className="px-4 py-2 text-right">
+                            Tổng vòi bơm (1)
+                          </th>
                           <th className="px-4 py-2 text-right">Bán nợ (2)</th>
-                          <th className="px-4 py-2 text-right w-48">Bán lẻ thực tế (3) *</th>
-                          <th className="px-4 py-2 text-right">Thành tiền bán lẻ</th>
-                          <th className="px-4 py-2 text-right">Tổng bán (2+3)</th>
+                          <th className="px-4 py-2 text-right w-48">
+                            Bán lẻ thực tế (3) *
+                          </th>
+                          <th className="px-4 py-2 text-right">
+                            Thành tiền bán lẻ
+                          </th>
+                          <th className="px-4 py-2 text-right">
+                            Tổng bán (2+3)
+                          </th>
                           <th className="px-4 py-2 text-right">Chênh lệch</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
                         {(() => {
                           // Get unique products from pumps
-                          const productIds = Array.from(new Set(Object.values(pumpReadings).map((r) => r.productId)));
+                          const productIds = Array.from(
+                            new Set(
+                              Object.values(pumpReadings).map(
+                                (r) => r.productId,
+                              ),
+                            ),
+                          );
 
                           return productIds.map((productId) => {
-                            const product = products?.find((p) => p.id === productId);
+                            const product = products?.find(
+                              (p) => p.id === productId,
+                            );
 
                             // 1. Total Pump Quantity
                             const pumpQty = Object.values(pumpReadings)
                               .filter((r) => r.productId === productId)
-                              .reduce((sum, r) => sum + calculateQuantity(r), 0);
+                              .reduce(
+                                (sum, r) => sum + calculateQuantity(r),
+                                0,
+                              );
 
                             // 2. Total Debt Quantity
                             const debtQty = draftDebtSales
@@ -2731,7 +3273,8 @@ const ShiftOperationsPage: React.FC = () => {
                               .reduce((sum, s) => sum + s.quantity, 0);
 
                             // 3. Declared Retail Quantity
-                            const declaredQty = declaredRetailQuantities[productId] ?? 0;
+                            const declaredQty =
+                              declaredRetailQuantities[productId] ?? 0;
 
                             // Get price for this product from the shift's price list
                             const price = productPrices[productId] || 0;
@@ -2747,38 +3290,59 @@ const ShiftOperationsPage: React.FC = () => {
                             const isMatch = Math.abs(diff) < 0.1; // Allow small tolerance
 
                             return (
-                              <tr key={productId} className={!isMatch ? "bg-red-50" : ""}>
+                              <tr
+                                key={productId}
+                                className={!isMatch ? "bg-red-50" : ""}
+                              >
                                 <td className="px-4 py-3 font-medium text-gray-900">
                                   {product?.name || `ID: ${productId}`}
                                 </td>
-                                <td className="px-4 py-3 text-right font-bold text-blue-600">{pumpQty.toFixed(3)}</td>
-                                <td className="px-4 py-3 text-right text-gray-600">{debtQty.toFixed(3)}</td>
+                                <td className="px-4 py-3 text-right font-bold text-blue-600">
+                                  {pumpQty.toFixed(3)}
+                                </td>
+                                <td className="px-4 py-3 text-right text-gray-600">
+                                  {debtQty.toFixed(3)}
+                                </td>
                                 <td className="px-4 py-3 text-right">
                                   <input
                                     type="number"
                                     step="1"
                                     min="0"
-                                    value={declaredRetailQuantities[productId] ?? ""}
+                                    value={
+                                      declaredRetailQuantities[productId] ?? ""
+                                    }
                                     onChange={(e) => {
-                                      const val = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                                      const val =
+                                        e.target.value === ""
+                                          ? 0
+                                          : parseFloat(e.target.value);
                                       if (val < 0) return;
                                       setDeclaredRetailQuantities((prev) => ({
                                         ...prev,
                                         [productId]: val,
                                       }));
                                     }}
-                                    className={`w-full px-2 py-1 text-right border rounded focus:ring-2 focus:ring-blue-500 ${!isMatch ? "border-red-300 bg-white" : "border-gray-300"
-                                      }`}
+                                    className={`w-full px-2 py-1 text-right border rounded focus:ring-2 focus:ring-blue-500 ${
+                                      !isMatch
+                                        ? "border-red-300 bg-white"
+                                        : "border-gray-300"
+                                    }`}
                                     placeholder="0.000"
                                   />
                                 </td>
                                 <td className="px-4 py-3 text-right font-medium text-purple-600">
-                                  {Math.round(retailAmount).toLocaleString('vi-VN')} ₫
+                                  {Math.round(retailAmount).toLocaleString(
+                                    "vi-VN",
+                                  )}{" "}
+                                  ₫
                                 </td>
-                                <td className="px-4 py-3 text-right font-medium">{totalDeclared.toFixed(3)}</td>
+                                <td className="px-4 py-3 text-right font-medium">
+                                  {totalDeclared.toFixed(3)}
+                                </td>
                                 <td
-                                  className={`px-4 py-3 text-right font-bold ${isMatch ? "text-green-600" : "text-red-600"
-                                    }`}
+                                  className={`px-4 py-3 text-right font-bold ${
+                                    isMatch ? "text-green-600" : "text-red-600"
+                                  }`}
                                 >
                                   {diff.toFixed(3)}
                                 </td>
@@ -2792,46 +3356,93 @@ const ShiftOperationsPage: React.FC = () => {
                           <td className="px-4 py-3">Cộng</td>
                           <td className="px-4 py-3 text-right">
                             {(() => {
-                              const productIds = Array.from(new Set(Object.values(pumpReadings).map((r) => r.productId)));
-                              const total = productIds.reduce((sum, productId) => {
-                                const pumpQty = Object.values(pumpReadings)
-                                  .filter((r) => r.productId === productId)
-                                  .reduce((s, r) => s + calculateQuantity(r), 0);
-                                return sum + pumpQty;
-                              }, 0);
+                              const productIds = Array.from(
+                                new Set(
+                                  Object.values(pumpReadings).map(
+                                    (r) => r.productId,
+                                  ),
+                                ),
+                              );
+                              const total = productIds.reduce(
+                                (sum, productId) => {
+                                  const pumpQty = Object.values(pumpReadings)
+                                    .filter((r) => r.productId === productId)
+                                    .reduce(
+                                      (s, r) => s + calculateQuantity(r),
+                                      0,
+                                    );
+                                  return sum + pumpQty;
+                                },
+                                0,
+                              );
                               return total.toFixed(3);
                             })()}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {draftDebtSales.reduce((sum, s) => sum + s.quantity, 0).toFixed(3)}
+                            {draftDebtSales
+                              .reduce((sum, s) => sum + s.quantity, 0)
+                              .toFixed(3)}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0).toFixed(3)}
+                            {Object.values(declaredRetailQuantities)
+                              .reduce((sum, qty) => sum + qty, 0)
+                              .toFixed(3)}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {Math.round(
-                              Object.entries(declaredRetailQuantities).reduce((sum, [productId, qty]) => {
-                                const price = productPrices[Number(productId)] || 0;
-                                return sum + qty * price;
-                              }, 0)
-                            ).toLocaleString('vi-VN')} ₫
+                              Object.entries(declaredRetailQuantities).reduce(
+                                (sum, [productId, qty]) => {
+                                  const price =
+                                    productPrices[Number(productId)] || 0;
+                                  return sum + qty * price;
+                                },
+                                0,
+                              ),
+                            ).toLocaleString("vi-VN")}{" "}
+                            ₫
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {(draftDebtSales.reduce((sum, s) => sum + s.quantity, 0) +
-                              Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0)
+                            {(
+                              draftDebtSales.reduce(
+                                (sum, s) => sum + s.quantity,
+                                0,
+                              ) +
+                              Object.values(declaredRetailQuantities).reduce(
+                                (sum, qty) => sum + qty,
+                                0,
+                              )
                             ).toFixed(3)}
                           </td>
                           <td className="px-4 py-3 text-right">
                             {(() => {
-                              const productIds = Array.from(new Set(Object.values(pumpReadings).map((r) => r.productId)));
-                              const totalPump = productIds.reduce((sum, productId) => {
-                                const pumpQty = Object.values(pumpReadings)
-                                  .filter((r) => r.productId === productId)
-                                  .reduce((s, r) => s + calculateQuantity(r), 0);
-                                return sum + pumpQty;
-                              }, 0);
-                              const totalDeclared = draftDebtSales.reduce((sum, s) => sum + s.quantity, 0) +
-                                Object.values(declaredRetailQuantities).reduce((sum, qty) => sum + qty, 0);
+                              const productIds = Array.from(
+                                new Set(
+                                  Object.values(pumpReadings).map(
+                                    (r) => r.productId,
+                                  ),
+                                ),
+                              );
+                              const totalPump = productIds.reduce(
+                                (sum, productId) => {
+                                  const pumpQty = Object.values(pumpReadings)
+                                    .filter((r) => r.productId === productId)
+                                    .reduce(
+                                      (s, r) => s + calculateQuantity(r),
+                                      0,
+                                    );
+                                  return sum + pumpQty;
+                                },
+                                0,
+                              );
+                              const totalDeclared =
+                                draftDebtSales.reduce(
+                                  (sum, s) => sum + s.quantity,
+                                  0,
+                                ) +
+                                Object.values(declaredRetailQuantities).reduce(
+                                  (sum, qty) => sum + qty,
+                                  0,
+                                );
                               const diff = totalPump - totalDeclared;
                               return diff.toFixed(3);
                             })()}
@@ -2841,13 +3452,17 @@ const ShiftOperationsPage: React.FC = () => {
                     </table>
                   </div>
                   <p className="text-xs text-gray-500 mt-2 italic">
-                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu. Khi chốt ca, lượng này sẽ được ghi nhận cho khách hàng nội bộ để kiểm soát tiền.
+                    * Nhập số lượng bán lẻ thực tế (lít) để đối chiếu. Khi chốt
+                    ca, lượng này sẽ được ghi nhận cho khách hàng nội bộ để kiểm
+                    soát tiền.
                   </p>
                 </div>
               ) : null}
 
               <div className="border-t pt-6 overflow-visible">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📝 Danh sách bán nợ  </h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📝 Danh sách bán nợ{" "}
+                </h3>
                 {canEdit && (
                   <div className="mb-4">
                     <button
@@ -2879,30 +3494,58 @@ const ShiftOperationsPage: React.FC = () => {
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4 overflow-visible"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Khách hàng *
+                      </label>
                       <SearchableSelect
-                        options={debtCustomers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}${c.type === 'INTERNAL' ? ' 🏠' : ''}` })) || []}
+                        options={
+                          debtCustomers?.map((c: any) => ({
+                            value: c.id,
+                            label: `${c.code} - ${c.name}${c.type === "INTERNAL" ? " 🏠" : ""}`,
+                          })) || []
+                        }
                         value={selectedDebtCustomer}
-                        onChange={(value) => setSelectedDebtCustomer(value as number)}
+                        onChange={(value) =>
+                          setSelectedDebtCustomer(value as number)
+                        }
                         placeholder="-- Chọn khách hàng --"
                         required
                       />
-                      <input type="hidden" name="customerId" value={selectedDebtCustomer || ""} required />
+                      <input
+                        type="hidden"
+                        name="customerId"
+                        value={selectedDebtCustomer || ""}
+                        required
+                      />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Mặt hàng *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Mặt hàng *
+                      </label>
                       <SearchableSelect
-                        options={storeProducts?.map((p: any) => ({ value: p.id, label: `${p.code} - ${p.name}` })) || []}
+                        options={
+                          storeProducts?.map((p: any) => ({
+                            value: p.id,
+                            label: `${p.code} - ${p.name}`,
+                          })) || []
+                        }
                         value={selectedDebtProduct}
                         onChange={(value) => {
                           setSelectedDebtProduct(value as number);
                           if (value && productPrices[value as number]) {
-                            setDebtSaleFormPrice(productPrices[value as number]);
+                            setDebtSaleFormPrice(
+                              productPrices[value as number],
+                            );
                             // Tính lại thành tiền khi đổi mặt hàng - làm tròn
-                            const amount = Math.round(debtSaleFormQuantity * productPrices[value as number]);
+                            const amount = Math.round(
+                              debtSaleFormQuantity *
+                                productPrices[value as number],
+                            );
                             setDebtSaleFormAmount(amount);
-                            setDebtSaleFormAmountFormatted(amount > 0 ? amount.toLocaleString('vi-VN') : '');
+                            setDebtSaleFormAmountFormatted(
+                              amount > 0 ? amount.toLocaleString("vi-VN") : "",
+                            );
                           } else {
                             setDebtSaleFormPrice(0);
                             setDebtSaleFormAmount(0);
@@ -2912,11 +3555,18 @@ const ShiftOperationsPage: React.FC = () => {
                         placeholder="-- Chọn mặt hàng --"
                         required
                       />
-                      <input type="hidden" name="productId" value={selectedDebtProduct || ""} required />
+                      <input
+                        type="hidden"
+                        name="productId"
+                        value={selectedDebtProduct || ""}
+                        required
+                      />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng (lít) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Số lượng (lít) *
+                      </label>
                       <input
                         type="number"
                         name="quantity"
@@ -2925,7 +3575,7 @@ const ShiftOperationsPage: React.FC = () => {
                         value={debtSaleFormQuantity || ""}
                         onKeyDown={(e) => {
                           // Chặn phím mũi tên để không ảnh hưởng đến Select component
-                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                             e.stopPropagation();
                           }
                         }}
@@ -2937,32 +3587,47 @@ const ShiftOperationsPage: React.FC = () => {
                           setIsAmountManuallyEntered(false);
                           const amount = Math.round(qty * debtSaleFormPrice);
                           setDebtSaleFormAmount(amount);
-                          setDebtSaleFormAmountFormatted(amount > 0 ? amount.toLocaleString('vi-VN') : '');
+                          setDebtSaleFormAmountFormatted(
+                            amount > 0 ? amount.toLocaleString("vi-VN") : "",
+                          );
                         }}
                         onBlur={(e) => {
                           const qty = parseFloat(e.target.value) || 0;
                           if (qty <= 0) {
-                            toast.error("Số lượng phải lớn hơn 0!", { position: "top-right", autoClose: 2000 });
+                            toast.error("Số lượng phải lớn hơn 0!", {
+                              position: "top-right",
+                              autoClose: 2000,
+                            });
                             return;
                           }
                           // Kiểm tra không vượt quá tồn kho bán
                           if (selectedDebtProduct) {
-                            const totalPumpedForProduct = Object.values(pumpReadings)
-                              .filter((r) => r.productId === selectedDebtProduct)
-                              .reduce((sum, r) => sum + calculateQuantity(r), 0);
+                            const totalPumpedForProduct = Object.values(
+                              pumpReadings,
+                            )
+                              .filter(
+                                (r) => r.productId === selectedDebtProduct,
+                              )
+                              .reduce(
+                                (sum, r) => sum + calculateQuantity(r),
+                                0,
+                              );
 
                             const existingDebtForProduct = draftDebtSales
-                              .filter((ds) => ds.productId === selectedDebtProduct)
+                              .filter(
+                                (ds) => ds.productId === selectedDebtProduct,
+                              )
                               .reduce((sum, ds) => sum + ds.quantity, 0);
 
-                            const availableQty = totalPumpedForProduct - existingDebtForProduct;
+                            const availableQty =
+                              totalPumpedForProduct - existingDebtForProduct;
 
                             if (qty > availableQty) {
                               toast.error(
                                 `Số lượng bán nợ (${qty.toFixed(3)}) vượt quá số lượng còn lại (${availableQty.toFixed(
-                                  3
+                                  3,
                                 )} lít)!`,
-                                { position: "top-right", autoClose: 4000 }
+                                { position: "top-right", autoClose: 4000 },
                               );
                               setDebtSaleFormQuantity(0);
                               setDebtSaleFormAmount(0);
@@ -2976,7 +3641,9 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Đơn giá (₫) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Đơn giá (₫) *
+                      </label>
                       <input
                         type="number"
                         name="unitPrice"
@@ -2986,7 +3653,7 @@ const ShiftOperationsPage: React.FC = () => {
                         readOnly
                         value={debtSaleFormPrice || ""}
                         onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                             e.stopPropagation();
                           }
                         }}
@@ -2996,24 +3663,30 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Thành tiền (₫)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Thành tiền (₫)
+                      </label>
                       <input
                         type="text"
                         value={debtSaleFormAmountFormatted}
                         onKeyDown={(e) => {
-                          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                             e.stopPropagation();
                           }
                         }}
                         onChange={(e) => {
                           const value = e.target.value;
                           // Remove all non-digit characters
-                          const numericValue = value.replace(/\D/g, '');
+                          const numericValue = value.replace(/\D/g, "");
                           // Format with dots
-                          const formattedValue = numericValue ? Number(numericValue).toLocaleString('vi-VN') : '';
+                          const formattedValue = numericValue
+                            ? Number(numericValue).toLocaleString("vi-VN")
+                            : "";
                           setDebtSaleFormAmountFormatted(formattedValue);
 
-                          const amount = numericValue ? parseInt(numericValue) : 0;
+                          const amount = numericValue
+                            ? parseInt(numericValue)
+                            : 0;
                           // Làm tròn số tiền ngay khi nhập
                           setDebtSaleFormAmount(Math.round(amount));
                           // Đánh dấu người dùng đã nhập thành tiền thủ công
@@ -3021,7 +3694,9 @@ const ShiftOperationsPage: React.FC = () => {
                           if (debtSaleFormPrice > 0) {
                             const rawQty = amount / debtSaleFormPrice;
                             // Lấy 3 số sau dấu phẩy và không làm tròn (truncate)
-                            setDebtSaleFormQuantity(Math.floor(rawQty * 1000) / 1000);
+                            setDebtSaleFormQuantity(
+                              Math.floor(rawQty * 1000) / 1000,
+                            );
                           }
                         }}
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg bg-blue-50"
@@ -3030,7 +3705,9 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Diễn giải
+                      </label>
                       <input
                         type="text"
                         name="notes"
@@ -3067,13 +3744,25 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Đơn giá</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thành tiền</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Khách hàng
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Mặt hàng
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Số lượng
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Đơn giá
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thành tiền
+                      </th>
                       {canEdit && (
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                          Thao tác
+                        </th>
                       )}
                     </tr>
                   </thead>
@@ -3082,22 +3771,36 @@ const ShiftOperationsPage: React.FC = () => {
                       // Hiển thị draft data khi ca đang mở
                       draftDebtSales.length > 0 ? (
                         draftDebtSales.map((sale) => {
-                          const customer = debtCustomers?.find((c) => c.id === sale.customerId);
-                          const product = products?.find((p) => p.id === sale.productId);
+                          const customer = debtCustomers?.find(
+                            (c) => c.id === sale.customerId,
+                          );
+                          const product = products?.find(
+                            (p) => p.id === sale.productId,
+                          );
                           return (
                             <tr key={sale.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {customer?.code} - {customer?.name}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name}</td>
-                              <td className="px-6 py-4 text-sm text-right">
-                                {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {product?.name}
                               </td>
                               <td className="px-6 py-4 text-sm text-right">
-                                {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
+                                {Number(sale.quantity).toLocaleString("vi-VN", {
+                                  maximumFractionDigits: 3,
+                                })}{" "}
+                                L
+                              </td>
+                              <td className="px-6 py-4 text-sm text-right">
+                                {Number(sale.unitPrice).toLocaleString("vi-VN")}{" "}
+                                ₫
                               </td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
-                                {(sale.amount ?? Math.round(sale.quantity * sale.unitPrice)).toLocaleString("vi-VN")} ₫
+                                {(
+                                  sale.amount ??
+                                  Math.round(sale.quantity * sale.unitPrice)
+                                ).toLocaleString("vi-VN")}{" "}
+                                ₫
                               </td>
                               <td className="px-6 py-4 text-right">
                                 <button
@@ -3122,67 +3825,108 @@ const ShiftOperationsPage: React.FC = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                          <td
+                            colSpan={6}
+                            className="px-6 py-12 text-center text-sm text-gray-500"
+                          >
                             Chưa có doanh số bán công nợ{" "}
                           </td>
                         </tr>
                       )
                     ) : // Hiển thị data từ report khi ca đã chốt
-                      report?.debtSales && report.debtSales.length > 0 ? (
-                        report.debtSales.map((sale: any) => {
-                          const customer = customers?.find((c) => c.id === sale.customerId);
-                          const product = products?.find((p) => p.id === sale.productId);
-                          return (
-                            <tr key={sale.id}>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                {customer?.code || sale.customer?.code} - {customer?.name || sale.customer?.name}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{product?.name || sale.product?.name}</td>
-                              <td className="px-6 py-4 text-sm text-right">
-                                {Number(sale.quantity).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
-                              </td>
-                              <td className="px-6 py-4 text-sm text-right">
-                                {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
-                              </td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
-                                {Number(sale.amount).toLocaleString("vi-VN")} ₫
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                            Không có doanh số bán công nợ
-                          </td>
-                        </tr>
-                      )}
+                    report?.debtSales && report.debtSales.length > 0 ? (
+                      report.debtSales.map((sale: any) => {
+                        const customer = customers?.find(
+                          (c) => c.id === sale.customerId,
+                        );
+                        const product = products?.find(
+                          (p) => p.id === sale.productId,
+                        );
+                        return (
+                          <tr key={sale.id}>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {customer?.code || sale.customer?.code} -{" "}
+                              {customer?.name || sale.customer?.name}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {product?.name || sale.product?.name}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-right">
+                              {Number(sale.quantity).toLocaleString("vi-VN", {
+                                maximumFractionDigits: 3,
+                              })}{" "}
+                              L
+                            </td>
+                            <td className="px-6 py-4 text-sm text-right">
+                              {Number(sale.unitPrice).toLocaleString("vi-VN")} ₫
+                            </td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
+                              {Number(sale.amount).toLocaleString("vi-VN")} ₫
+                            </td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-12 text-center text-sm text-gray-500"
+                        >
+                          Không có doanh số bán công nợ
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                   {/* Dòng tổng cộng */}
-                  {((canEdit && draftDebtSales.length > 0) || (!canEdit && report?.debtSales && report.debtSales.length > 0)) && (
+                  {((canEdit && draftDebtSales.length > 0) ||
+                    (!canEdit &&
+                      report?.debtSales &&
+                      report.debtSales.length > 0)) && (
                     <tfoot className="bg-orange-50 border-t-2 border-orange-200">
                       <tr>
-                        <td colSpan={2} className="px-6 py-3 text-sm font-bold text-gray-900 uppercase">
+                        <td
+                          colSpan={2}
+                          className="px-6 py-3 text-sm font-bold text-gray-900 uppercase"
+                        >
                           Tổng cộng
                         </td>
                         <td className="px-6 py-3 text-sm text-right font-bold text-gray-900">
                           {(canEdit
-                            ? draftDebtSales.reduce((sum, sale) => sum + Number(sale.quantity), 0)
-                            : (report?.debtSales || []).reduce((sum: number, sale: any) => sum + Number(sale.quantity), 0)
-                          ).toLocaleString("vi-VN", { maximumFractionDigits: 3 })} L
+                            ? draftDebtSales.reduce(
+                                (sum, sale) => sum + Number(sale.quantity),
+                                0,
+                              )
+                            : (report?.debtSales || []).reduce(
+                                (sum: number, sale: any) =>
+                                  sum + Number(sale.quantity),
+                                0,
+                              )
+                          ).toLocaleString("vi-VN", {
+                            maximumFractionDigits: 3,
+                          })}{" "}
+                          L
                         </td>
                         <td className="px-6 py-3 text-sm text-right font-bold text-gray-500">
                           —
                         </td>
                         <td className="px-6 py-3 text-sm text-right font-bold text-orange-600">
                           {(canEdit
-                            ? draftDebtSales.reduce((sum, sale) => sum + (sale.amount ?? Math.round(sale.quantity * sale.unitPrice)), 0)
-                            : (report?.debtSales || []).reduce((sum: number, sale: any) => sum + Number(sale.amount), 0)
-                          ).toLocaleString("vi-VN")} ₫
+                            ? draftDebtSales.reduce(
+                                (sum, sale) =>
+                                  sum +
+                                  (sale.amount ??
+                                    Math.round(sale.quantity * sale.unitPrice)),
+                                0,
+                              )
+                            : (report?.debtSales || []).reduce(
+                                (sum: number, sale: any) =>
+                                  sum + Number(sale.amount),
+                                0,
+                              )
+                          ).toLocaleString("vi-VN")}{" "}
+                          ₫
                         </td>
-                        {canEdit && (
-                          <td className="px-6 py-3"></td>
-                        )}
+                        {canEdit && <td className="px-6 py-3"></td>}
                       </tr>
                     </tfoot>
                   )}
@@ -3203,7 +3947,9 @@ const ShiftOperationsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Section 1: Phiếu Thu Tiền */}
               <div className="border border-gray-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Thu Tiền (Thanh toán nợ)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📥 Phiếu Thu Tiền (Thanh toán nợ)
+                </h3>
 
                 {canEdit && (
                   <div className="mb-4">
@@ -3226,19 +3972,35 @@ const ShiftOperationsPage: React.FC = () => {
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Khách hàng *
+                      </label>
                       <SearchableSelect
-                        options={debtCustomers?.map((c: any) => ({ value: c.id, label: `${c.code} - ${c.name}${c.type === 'INTERNAL' ? ' 🏠' : ''}` })) || []}
+                        options={
+                          debtCustomers?.map((c: any) => ({
+                            value: c.id,
+                            label: `${c.code} - ${c.name}${c.type === "INTERNAL" ? " 🏠" : ""}`,
+                          })) || []
+                        }
                         value={selectedReceiptCustomer}
-                        onChange={(value) => setSelectedReceiptCustomer(value as number)}
+                        onChange={(value) =>
+                          setSelectedReceiptCustomer(value as number)
+                        }
                         placeholder="-- Chọn khách hàng --"
                         required
                       />
-                      <input type="hidden" name="customerId" value={selectedReceiptCustomer || ""} required />
+                      <input
+                        type="hidden"
+                        name="customerId"
+                        value={selectedReceiptCustomer || ""}
+                        required
+                      />
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền thu (₫) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Số tiền thu (₫) *
+                      </label>
                       <input
                         type="number"
                         name="amount"
@@ -3246,7 +4008,11 @@ const ShiftOperationsPage: React.FC = () => {
                         min="0"
                         required
                         defaultValue={
-                          editingReceiptId ? draftReceipts.find((r) => r.id === editingReceiptId)?.amount : ""
+                          editingReceiptId
+                            ? draftReceipts.find(
+                                (r) => r.id === editingReceiptId,
+                              )?.amount
+                            : ""
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                         placeholder="VD: 5000000"
@@ -3254,12 +4020,16 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Hình thức thanh toán *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Hình thức thanh toán *
+                      </label>
                       <select
                         name="paymentMethod"
                         defaultValue={
                           editingReceiptId
-                            ? draftReceipts.find((r) => r.id === editingReceiptId)?.paymentMethod
+                            ? draftReceipts.find(
+                                (r) => r.id === editingReceiptId,
+                              )?.paymentMethod
                             : "CASH"
                         }
                         required
@@ -3271,7 +4041,9 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian thu *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Thời gian thu *
+                      </label>
                       <input
                         type="datetime-local"
                         step="1"
@@ -3279,7 +4051,9 @@ const ShiftOperationsPage: React.FC = () => {
                         required
                         defaultValue={
                           editingReceiptId
-                            ? draftReceipts.find((r) => r.id === editingReceiptId)?.receiptAt?.slice(0, 16)
+                            ? draftReceipts
+                                .find((r) => r.id === editingReceiptId)
+                                ?.receiptAt?.slice(0, 16)
                             : dayjs().format("YYYY-MM-DDTHH:mm")
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -3287,12 +4061,18 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Diễn giải
+                      </label>
                       <input
                         type="text"
                         name="notes"
                         defaultValue={
-                          editingReceiptId ? draftReceipts.find((r) => r.id === editingReceiptId)?.notes : ""
+                          editingReceiptId
+                            ? draftReceipts.find(
+                                (r) => r.id === editingReceiptId,
+                              )?.notes
+                            : ""
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
                         placeholder="VD: Thu tiền hàng tháng 12"
@@ -3311,7 +4091,10 @@ const ShiftOperationsPage: React.FC = () => {
                       >
                         Hủy
                       </button>
-                      <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
                         {editingReceiptId ? "Cập nhật" : "Thêm vào danh sách"}
                       </button>
                     </div>
@@ -3321,12 +4104,24 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Thời gian</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Khách hàng</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hình thức thanh toán</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Thời gian
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Khách hàng
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Diễn giải
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Số tiền
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Hình thức thanh toán
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -3337,7 +4132,9 @@ const ShiftOperationsPage: React.FC = () => {
                           console.log("receipt", receipt);
                           const customerNames = receipt.details
                             .map((d) => {
-                              const cust = debtCustomers?.find((c) => c.id === d.customerId);
+                              const cust = debtCustomers?.find(
+                                (c) => c.id === d.customerId,
+                              );
                               console.log("cust", cust);
                               return cust?.name || "N/A";
                             })
@@ -3346,16 +4143,27 @@ const ShiftOperationsPage: React.FC = () => {
                             <tr key={receipt.id}>
                               <td className="px-6 py-4 text-sm text-gray-900">
                                 {receipt.receiptAt
-                                  ? dayjs(receipt.receiptAt).format("DD/MM/YYYY HH:mm")
+                                  ? dayjs(receipt.receiptAt).format(
+                                      "DD/MM/YYYY HH:mm",
+                                    )
                                   : "Chưa lưu"}
                               </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
+                              <td className="px-6 py-4 text-sm text-gray-900">
+                                {customerNames}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-gray-500">
+                                {receipt.notes || "-"}
+                              </td>
                               <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
-                                {Number(receipt.amount).toLocaleString("vi-VN")} ₫
+                                {Number(receipt.amount).toLocaleString("vi-VN")}{" "}
+                                ₫
                               </td>
                               <td className="px-6 py-4 text-sm text-gray-900">
-                                {receipt.paymentMethod === 'CASH' ? 'Tiền mặt' : receipt.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : receipt.paymentMethod || '-'}
+                                {receipt.paymentMethod === "CASH"
+                                  ? "Tiền mặt"
+                                  : receipt.paymentMethod === "BANK_TRANSFER"
+                                    ? "Chuyển khoản"
+                                    : receipt.paymentMethod || "-"}
                               </td>
                               <td className="px-6 py-4 text-right text-sm font-medium">
                                 <button
@@ -3366,7 +4174,9 @@ const ShiftOperationsPage: React.FC = () => {
                                   <PencilIcon className="h-5 w-5 inline" />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteReceipt(receipt.id)}
+                                  onClick={() =>
+                                    handleDeleteReceipt(receipt.id)
+                                  }
                                   className="text-red-600 hover:text-red-900"
                                   type="button"
                                 >
@@ -3378,54 +4188,76 @@ const ShiftOperationsPage: React.FC = () => {
                         })
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                          <td
+                            colSpan={5}
+                            className="px-6 py-12 text-center text-sm text-gray-500"
+                          >
                             Chưa có phiếu thu tiền{" "}
                           </td>
                         </tr>
                       )
                     ) : // Data từ report khi ca đã chốt
-                      report?.receipts && report.receipts.length > 0 ? (
-                        report.receipts.map((receipt: any) => {
-                          const customerNames =
-                            receipt.receiptDetails
-                              ?.map((d: any) => {
-                                const cust = customers?.find((c) => c.id === d.customerId);
-                                return cust?.name || d.customer?.name || "N/A";
-                              })
-                              .join(", ") ||
-                            receipt.details
-                              ?.map((d: any) => {
-                                const cust = customers?.find((c) => c.id === d.customerId);
-                                return cust?.name || d.customer?.name || "N/A";
-                              })
-                              .join(", ") ||
-                            "-";
-                          return (
-                            <tr key={receipt.id}>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                {receipt.receiptAt
-                                  ? dayjs(receipt.receiptAt).format("DD/MM/YYYY HH:mm")
-                                  : dayjs(receipt.createdAt).format("DD/MM/YYYY HH:mm")}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">{customerNames}</td>
-                              <td className="px-6 py-4 text-sm text-gray-500">{receipt.notes || "-"}</td>
-                              <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
-                                {Number(receipt.amount).toLocaleString("vi-VN")} ₫
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                {receipt.paymentMethod === 'CASH' ? 'Tiền mặt' : receipt.paymentMethod === 'BANK_TRANSFER' ? 'Chuyển khoản' : receipt.paymentMethod || '-'}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-500"></td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                            Không có phiếu thu tiền
-                          </td>
-                        </tr>
-                      )}
+                    report?.receipts && report.receipts.length > 0 ? (
+                      report.receipts.map((receipt: any) => {
+                        const customerNames =
+                          receipt.receiptDetails
+                            ?.map((d: any) => {
+                              const cust = customers?.find(
+                                (c) => c.id === d.customerId,
+                              );
+                              return cust?.name || d.customer?.name || "N/A";
+                            })
+                            .join(", ") ||
+                          receipt.details
+                            ?.map((d: any) => {
+                              const cust = customers?.find(
+                                (c) => c.id === d.customerId,
+                              );
+                              return cust?.name || d.customer?.name || "N/A";
+                            })
+                            .join(", ") ||
+                          "-";
+                        return (
+                          <tr key={receipt.id}>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {receipt.receiptAt
+                                ? dayjs(receipt.receiptAt).format(
+                                    "DD/MM/YYYY HH:mm",
+                                  )
+                                : dayjs(receipt.createdAt).format(
+                                    "DD/MM/YYYY HH:mm",
+                                  )}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {customerNames}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {receipt.notes || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-right font-semibold text-green-600">
+                              {Number(receipt.amount).toLocaleString("vi-VN")} ₫
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {receipt.paymentMethod === "CASH"
+                                ? "Tiền mặt"
+                                : receipt.paymentMethod === "BANK_TRANSFER"
+                                  ? "Chuyển khoản"
+                                  : receipt.paymentMethod || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500"></td>
+                          </tr>
+                        );
+                      })
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-12 text-center text-sm text-gray-500"
+                        >
+                          Không có phiếu thu tiền
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -3439,7 +4271,9 @@ const ShiftOperationsPage: React.FC = () => {
             <div className="space-y-6">
               {/* Section 2: Phiếu Nộp Tiền */}
               <div className="border border-red-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Phiếu Nộp Tiền (Về công ty)</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📤 Phiếu Nộp Tiền (Về công ty)
+                </h3>
 
                 {canEdit && (
                   <div className="mb-4">
@@ -3462,13 +4296,17 @@ const ShiftOperationsPage: React.FC = () => {
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Số tiền (₫) *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Số tiền (₫) *
+                      </label>
                       <MoneyInput
                         name="amount"
                         required
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.amount
+                            ? draftDeposits.find(
+                                (d) => d.id === editingDepositId,
+                              )?.amount
                             : suggestedDepositAmount > 0
                               ? suggestedDepositAmount
                               : ""
@@ -3479,7 +4317,9 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày giờ nộp *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ngày giờ nộp *
+                      </label>
                       <input
                         type="datetime-local"
                         step="1"
@@ -3487,7 +4327,11 @@ const ShiftOperationsPage: React.FC = () => {
                         required
                         defaultValue={
                           editingDepositId
-                            ? dayjs(draftDeposits.find((d) => d.id === editingDepositId)?.depositAt).format("YYYY-MM-DDTHH:mm")
+                            ? dayjs(
+                                draftDeposits.find(
+                                  (d) => d.id === editingDepositId,
+                                )?.depositAt,
+                              ).format("YYYY-MM-DDTHH:mm")
                             : dayjs().format("YYYY-MM-DDTHH:mm")
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -3495,12 +4339,16 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Loại thanh toán *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Loại thanh toán *
+                      </label>
                       <select
                         name="paymentMethod"
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.paymentMethod
+                            ? draftDeposits.find(
+                                (d) => d.id === editingDepositId,
+                              )?.paymentMethod
                             : "CASH"
                         }
                         required
@@ -3512,13 +4360,17 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Người nhận</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Người nhận
+                      </label>
                       <input
                         type="text"
                         name="receiverName"
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.receiverName
+                            ? draftDeposits.find(
+                                (d) => d.id === editingDepositId,
+                              )?.receiverName
                             : "Công ty SWP"
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -3527,13 +4379,17 @@ const ShiftOperationsPage: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Diễn giải
+                      </label>
                       <input
                         type="text"
                         name="notes"
                         defaultValue={
                           editingDepositId
-                            ? draftDeposits.find((d) => d.id === editingDepositId)?.notes
+                            ? draftDeposits.find(
+                                (d) => d.id === editingDepositId,
+                              )?.notes
                             : `Nộp tiền Ca #${report?.shift.shiftNo || ""}`
                         }
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg"
@@ -3551,7 +4407,10 @@ const ShiftOperationsPage: React.FC = () => {
                       >
                         Hủy
                       </button>
-                      <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                      <button
+                        type="submit"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
                         {editingDepositId ? "Cập nhật" : "Thêm vào danh sách"}
                       </button>
                     </div>
@@ -3561,11 +4420,21 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày giờ nộp</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số tiền</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Ngày giờ nộp
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Người nhận
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Diễn giải
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Số tiền
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -3575,10 +4444,16 @@ const ShiftOperationsPage: React.FC = () => {
                         draftDeposits.map((deposit) => (
                           <tr key={deposit.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">
-                              {dayjs(deposit.depositAt).format("DD/MM/YYYY HH:mm")}
+                              {dayjs(deposit.depositAt).format(
+                                "DD/MM/YYYY HH:mm",
+                              )}
                             </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {deposit.receiverName || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              {deposit.notes || "-"}
+                            </td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
                               {Number(deposit.amount).toLocaleString("vi-VN")} ₫
                             </td>
@@ -3602,33 +4477,47 @@ const ShiftOperationsPage: React.FC = () => {
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                          <td
+                            colSpan={5}
+                            className="px-6 py-12 text-center text-sm text-gray-500"
+                          >
                             Chưa có phiếu nộp tiền{" "}
                           </td>
                         </tr>
                       )
                     ) : // Data từ report khi ca đã chốt
-                      report?.cashDeposits && report.cashDeposits.length > 0 ? (
-                        report.cashDeposits.map((deposit: any) => (
-                          <tr key={deposit.id}>
-                            <td className="px-6 py-4 text-sm text-gray-900">
-                              {deposit.depositAt ? dayjs(deposit.depositAt).format("DD/MM/YYYY HH:mm") : dayjs(deposit.depositDate).format("DD/MM/YYYY")}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{deposit.receiverName || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-500">{deposit.notes || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
-                              {Number(deposit.amount).toLocaleString("vi-VN")} ₫
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500"></td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
-                            Không có phiếu nộp tiền
+                    report?.cashDeposits && report.cashDeposits.length > 0 ? (
+                      report.cashDeposits.map((deposit: any) => (
+                        <tr key={deposit.id}>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {deposit.depositAt
+                              ? dayjs(deposit.depositAt).format(
+                                  "DD/MM/YYYY HH:mm",
+                                )
+                              : dayjs(deposit.depositDate).format("DD/MM/YYYY")}
                           </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {deposit.receiverName || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {deposit.notes || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-right font-semibold text-red-600">
+                            {Number(deposit.amount).toLocaleString("vi-VN")} ₫
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500"></td>
                         </tr>
-                      )}
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="px-6 py-12 text-center text-sm text-gray-500"
+                        >
+                          Không có phiếu nộp tiền
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -3641,7 +4530,9 @@ const ShiftOperationsPage: React.FC = () => {
           {activeTab === "import" && (
             <div className="space-y-6">
               <div className="border border-blue-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📥 Phiếu Nhập Hàng Xăng Dầu</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📥 Phiếu Nhập Hàng Xăng Dầu
+                </h3>
 
                 {isShiftOpen && (
                   <div className="mb-4">
@@ -3657,50 +4548,86 @@ const ShiftOperationsPage: React.FC = () => {
 
                 {showImportForm && (
                   <TruckInventoryImportForm
-                    key={editingImportId || 'new'}
+                    key={editingImportId || "new"}
                     onSubmit={handleImportSubmit}
                     onCancel={() => {
                       setShowImportForm(false);
                       setEditingImportId(null);
                     }}
                     storeId={report?.shift.storeId}
-                    initialData={editingImportId ? draftImports.find((i) => i.id === editingImportId) : undefined}
+                    initialData={
+                      editingImportId
+                        ? draftImports.find((i) => i.id === editingImportId)
+                        : undefined
+                    }
                   />
                 )}
 
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày giờ</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Biển số xe</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">NCC</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mặt hàng</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Bể</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Số lượng</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Ngày giờ
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Biển số xe
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        NCC
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Mặt hàng
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Bể
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Số lượng
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {draftImports.length > 0 ? (
                       draftImports.map((item) => {
                         // Lấy tên mặt hàng từ productId
-                        const product = products?.find((p) => p.id === item.productId);
-                        const productName = product?.name || `SP#${item.productId}`;
+                        const product = products?.find(
+                          (p) => p.id === item.productId,
+                        );
+                        const productName =
+                          product?.name || `SP#${item.productId}`;
                         // ✅ Lấy tên bể từ tankId
                         const tank = tanks?.find((t) => t.id === item.tankId);
-                        const tankName = tank ? `${tank.tankCode} - ${tank.name}` : (item.tankId ? `Bể#${item.tankId}` : "-");
+                        const tankName = tank
+                          ? `${tank.tankCode} - ${tank.name}`
+                          : item.tankId
+                            ? `Bể#${item.tankId}`
+                            : "-";
 
                         return (
                           <tr key={item.id}>
                             <td className="px-6 py-4 text-sm text-gray-900">
                               {dayjs(item.docAt).format("DD/MM/YYYY HH:mm")}
                             </td>
-                            <td className="px-6 py-4 text-sm font-medium text-blue-600">{item.licensePlate || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
-                            <td className="px-6 py-4 text-sm text-gray-700">{productName}</td>
-                            <td className="px-6 py-4 text-sm text-gray-700">{tankName}</td>
+                            <td className="px-6 py-4 text-sm font-medium text-blue-600">
+                              {item.licensePlate || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              {item.supplierName || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              {productName}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              {tankName}
+                            </td>
                             <td className="px-6 py-4 text-sm text-right font-semibold text-blue-600">
-                              {Number(item.quantity || 0).toLocaleString("vi-VN")} lít
+                              {Number(item.quantity || 0).toLocaleString(
+                                "vi-VN",
+                              )}{" "}
+                              lít
                             </td>
                             <td className="px-6 py-4 text-right text-sm font-medium">
                               <div className="inline-flex items-center space-x-2">
@@ -3715,7 +4642,9 @@ const ShiftOperationsPage: React.FC = () => {
                                       <PencilIcon className="h-5 w-5" />
                                     </button>
                                     <button
-                                      onClick={() => handleDeleteImport(item.id)}
+                                      onClick={() =>
+                                        handleDeleteImport(item.id)
+                                      }
                                       className="text-red-600 hover:text-red-900"
                                       type="button"
                                       title="Xóa phiếu nhập"
@@ -3731,7 +4660,10 @@ const ShiftOperationsPage: React.FC = () => {
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
+                        <td
+                          colSpan={7}
+                          className="px-6 py-12 text-center text-sm text-gray-500"
+                        >
                           Chưa có phiếu nhập hàng
                         </td>
                       </tr>
@@ -3748,7 +4680,9 @@ const ShiftOperationsPage: React.FC = () => {
           {activeTab === "export" && (
             <div className="space-y-6">
               <div className="border border-orange-200 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">📤 Phiếu Xuất Hàng</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  📤 Phiếu Xuất Hàng
+                </h3>
 
                 {isShiftOpen && (
                   <div className="mb-4">
@@ -3770,7 +4704,9 @@ const ShiftOperationsPage: React.FC = () => {
                     className="mb-6 p-4 bg-gray-50 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-4"
                   >
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Ngày xuất *</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Ngày xuất *
+                      </label>
                       <input
                         type="date"
                         name="docDate"
@@ -3780,7 +4716,9 @@ const ShiftOperationsPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Người nhận / Đơn vị</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Người nhận / Đơn vị
+                      </label>
                       <input
                         type="text"
                         name="receiverName"
@@ -3789,7 +4727,9 @@ const ShiftOperationsPage: React.FC = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Diễn giải</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Diễn giải
+                      </label>
                       <input
                         type="text"
                         name="notes"
@@ -3800,10 +4740,14 @@ const ShiftOperationsPage: React.FC = () => {
 
                     {/* Simple Item Entry for now */}
                     <div className="md:col-span-2 border-t pt-4 mt-2">
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Chi tiết hàng hóa (Xuất nhanh)</h4>
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">
+                        Chi tiết hàng hóa (Xuất nhanh)
+                      </h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">mặt hàng</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            mặt hàng
+                          </label>
                           <select
                             name="productId"
                             className="block w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
@@ -3817,7 +4761,9 @@ const ShiftOperationsPage: React.FC = () => {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Số lượng</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            Số lượng
+                          </label>
                           <input
                             type="number"
                             name="quantity"
@@ -3827,7 +4773,9 @@ const ShiftOperationsPage: React.FC = () => {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Đơn giá (nếu có)</label>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">
+                            Đơn giá (nếu có)
+                          </label>
                           <input
                             type="number"
                             name="unitPrice"
@@ -3860,11 +4808,21 @@ const ShiftOperationsPage: React.FC = () => {
                 <table className="w-full border rounded-lg">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ngày</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Người nhận</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diễn giải</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Tổng tiền</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Thao tác</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Ngày
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Người nhận
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                        Diễn giải
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Tổng tiền
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                        Thao tác
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -3874,10 +4832,17 @@ const ShiftOperationsPage: React.FC = () => {
                           <td className="px-6 py-4 text-sm text-gray-900">
                             {dayjs(item.docDate).format("DD/MM/YYYY")}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{item.supplierName || "-"}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{item.notes || "-"}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {item.supplierName || "-"}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">
+                            {item.notes || "-"}
+                          </td>
                           <td className="px-6 py-4 text-sm text-right font-semibold text-orange-600">
-                            {Number(item.totalAmount || 0).toLocaleString("vi-VN")} ₫
+                            {Number(item.totalAmount || 0).toLocaleString(
+                              "vi-VN",
+                            )}{" "}
+                            ₫
                           </td>
                           <td className="px-6 py-4 text-right text-sm font-medium">
                             <button
@@ -3892,7 +4857,10 @@ const ShiftOperationsPage: React.FC = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                        <td
+                          colSpan={5}
+                          className="px-6 py-12 text-center text-sm text-gray-500"
+                        >
                           Chưa có phiếu xuất hàng
                         </td>
                       </tr>
@@ -3910,14 +4878,21 @@ const ShiftOperationsPage: React.FC = () => {
             <div className="space-y-6">
               <div className="border border-purple-200 rounded-lg p-4">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">📋 Biên Bản Kiểm Kê Tồn Kho Xăng Dầu</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    📋 Biên Bản Kiểm Kê Tồn Kho Xăng Dầu
+                  </h3>
                   {/* Nút Xuất Excel ở trên */}
                   <button
                     type="button"
                     onClick={async () => {
                       // Validate
-                      const filledTanks = Object.entries(inventoryCheckData).filter(([_, data]) =>
-                        data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0
+                      const filledTanks = Object.entries(
+                        inventoryCheckData,
+                      ).filter(
+                        ([_, data]) =>
+                          data.actualStock > 0 ||
+                          data.heightTotal > 0 ||
+                          data.heightWater > 0,
                       );
 
                       if (filledTanks.length === 0) {
@@ -3929,72 +4904,111 @@ const ShiftOperationsPage: React.FC = () => {
                       const rows: InventoryCheckRow[] = [];
                       let stt = 0;
 
-                      products?.filter(p => p.isFuel).forEach(product => {
-                        const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
-                        if (productTanks.length === 0) return;
+                      products
+                        ?.filter((p) => p.isFuel)
+                        .forEach((product) => {
+                          const productTanks =
+                            tanks?.filter(
+                              (t: any) => t.productId === product.id,
+                            ) || [];
+                          if (productTanks.length === 0) return;
 
-                        stt++;
-                        let isFirstProductRow = true;
+                          stt++;
+                          let isFirstProductRow = true;
 
-                        productTanks.forEach((tank: any) => {
-                          const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
-                          const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : 0; // ✅ Không tự fill
-                          const diff = (tankData.actualStock || 0) - bookStock;
+                          productTanks.forEach((tank: any) => {
+                            const tankData = inventoryCheckData[tank.id] || {
+                              heightTotal: 0,
+                              heightWater: 0,
+                              actualStock: 0,
+                              bookStock: undefined,
+                            };
+                            const bookStock =
+                              tankData.bookStock !== undefined
+                                ? tankData.bookStock
+                                : 0; // ✅ Không tự fill
+                            const diff =
+                              (tankData.actualStock || 0) - bookStock;
 
-                          // Get pumps for this tank
-                          const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
+                            // Get pumps for this tank
+                            const tankPumps =
+                              pumps?.filter((p: any) => p.tankId === tank.id) ||
+                              [];
 
-                          if (tankPumps.length === 0) {
-                            rows.push({
-                              stt: isFirstProductRow ? stt : '',
-                              productName: isFirstProductRow ? product.name : '',
-                              tankName: tank.tankCode || tank.name,
-                              heightTotal: tankData.heightTotal || '',
-                              heightWater: tankData.heightWater || '',
-                              actualStock: tankData.actualStock || '',
-                              bookStock: bookStock || '',
-                              difference: tankData.actualStock ? diff : '',
-                              pumpElectronic: '',
-                              pumpMechanical: ''
-                            });
-                            isFirstProductRow = false;
-                          } else {
-                            let isFirstTankRow = true;
-                            tankPumps.forEach((pump: any) => {
+                            if (tankPumps.length === 0) {
                               rows.push({
-                                stt: isFirstProductRow ? stt : '',
-                                productName: isFirstProductRow ? product.name : '',
-                                tankName: isFirstTankRow ? (tank.tankCode || tank.name) : '',
-                                heightTotal: isFirstTankRow ? (tankData.heightTotal || '') : '',
-                                heightWater: isFirstTankRow ? (tankData.heightWater || '') : '',
-                                actualStock: isFirstTankRow ? (tankData.actualStock || '') : '',
-                                bookStock: isFirstTankRow ? (bookStock || '') : '',
-                                difference: isFirstTankRow && tankData.actualStock ? diff : '',
-                                pumpElectronic: `${pump.pumpCode}: ${(pumpMeterReadings[pump.id] || 0).toLocaleString("vi-VN")}`,
-                                pumpMechanical: ''
+                                stt: isFirstProductRow ? stt : "",
+                                productName: isFirstProductRow
+                                  ? product.name
+                                  : "",
+                                tankName: tank.tankCode || tank.name,
+                                heightTotal: tankData.heightTotal || "",
+                                heightWater: tankData.heightWater || "",
+                                actualStock: tankData.actualStock || "",
+                                bookStock: bookStock || "",
+                                difference: tankData.actualStock ? diff : "",
+                                pumpElectronic: "",
+                                pumpMechanical: "",
                               });
                               isFirstProductRow = false;
-                              isFirstTankRow = false;
-                            });
-                          }
+                            } else {
+                              let isFirstTankRow = true;
+                              tankPumps.forEach((pump: any) => {
+                                rows.push({
+                                  stt: isFirstProductRow ? stt : "",
+                                  productName: isFirstProductRow
+                                    ? product.name
+                                    : "",
+                                  tankName: isFirstTankRow
+                                    ? tank.tankCode || tank.name
+                                    : "",
+                                  heightTotal: isFirstTankRow
+                                    ? tankData.heightTotal || ""
+                                    : "",
+                                  heightWater: isFirstTankRow
+                                    ? tankData.heightWater || ""
+                                    : "",
+                                  actualStock: isFirstTankRow
+                                    ? tankData.actualStock || ""
+                                    : "",
+                                  bookStock: isFirstTankRow
+                                    ? bookStock || ""
+                                    : "",
+                                  difference:
+                                    isFirstTankRow && tankData.actualStock
+                                      ? diff
+                                      : "",
+                                  pumpElectronic: `${pump.pumpCode}: ${(pumpMeterReadings[pump.id] || 0).toLocaleString("vi-VN")}`,
+                                  pumpMechanical: "",
+                                });
+                                isFirstProductRow = false;
+                                isFirstTankRow = false;
+                              });
+                            }
+                          });
                         });
-                      });
 
                       const exportData: InventoryCheckExportData = {
-                        companyName: "CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CN ĐỐNG ĐA",
+                        companyName:
+                          "CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CN ĐỐNG ĐA",
                         branchName: store?.name || "CỬA HÀNG XĂNG DẦU",
                         storeName: store?.name || "",
-                        checkTime: dayjs().format("HH:mm [ngày] DD [tháng] MM [năm] YYYY"),
+                        checkTime: dayjs().format(
+                          "HH:mm [ngày] DD [tháng] MM [năm] YYYY",
+                        ),
                         members: [
-                          { name: inventoryMember1 || "", department: store?.name || "" },
-                          { name: inventoryMember2 || "", department: "" }
-                        ].filter(m => m.name),
+                          {
+                            name: inventoryMember1 || "",
+                            department: store?.name || "",
+                          },
+                          { name: inventoryMember2 || "", department: "" },
+                        ].filter((m) => m.name),
                         rows,
                         reason: inventoryReason,
-                        conclusion: inventoryConclusion
+                        conclusion: inventoryConclusion,
                       };
 
-                      const fileName = `Kiem_ke_${store?.code || 'store'}_${dayjs().format("YYYYMMDD_HHmm")}`;
+                      const fileName = `Kiem_ke_${store?.code || "store"}_${dayjs().format("YYYYMMDD_HHmm")}`;
                       await exportInventoryCheckExcel(exportData, fileName);
                       toast.success("Đã xuất file Excel kiểm kê!");
                     }}
@@ -4007,10 +5021,14 @@ const ShiftOperationsPage: React.FC = () => {
 
                 {/* Thông tin tổ kiểm kê */}
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-gray-800 mb-3">Thành phần Tổ kiểm kê</h4>
+                  <h4 className="font-medium text-gray-800 mb-3">
+                    Thành phần Tổ kiểm kê
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Thành viên 1</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Thành viên 1
+                      </label>
                       <input
                         type="text"
                         value={inventoryMember1}
@@ -4020,7 +5038,9 @@ const ShiftOperationsPage: React.FC = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Thành viên 2</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Thành viên 2
+                      </label>
                       <input
                         type="text"
                         value={inventoryMember2}
@@ -4034,141 +5054,238 @@ const ShiftOperationsPage: React.FC = () => {
 
                 {/* Bảng nhập liệu theo Mặt hàng -> Bể -> Vòi */}
                 <div className="mb-6">
-                  <h4 className="font-medium text-gray-800 mb-3">📊 Số liệu kiểm kê</h4>
+                  <h4 className="font-medium text-gray-800 mb-3">
+                    📊 Số liệu kiểm kê
+                  </h4>
 
                   {/* Group by Product */}
-                  {products?.filter(p => p.isFuel).map((product, productIdx) => {
-                    const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
-                    if (productTanks.length === 0) return null;
+                  {products
+                    ?.filter((p) => p.isFuel)
+                    .map((product, productIdx) => {
+                      const productTanks =
+                        tanks?.filter((t: any) => t.productId === product.id) ||
+                        [];
+                      if (productTanks.length === 0) return null;
 
-                    return (
-                      <div key={product.id} className="mb-6 border rounded-lg overflow-hidden">
-                        {/* Product Header */}
-                        <div className="bg-blue-50 px-4 py-2 border-b">
-                          <h5 className="font-semibold text-blue-800">{productIdx + 1}. {product.name}</h5>
+                      return (
+                        <div
+                          key={product.id}
+                          className="mb-6 border rounded-lg overflow-hidden"
+                        >
+                          {/* Product Header */}
+                          <div className="bg-blue-50 px-4 py-2 border-b">
+                            <h5 className="font-semibold text-blue-800">
+                              {productIdx + 1}. {product.name}
+                            </h5>
+                          </div>
+
+                          {/* Tanks table */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-100">
+                                <tr>
+                                  <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    Bể chứa
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    Chiều cao chung (mm)
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    Chiều cao nước (mm)
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    Tồn thực tế (Lít)
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    Tồn sổ sách (Lít)
+                                  </th>
+                                  <th className="px-3 py-2 text-center font-medium text-gray-700">
+                                    Chênh lệch
+                                  </th>
+                                  <th className="px-3 py-2 text-left font-medium text-gray-700">
+                                    Số máy các vòi
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                {productTanks.map((tank: any) => {
+                                  const tankPumps =
+                                    pumps?.filter(
+                                      (p: any) => p.tankId === tank.id,
+                                    ) || [];
+                                  const tankData = inventoryCheckData[
+                                    tank.id
+                                  ] || {
+                                    heightTotal: 0,
+                                    heightWater: 0,
+                                    actualStock: 0,
+                                    bookStock: undefined,
+                                  };
+                                  const defaultBookStock =
+                                    Number(tank.currentStock) || 0;
+                                  const bookStock =
+                                    tankData.bookStock !== undefined
+                                      ? tankData.bookStock
+                                      : 0;
+                                  const diff =
+                                    (tankData.actualStock || 0) - bookStock;
+
+                                  return (
+                                    <tr
+                                      key={tank.id}
+                                      className="hover:bg-gray-50"
+                                    >
+                                      <td className="px-3 py-2 font-medium text-gray-900">
+                                        {tank.tankCode || tank.name}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="1"
+                                          value={tankData.heightTotal || ""}
+                                          onChange={(e) =>
+                                            setInventoryCheckData((prev) => ({
+                                              ...prev,
+                                              [tank.id]: {
+                                                ...prev[tank.id],
+                                                heightTotal: Number(
+                                                  e.target.value,
+                                                ),
+                                              },
+                                            }))
+                                          }
+                                          placeholder="0"
+                                          className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="1"
+                                          value={tankData.heightWater || ""}
+                                          onChange={(e) =>
+                                            setInventoryCheckData((prev) => ({
+                                              ...prev,
+                                              [tank.id]: {
+                                                ...prev[tank.id],
+                                                heightWater: Number(
+                                                  e.target.value,
+                                                ),
+                                              },
+                                            }))
+                                          }
+                                          placeholder="0"
+                                          className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={tankData.actualStock || ""}
+                                          onChange={(e) =>
+                                            setInventoryCheckData((prev) => ({
+                                              ...prev,
+                                              [tank.id]: {
+                                                ...prev[tank.id],
+                                                actualStock: Number(
+                                                  e.target.value,
+                                                ),
+                                              },
+                                            }))
+                                          }
+                                          placeholder="0"
+                                          className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
+                                        />
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <input
+                                          type="number"
+                                          min="0"
+                                          step="0.01"
+                                          value={
+                                            tankData.bookStock !== undefined
+                                              ? tankData.bookStock
+                                              : ""
+                                          }
+                                          onChange={(e) =>
+                                            setInventoryCheckData((prev) => ({
+                                              ...prev,
+                                              [tank.id]: {
+                                                ...prev[tank.id],
+                                                bookStock: e.target.value
+                                                  ? Number(e.target.value)
+                                                  : undefined,
+                                              },
+                                            }))
+                                          }
+                                          placeholder="Nhập số từ sổ sách"
+                                          className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
+                                        />
+                                      </td>
+                                      <td
+                                        className={`px-3 py-2 text-right font-medium ${diff > 0 ? "text-green-600" : diff < 0 ? "text-red-600" : "text-gray-500"}`}
+                                      >
+                                        {tankData.actualStock
+                                          ? (diff > 0 ? "+" : "") +
+                                            diff.toLocaleString("vi-VN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        <div className="flex flex-wrap gap-2">
+                                          {tankPumps.map((pump: any) => (
+                                            <div
+                                              key={pump.id}
+                                              className="flex items-center gap-1"
+                                            >
+                                              <span className="text-xs text-gray-500">
+                                                {pump.pumpCode}:
+                                              </span>
+                                              <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={
+                                                  pumpMeterReadings[pump.id] ||
+                                                  ""
+                                                }
+                                                onChange={(e) =>
+                                                  setPumpMeterReadings(
+                                                    (prev) => ({
+                                                      ...prev,
+                                                      [pump.id]: Number(
+                                                        e.target.value,
+                                                      ),
+                                                    }),
+                                                  )
+                                                }
+                                                placeholder="0"
+                                                className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
+                                              />
+                                            </div>
+                                          ))}
+                                          {tankPumps.length === 0 && (
+                                            <span className="text-xs text-gray-400">
+                                              Không có vòi
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
+                      );
+                    })}
 
-                        {/* Tanks table */}
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead className="bg-gray-100">
-                              <tr>
-                                <th className="px-3 py-2 text-left font-medium text-gray-700">Bể chứa</th>
-                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chiều cao chung (mm)</th>
-                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chiều cao nước (mm)</th>
-                                <th className="px-3 py-2 text-center font-medium text-gray-700">Tồn thực tế (Lít)</th>
-                                <th className="px-3 py-2 text-center font-medium text-gray-700">Tồn sổ sách (Lít)</th>
-                                <th className="px-3 py-2 text-center font-medium text-gray-700">Chênh lệch</th>
-                                <th className="px-3 py-2 text-left font-medium text-gray-700">Số máy các vòi</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                              {productTanks.map((tank: any) => {
-                                const tankPumps = pumps?.filter((p: any) => p.tankId === tank.id) || [];
-                                const tankData = inventoryCheckData[tank.id] || { heightTotal: 0, heightWater: 0, actualStock: 0, bookStock: undefined };
-                                const defaultBookStock = Number(tank.currentStock) || 0;
-                                const bookStock = tankData.bookStock !== undefined ? tankData.bookStock : 0;
-                                const diff = (tankData.actualStock || 0) - bookStock;
-
-                                return (
-                                  <tr key={tank.id} className="hover:bg-gray-50">
-                                    <td className="px-3 py-2 font-medium text-gray-900">
-                                      {tank.tankCode || tank.name}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={tankData.heightTotal || ""}
-                                        onChange={(e) => setInventoryCheckData(prev => ({
-                                          ...prev,
-                                          [tank.id]: { ...prev[tank.id], heightTotal: Number(e.target.value) }
-                                        }))}
-                                        placeholder="0"
-                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="1"
-                                        value={tankData.heightWater || ""}
-                                        onChange={(e) => setInventoryCheckData(prev => ({
-                                          ...prev,
-                                          [tank.id]: { ...prev[tank.id], heightWater: Number(e.target.value) }
-                                        }))}
-                                        placeholder="0"
-                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-right"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={tankData.actualStock || ""}
-                                        onChange={(e) => setInventoryCheckData(prev => ({
-                                          ...prev,
-                                          [tank.id]: { ...prev[tank.id], actualStock: Number(e.target.value) }
-                                        }))}
-                                        placeholder="0"
-                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <input
-                                        type="number"
-                                        min="0"
-                                        step="0.01"
-                                        value={tankData.bookStock !== undefined ? tankData.bookStock : ""}
-                                        onChange={(e) => setInventoryCheckData(prev => ({
-                                          ...prev,
-                                          [tank.id]: { ...prev[tank.id], bookStock: e.target.value ? Number(e.target.value) : undefined }
-                                        }))}
-                                        placeholder="Nhập số từ sổ sách"
-                                        className="w-28 px-2 py-1 border border-gray-300 rounded text-right"
-                                      />
-                                    </td>
-                                    <td className={`px-3 py-2 text-right font-medium ${diff > 0 ? 'text-green-600' : diff < 0 ? 'text-red-600' : 'text-gray-500'}`}>
-                                      {tankData.actualStock ? (diff > 0 ? '+' : '') + diff.toLocaleString("vi-VN") : '-'}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      <div className="flex flex-wrap gap-2">
-                                        {tankPumps.map((pump: any) => (
-                                          <div key={pump.id} className="flex items-center gap-1">
-                                            <span className="text-xs text-gray-500">{pump.pumpCode}:</span>
-                                            <input
-                                              type="number"
-                                              min="0"
-                                              step="0.01"
-                                              value={pumpMeterReadings[pump.id] || ""}
-                                              onChange={(e) => setPumpMeterReadings(prev => ({
-                                                ...prev,
-                                                [pump.id]: Number(e.target.value)
-                                              }))}
-                                              placeholder="0"
-                                              className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
-                                            />
-                                          </div>
-                                        ))}
-                                        {tankPumps.length === 0 && (
-                                          <span className="text-xs text-gray-400">Không có vòi</span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {(!products?.filter(p => p.isFuel).length || !tanks?.length) && (
+                  {(!products?.filter((p) => p.isFuel).length ||
+                    !tanks?.length) && (
                     <div className="text-center py-8 text-gray-500">
                       Chưa có cấu hình bể/mặt hàng cho cửa hàng này
                     </div>
@@ -4178,7 +5295,9 @@ const ShiftOperationsPage: React.FC = () => {
                 {/* Nguyên nhân & Kiến nghị */}
                 <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Nguyên nhân (nếu có chênh lệch)</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nguyên nhân (nếu có chênh lệch)
+                    </label>
                     <textarea
                       value={inventoryReason}
                       onChange={(e) => setInventoryReason(e.target.value)}
@@ -4188,7 +5307,9 @@ const ShiftOperationsPage: React.FC = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Kiến nghị / Kết luận</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Kiến nghị / Kết luận
+                    </label>
                     <textarea
                       value={inventoryConclusion}
                       onChange={(e) => setInventoryConclusion(e.target.value)}
@@ -4219,8 +5340,13 @@ const ShiftOperationsPage: React.FC = () => {
                     type="button"
                     onClick={async () => {
                       // Validate
-                      const filledTanks = Object.entries(inventoryCheckData).filter(([_, data]) =>
-                        data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0
+                      const filledTanks = Object.entries(
+                        inventoryCheckData,
+                      ).filter(
+                        ([_, data]) =>
+                          data.actualStock > 0 ||
+                          data.heightTotal > 0 ||
+                          data.heightWater > 0,
                       );
 
                       if (filledTanks.length === 0) {
@@ -4237,44 +5363,60 @@ const ShiftOperationsPage: React.FC = () => {
                       const tankDataArray: TankDataDto[] = [];
                       let totalDiff = 0;
 
-                      products?.filter(p => p.isFuel).forEach(product => {
-                        const productTanks = tanks?.filter((t: any) => t.productId === product.id) || [];
-                        productTanks.forEach((tank: any) => {
-                          const data = inventoryCheckData[tank.id];
-                          if (data && (data.actualStock > 0 || data.heightTotal > 0 || data.heightWater > 0)) {
-                            const defaultBookStock = Number(tank.currentStock) || 0;
-                            const bookStock = data.bookStock !== undefined ? data.bookStock : defaultBookStock;
-                            const diff = (data.actualStock || 0) - bookStock;
-                            totalDiff += diff;
+                      products
+                        ?.filter((p) => p.isFuel)
+                        .forEach((product) => {
+                          const productTanks =
+                            tanks?.filter(
+                              (t: any) => t.productId === product.id,
+                            ) || [];
+                          productTanks.forEach((tank: any) => {
+                            const data = inventoryCheckData[tank.id];
+                            if (
+                              data &&
+                              (data.actualStock > 0 ||
+                                data.heightTotal > 0 ||
+                                data.heightWater > 0)
+                            ) {
+                              const defaultBookStock =
+                                Number(tank.currentStock) || 0;
+                              const bookStock =
+                                data.bookStock !== undefined
+                                  ? data.bookStock
+                                  : defaultBookStock;
+                              const diff = (data.actualStock || 0) - bookStock;
+                              totalDiff += diff;
 
-                            tankDataArray.push({
-                              tankId: tank.id,
-                              tankCode: tank.tankCode || tank.name,
-                              productName: product.name,
-                              heightTotal: data.heightTotal || 0,
-                              heightWater: data.heightWater || 0,
-                              actualStock: data.actualStock || 0,
-                              bookStock: bookStock,
-                              difference: diff,
-                            });
-                          }
+                              tankDataArray.push({
+                                tankId: tank.id,
+                                tankCode: tank.tankCode || tank.name,
+                                productName: product.name,
+                                heightTotal: data.heightTotal || 0,
+                                heightWater: data.heightWater || 0,
+                                actualStock: data.actualStock || 0,
+                                bookStock: bookStock,
+                                difference: diff,
+                              });
+                            }
+                          });
                         });
-                      });
 
                       // Build pump data for API
                       const pumpDataArray: PumpDataDto[] = [];
-                      Object.entries(pumpMeterReadings).forEach(([pumpIdStr, meterReading]) => {
-                        const pumpId = Number(pumpIdStr);
-                        const pump = pumps?.find((p: any) => p.id === pumpId);
-                        if (pump && meterReading > 0) {
-                          pumpDataArray.push({
-                            pumpId: pump.id,
-                            pumpCode: pump.pumpCode,
-                            tankId: pump.tankId, // ✅ Thêm tankId để map vòi với bể
-                            meterReading: meterReading,
-                          });
-                        }
-                      });
+                      Object.entries(pumpMeterReadings).forEach(
+                        ([pumpIdStr, meterReading]) => {
+                          const pumpId = Number(pumpIdStr);
+                          const pump = pumps?.find((p: any) => p.id === pumpId);
+                          if (pump && meterReading > 0) {
+                            pumpDataArray.push({
+                              pumpId: pump.id,
+                              pumpCode: pump.pumpCode,
+                              tankId: pump.tankId, // ✅ Thêm tankId để map vòi với bể
+                              meterReading: meterReading,
+                            });
+                          }
+                        },
+                      );
 
                       try {
                         await inventoryCheckApi.create({
@@ -4288,7 +5430,7 @@ const ShiftOperationsPage: React.FC = () => {
                           reason: inventoryReason || undefined,
                           conclusion: inventoryConclusion || undefined,
                           totalDifference: totalDiff,
-                          status: 'DRAFT',
+                          status: "DRAFT",
                         });
 
                         toast.success("Đã lưu biên bản kiểm kê!");
@@ -4301,7 +5443,10 @@ const ShiftOperationsPage: React.FC = () => {
                         setInventoryMember1("");
                         setInventoryMember2("");
                       } catch (error: any) {
-                        toast.error(error?.response?.data?.message || "Không thể lưu biên bản kiểm kê");
+                        toast.error(
+                          error?.response?.data?.message ||
+                            "Không thể lưu biên bản kiểm kê",
+                        );
                       }
                     }}
                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
@@ -4323,25 +5468,40 @@ const ShiftOperationsPage: React.FC = () => {
         <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg shadow p-6">
           <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-4">
             <p className="text-sm text-yellow-700">
-              <strong>⚠️ Lưu ý:</strong> Kiểm tra lại số cột bơm và thông tin các phiếu truớc khi chốt ca. Bấm "Chốt ca"
-              để lưu toàn bộ dữ liệu.
+              <strong>⚠️ Lưu ý:</strong> Kiểm tra lại số cột bơm và thông tin
+              các phiếu truớc khi chốt ca. Bấm "Chốt ca" để lưu toàn bộ dữ liệu.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="border-l-4 border-blue-500 pl-4">
               <p className="text-sm text-gray-600">Thu tiền (thanh toán nợ)</p>
-              <p className="text-xl font-bold text-blue-600">{totalReceipts.toLocaleString("vi-VN")} ₫</p>
-              <p className="text-xs text-gray-500">({draftReceipts.length} phiếu)</p>
+              <p className="text-xl font-bold text-blue-600">
+                {totalReceipts.toLocaleString("vi-VN")} ₫
+              </p>
+              <p className="text-xs text-gray-500">
+                ({draftReceipts.length} phiếu)
+              </p>
             </div>
             <div className="border-l-4 border-red-500 pl-4">
               <p className="text-sm text-gray-600">Nộp về công ty</p>
-              <p className="text-xl font-bold text-red-600">{totalDeposits.toLocaleString("vi-VN")} ₫</p>
-              <p className="text-xs text-gray-500">({draftDeposits.length} phiếu)</p>
+              <p className="text-xl font-bold text-red-600">
+                {totalDeposits.toLocaleString("vi-VN")} ₫
+              </p>
+              <p className="text-xs text-gray-500">
+                ({draftDeposits.length} phiếu)
+              </p>
             </div>
             <div className="border-l-4 border-purple-500 pl-4">
-              <p className="text-sm text-gray-600">Biến động tiền trong ca (dự tính)</p>
+              <p className="text-sm text-gray-600">
+                Biến động tiền trong ca (dự tính)
+              </p>
               <p className="text-xl font-bold text-purple-600">
-                {(totalRetailSales + totalReceipts - totalDeposits).toLocaleString("vi-VN")} ₫
+                {(
+                  totalRetailSales +
+                  totalReceipts -
+                  totalDeposits
+                ).toLocaleString("vi-VN")}{" "}
+                ₫
               </p>
               <p className="text-xs text-gray-500">Bán lẻ + Thu - Nộp</p>
             </div>
