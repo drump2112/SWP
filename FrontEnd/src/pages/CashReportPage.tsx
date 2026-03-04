@@ -750,115 +750,117 @@ const CashReportPage: React.FC = () => {
                         </>
                       )}
 
-                      {!isStoreCollapsed && storeData.data?.ledgers && storeData.data.ledgers.length > 0 ? (
-                        <>
-                          {/* Opening Balance for this store */}
-                          <tr className="bg-blue-50 border-y border-blue-200">
-                            <td colSpan={4} className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                              Số dư đầu kỳ
-                            </td>
-                            <td className="px-6 py-3 text-right text-base border-l border-blue-200">
-                              <span className="font-bold text-blue-600 tabular-nums">
-                                {storeData.data?.openingBalance?.toLocaleString('vi-VN') || '0'}
-                              </span>
-                            </td>
-                            <td></td>
-                          </tr>
+                      {!isStoreCollapsed && (
+                        storeData.data?.ledgers && storeData.data.ledgers.length > 0 ? (
+                          <>
+                            {/* Opening Balance for this store */}
+                            <tr className="bg-blue-50 border-y border-blue-200">
+                              <td colSpan={4} className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                                Số dư đầu kỳ
+                              </td>
+                              <td className="px-6 py-3 text-right text-base border-l border-blue-200">
+                                <span className="font-bold text-blue-600 tabular-nums">
+                                  {storeData.data?.openingBalance?.toLocaleString('vi-VN') || '0'}
+                                </span>
+                              </td>
+                              <td></td>
+                            </tr>
 
-                          {/* Ledger entries for this store */}
-                          {storeData.data.ledgers.map((ledger: any) => (
-                            <React.Fragment key={ledger.id}>
-                              <tr className="hover:bg-gray-50 border-b border-gray-200">
-                                <td className="px-6 py-4 text-center text-sm text-gray-900 whitespace-nowrap border-r border-gray-300">
-                                  {dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
-                                  {ledger.details?.paymentMethod === 'BANK_TRANSFER' ? (
-                                    <span className="text-xs font-medium text-blue-600">🏦 CK</span>
-                                  ) : (
-                                    <span className="text-xs font-medium text-green-600">💵 TM</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
-                                  {ledger.cashIn > 0 ? (
-                                    <span className="text-green-600 font-semibold tabular-nums">
-                                      {ledger.cashIn.toLocaleString('vi-VN')}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
-                                  {ledger.cashOut > 0 ? (
-                                    <span className="text-red-600 font-semibold tabular-nums">
-                                      {ledger.cashOut.toLocaleString('vi-VN')}
-                                    </span>
-                                  ) : (
-                                    <span className="text-gray-400">-</span>
-                                  )}
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
-                                  <span className={`font-bold tabular-nums ${
-                                    ledger.balance >= 0 ? 'text-purple-600' : 'text-red-600'
-                                  }`}>
-                                    {ledger.balance.toLocaleString('vi-VN')}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 text-center text-sm">
-                                  {ledger.details && (
-                                    <button
-                                      onClick={() => setShowDetails(showDetails === ledger.id ? null : ledger.id)}
-                                      className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                                    >
-                                      {showDetails === ledger.id ? '▼' : '▶'}
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                              {/* Detail Row */}
-                              {showDetails === ledger.id && ledger.details && (
-                                <tr className="bg-gray-50 border-b border-gray-200">
-                                  <td colSpan={6} className="px-6 py-3">
-                                    <div className="text-sm font-semibold text-gray-700 mb-2">Chi tiết:</div>
-                                    {ledger.details.type === 'RECEIPT' && (
-                                      <div className="text-xs text-gray-700">
-                                        <div>Loại: {ledger.details.receiptType === 'CASH_SALES' ? 'Bán lẻ' : 'Thu nợ'}</div>
-                                        <div>Tổng tiền: {ledger.details.totalAmount?.toLocaleString('vi-VN')}₫</div>
-                                        {ledger.details.notes && <div>Ghi chú: {ledger.details.notes}</div>}
-                                      </div>
+                            {/* Ledger entries for this store */}
+                            {storeData.data.ledgers.map((ledger: any) => (
+                              <React.Fragment key={ledger.id}>
+                                <tr className="hover:bg-gray-50 border-b border-gray-200">
+                                  <td className="px-6 py-4 text-center text-sm text-gray-900 whitespace-nowrap border-r border-gray-300">
+                                    {dayjs(ledger.date).format('DD/MM/YYYY HH:mm')}
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
+                                    {ledger.details?.paymentMethod === 'BANK_TRANSFER' ? (
+                                      <span className="text-xs font-medium text-blue-600">🏦 CK</span>
+                                    ) : (
+                                      <span className="text-xs font-medium text-green-600">💵 TM</span>
                                     )}
-                                    {ledger.details.type === 'DEPOSIT' && (
-                                      <div className="text-xs text-gray-700">
-                                        <div>Ngày nộp: {dayjs(ledger.details.depositAt).format('DD/MM/YYYY HH:mm')}</div>
-                                        <div>Người nhận: {ledger.details.receiverName || '-'}</div>
-                                        <div>Số tiền: {ledger.details.amount?.toLocaleString('vi-VN')}₫</div>
-                                      </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
+                                    {ledger.cashIn > 0 ? (
+                                      <span className="text-green-600 font-semibold tabular-nums">
+                                        {ledger.cashIn.toLocaleString('vi-VN')}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
+                                    {ledger.cashOut > 0 ? (
+                                      <span className="text-red-600 font-semibold tabular-nums">
+                                        {ledger.cashOut.toLocaleString('vi-VN')}
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400">-</span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm border-r border-gray-300">
+                                    <span className={`font-bold tabular-nums ${
+                                      ledger.balance >= 0 ? 'text-purple-600' : 'text-red-600'
+                                    }`}>
+                                      {ledger.balance.toLocaleString('vi-VN')}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-center text-sm">
+                                    {ledger.details && (
+                                      <button
+                                        onClick={() => setShowDetails(showDetails === ledger.id ? null : ledger.id)}
+                                        className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                                      >
+                                        {showDetails === ledger.id ? '▼' : '▶'}
+                                      </button>
                                     )}
                                   </td>
                                 </tr>
-                              )}
-                            </React.Fragment>
-                          ))}
+                                {/* Detail Row */}
+                                {showDetails === ledger.id && ledger.details && (
+                                  <tr className="bg-gray-50 border-b border-gray-200">
+                                    <td colSpan={6} className="px-6 py-3">
+                                      <div className="text-sm font-semibold text-gray-700 mb-2">Chi tiết:</div>
+                                      {ledger.details.type === 'RECEIPT' && (
+                                        <div className="text-xs text-gray-700">
+                                          <div>Loại: {ledger.details.receiptType === 'CASH_SALES' ? 'Bán lẻ' : 'Thu nợ'}</div>
+                                          <div>Tổng tiền: {ledger.details.totalAmount?.toLocaleString('vi-VN')}₫</div>
+                                          {ledger.details.notes && <div>Ghi chú: {ledger.details.notes}</div>}
+                                        </div>
+                                      )}
+                                      {ledger.details.type === 'DEPOSIT' && (
+                                        <div className="text-xs text-gray-700">
+                                          <div>Ngày nộp: {dayjs(ledger.details.depositAt).format('DD/MM/YYYY HH:mm')}</div>
+                                          <div>Người nhận: {ledger.details.receiverName || '-'}</div>
+                                          <div>Số tiền: {ledger.details.amount?.toLocaleString('vi-VN')}₫</div>
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                )}
+                              </React.Fragment>
+                            ))}
 
-                          {/* Closing Balance for this store */}
-                          <tr className="bg-purple-50 border-y-2 border-purple-500">
-                            <td colSpan={4} className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
-                              Số dư cuối kỳ
+                            {/* Closing Balance for this store */}
+                            <tr className="bg-purple-50 border-y-2 border-purple-500">
+                              <td colSpan={4} className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
+                                Số dư cuối kỳ
+                              </td>
+                              <td className="px-6 py-3 text-right text-base border-l border-purple-300">
+                                <span className="font-bold text-purple-600 tabular-nums">
+                                  {storeData.data?.closingBalance?.toLocaleString('vi-VN') || '0'}
+                                </span>
+                              </td>
+                              <td></td>
+                            </tr>
+                          </>
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                              Không có giao dịch trong kỳ này
                             </td>
-                            <td className="px-6 py-3 text-right text-base border-l border-purple-300">
-                              <span className="font-bold text-purple-600 tabular-nums">
-                                {storeData.data?.closingBalance?.toLocaleString('vi-VN') || '0'}
-                              </span>
-                            </td>
-                            <td></td>
                           </tr>
-                        </>
-                      ) : (
-                        <tr>
-                          <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
-                            Không có giao dịch trong kỳ này
-                          </td>
-                        </tr>
+                        )
                       )}
                     </React.Fragment>
                     );
