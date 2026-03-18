@@ -27,6 +27,37 @@ import { printReport, formatCurrency, formatNumber, formatDate } from '../utils/
 import DateRangePicker from '../components/DateRangePicker';
 import SearchableSelect from '../components/SearchableSelect';
 
+// Helper function to aggregate tanks by product within a store's report
+const aggregateProductsByStore = (tanks: any[]) => {
+  const productMap: Record<number, any> = {};
+  
+  tanks.forEach((tank) => {
+    const productId = tank.productId;
+    if (!productMap[productId]) {
+      productMap[productId] = {
+        productId: tank.productId,
+        productCode: tank.productCode,
+        productName: tank.productName,
+        unitName: tank.unitName,
+        tankCount: 0,
+        totalCapacity: 0,
+        openingBalance: 0,
+        importQuantity: 0,
+        exportQuantity: 0,
+        closingBalance: 0,
+      };
+    }
+    productMap[productId].tankCount += 1;
+    productMap[productId].totalCapacity += Number(tank.capacity);
+    productMap[productId].openingBalance += Number(tank.openingBalance);
+    productMap[productId].importQuantity += Number(tank.importQuantity);
+    productMap[productId].exportQuantity += Number(tank.exportQuantity);
+    productMap[productId].closingBalance += Number(tank.closingBalance);
+  });
+  
+  return Object.values(productMap);
+};
+
 const InventoryReportPage: React.FC = () => {
   usePageTitle('Nhập Xuất Tồn');
   const { user } = useAuth();
@@ -93,9 +124,9 @@ const InventoryReportPage: React.FC = () => {
     enabled: false, // Disabled - use reportWithPeriods instead
   });
 
-  // Fetch inventory reports for all stores - 🔥 THEO BỂ (Tank-based)
+  // Fetch inventory reports for all stores - 🔥 THEO MẶT HÀNG (Product-based per store)
   const { data: allStoresReport, isLoading: isLoadingAllStoresReport } = useQuery({
-    queryKey: ['inventory-report-all-stores-by-tank', fromDate, toDate],
+    queryKey: ['inventory-report-all-stores-by-product', fromDate, toDate],
     queryFn: async () => {
       if (!stores || stores.length === 0) return [];
 
@@ -103,10 +134,11 @@ const InventoryReportPage: React.FC = () => {
         stores.map(async (store: any) => {
           try {
             const storeReport = await inventoryApi.getInventoryReportByTank(store.id, fromDate, toDate);
+            const aggregatedProducts = aggregateProductsByStore(storeReport);
             return {
               storeId: store.id,
               storeName: store.name,
-              data: storeReport,
+              data: aggregatedProducts,
             };
           } catch (error) {
             console.error(`Error fetching report for store ${store.id}:`, error);
@@ -208,39 +240,74 @@ const InventoryReportPage: React.FC = () => {
         toDate,
       });
 
-      // Columns setup - 🔥 THEO BỂ
-      worksheet.columns = [
-        { key: 'stt', width: 6 },
-        { key: 'tankCode', width: 12 },
-        { key: 'tankName', width: 20 },
-        { key: 'productName', width: 25 },
-        { key: 'unit', width: 10 },
-        { key: 'capacity', width: 12 },
-        { key: 'opening', width: 15 },
-        { key: 'import', width: 15 },
-        { key: 'export', width: 15 },
-        { key: 'closing', width: 15 },
-      ];
+      // Columns setup
+      if (isAllStores) {
+        // 🔥 THEO MẶT HÀNG (Product-based for all stores)
+        worksheet.columns = [
+          { key: 'stt', width: 6 },
+          { key: 'productName', width: 25 },
+          { key: 'unit', width: 10 },
+          { key: 'tankCount', width: 8 },
+          { key: 'capacity', width: 12 },
+          { key: 'opening', width: 15 },
+          { key: 'import', width: 15 },
+          { key: 'export', width: 15 },
+          { key: 'closing', width: 15 },
+        ];
 
-      // Table Header (Row 7)
-      const headerRow = worksheet.getRow(7);
-      headerRow.values = [
-        'STT',
-        'Mã bể',
-        'Tên bể',
-        'Mặt hàng',
-        'ĐVT',
-        'Dung tích',
-        'Tồn đầu kỳ',
-        'Nhập',
-        'Xuất',
-        'Tồn cuối kỳ',
-      ];
-      headerRow.font = STYLES.headerFont;
-      headerRow.alignment = STYLES.centerAlign;
-      headerRow.eachCell((cell) => {
-        cell.border = STYLES.borderStyle;
-      });
+        // Table Header (Row 7)
+        const headerRow = worksheet.getRow(7);
+        headerRow.values = [
+          'STT',
+          'Mặt hàng',
+          'ĐVT',
+          'Số bể',
+          'Dung tích',
+          'Tồn đầu kỳ',
+          'Nhập',
+          'Xuất',
+          'Tồn cuối kỳ',
+        ];
+        headerRow.font = STYLES.headerFont;
+        headerRow.alignment = STYLES.centerAlign;
+        headerRow.eachCell((cell) => {
+          cell.border = STYLES.borderStyle;
+        });
+      } else {
+        // 🔥 THEO BỂ (Tank-based for single store)
+        worksheet.columns = [
+          { key: 'stt', width: 6 },
+          { key: 'tankCode', width: 12 },
+          { key: 'tankName', width: 20 },
+          { key: 'productName', width: 25 },
+          { key: 'unit', width: 10 },
+          { key: 'capacity', width: 12 },
+          { key: 'opening', width: 15 },
+          { key: 'import', width: 15 },
+          { key: 'export', width: 15 },
+          { key: 'closing', width: 15 },
+        ];
+
+        // Table Header (Row 7)
+        const headerRow = worksheet.getRow(7);
+        headerRow.values = [
+          'STT',
+          'Mã bể',
+          'Tên bể',
+          'Mặt hàng',
+          'ĐVT',
+          'Dung tích',
+          'Tồn đầu kỳ',
+          'Nhập',
+          'Xuất',
+          'Tồn cuối kỳ',
+        ];
+        headerRow.font = STYLES.headerFont;
+        headerRow.alignment = STYLES.centerAlign;
+        headerRow.eachCell((cell) => {
+          cell.border = STYLES.borderStyle;
+        });
+      }
 
       // Data Rows
       let totalOpening = 0;
@@ -249,12 +316,12 @@ const InventoryReportPage: React.FC = () => {
       let totalClosing = 0;
 
       if (isAllStores && allStoresReport) {
-        // All stores mode - group by store (🔥 THEO BỂ)
+        // All stores mode - group by store, then by product (🔥 THEO MẶT HÀNG)
         let stt = 1;
         allStoresReport.forEach((storeData: any) => {
           if (storeData.data && storeData.data.length > 0) {
             // Store header row
-            const storeHeaderRow = worksheet.addRow([storeData.storeName, '', '', '', '', '', '', '', '', '']);
+            const storeHeaderRow = worksheet.addRow([storeData.storeName, '', '', '', '', '', '', '', '']);
             storeHeaderRow.font = { ...STYLES.boldFont, size: 12 };
             storeHeaderRow.eachCell((cell) => {
               cell.fill = {
@@ -264,34 +331,33 @@ const InventoryReportPage: React.FC = () => {
               };
               cell.border = STYLES.borderStyle;
             });
-            worksheet.mergeCells(`A${storeHeaderRow.number}:J${storeHeaderRow.number}`);
+            worksheet.mergeCells(`A${storeHeaderRow.number}:I${storeHeaderRow.number}`);
 
-            // Store data rows (🔥 THEO BỂ)
-            storeData.data.forEach((item: any) => {
+            // Store data rows - products (🔥 THEO MẶT HÀNG)
+            storeData.data.forEach((product: any) => {
               const row = worksheet.addRow([
                 stt++,
-                item.tankCode,
-                item.tankName,
-                item.productName,
-                item.unitName,
-                Number(item.capacity),
-                Number(item.openingBalance),
-                Number(item.importQuantity),
-                Number(item.exportQuantity),
-                Number(item.closingBalance),
+                product.productName,
+                product.unitName,
+                product.tankCount,
+                Number(product.totalCapacity),
+                Number(product.openingBalance),
+                Number(product.importQuantity),
+                Number(product.exportQuantity),
+                Number(product.closingBalance),
               ]);
 
-              totalOpening += Number(item.openingBalance);
-              totalImport += Number(item.importQuantity);
-              totalExport += Number(item.exportQuantity);
-              totalClosing += Number(item.closingBalance);
+              totalOpening += Number(product.openingBalance);
+              totalImport += Number(product.importQuantity);
+              totalExport += Number(product.exportQuantity);
+              totalClosing += Number(product.closingBalance);
 
               row.font = STYLES.normalFont;
               row.eachCell((cell, colNumber) => {
                 cell.border = STYLES.borderStyle;
-                if (colNumber === 1 || colNumber === 5) {
+                if (colNumber === 1 || colNumber === 4) {
                   cell.alignment = STYLES.centerAlign;
-                } else if (colNumber >= 2 && colNumber <= 4) {
+                } else if (colNumber >= 2 && colNumber <= 3) {
                   cell.alignment = STYLES.leftAlign;
                 } else {
                   cell.alignment = STYLES.rightAlign;
@@ -608,36 +674,35 @@ const InventoryReportPage: React.FC = () => {
       let tableRows = '';
 
       if (isAllStores && allStoresReport) {
-        // All stores mode
+        // All stores mode - group by store, then by product (🔥 THEO MẶT HÀNG)
         let stt = 1;
         allStoresReport.forEach((storeData: any) => {
           if (storeData.data && storeData.data.length > 0) {
-            // Store header row (🔥 THEO BỂ - 10 cột)
+            // Store header row (🔥 9 cột)
             tableRows += `
               <tr class="store-header">
-                <td colspan="10" class="text-left font-bold" style="background-color: #e0e0e0; padding: 8px;">${storeData.storeName}</td>
+                <td colspan="9" class="text-left font-bold" style="background-color: #e0e0e0; padding: 8px;">${storeData.storeName}</td>
               </tr>
             `;
 
-            // Store data rows (🔥 THEO BỂ)
-            storeData.data.forEach((item: any) => {
-              totalOpening += Number(item.openingBalance);
-              totalImport += Number(item.importQuantity);
-              totalExport += Number(item.exportQuantity);
-              totalClosing += Number(item.closingBalance);
+            // Store data rows - products (🔥 THEO MẶT HÀNG)
+            storeData.data.forEach((product: any) => {
+              totalOpening += Number(product.openingBalance);
+              totalImport += Number(product.importQuantity);
+              totalExport += Number(product.exportQuantity);
+              totalClosing += Number(product.closingBalance);
 
               tableRows += `
                 <tr>
                   <td class="text-center">${stt++}</td>
-                  <td class="text-center">${item.tankCode}</td>
-                  <td class="text-left">${item.tankName}</td>
-                  <td class="text-left">${item.productName}</td>
-                  <td class="text-center">${item.unitName}</td>
-                  <td class="text-right">${formatNumber(item.capacity)}</td>
-                  <td class="text-right">${formatNumber(item.openingBalance)}</td>
-                  <td class="text-right">${formatNumber(item.importQuantity)}</td>
-                  <td class="text-right">${formatNumber(item.exportQuantity)}</td>
-                  <td class="text-right">${formatNumber(item.closingBalance)}</td>
+                  <td class="text-left">${product.productName}</td>
+                  <td class="text-center">${product.unitName}</td>
+                  <td class="text-center">${product.tankCount}</td>
+                  <td class="text-right">${formatNumber(product.totalCapacity)}</td>
+                  <td class="text-right">${formatNumber(product.openingBalance)}</td>
+                  <td class="text-right">${formatNumber(product.importQuantity)}</td>
+                  <td class="text-right">${formatNumber(product.exportQuantity)}</td>
+                  <td class="text-right">${formatNumber(product.closingBalance)}</td>
                 </tr>
               `;
             });
@@ -754,14 +819,22 @@ const InventoryReportPage: React.FC = () => {
           <thead>
             <tr>
               <th>STT</th>
-              <th>Mã bể</th>
-              <th>Tên bể</th>
-              <th>Mặt hàng</th>
-              <th>ĐVT</th>
-              <th>Dung tích</th>
+              ${isAllStores ? `
+                <th>Mặt hàng</th>
+                <th>ĐVT</th>
+                <th>Số bể</th>
+                <th>Dung tích</th>
+              ` : `
+                <th>Mã bể</th>
+                <th>Tên bể</th>
+                <th>Mặt hàng</th>
+                <th>ĐVT</th>
+                <th>Dung tích</th>
+              `}
               <th>Tồn đầu kỳ</th>
               <th>Nhập</th>
               <th>Xuất</th>
+              ${!isAllStores ? '<th>Hao hụt</th>' : ''}
               <th>Tồn cuối kỳ</th>
             </tr>
           </thead>
@@ -773,7 +846,7 @@ const InventoryReportPage: React.FC = () => {
 
       printReport(tableHTML, {
         storeName,
-        title: 'BÁO CÁO NHẬP - XUẤT - TỒN THEO BỂ',
+        title: isAllStores ? 'BÁO CÁO NHẬP - XUẤT - TỒN THEO MẶT HÀNG' : 'BÁO CÁO NHẬP - XUẤT - TỒN THEO BỂ',
         fromDate,
         toDate,
       });
@@ -1013,21 +1086,42 @@ const InventoryReportPage: React.FC = () => {
                 <tr>
                   {reportType === 'summary' ? (
                     <>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Mã bể
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Tên bể
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Mặt hàng
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        ĐVT
-                      </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Dung tích
-                      </th>
+                      {isAllStores ? (
+                        // 🔥 All stores mode - THEO MẶT HÀNG (grouped by product)
+                        <>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Mặt hàng
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            ĐVT
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Số bể
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Dung tích
+                          </th>
+                        </>
+                      ) : (
+                        // 🔥 Single store mode - THEO BỂ (tank-based)
+                        <>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Mã bể
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Tên bể
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Mặt hàng
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            ĐVT
+                          </th>
+                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Dung tích
+                          </th>
+                        </>
+                      )}
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Tồn đầu kỳ
                       </th>
@@ -1037,7 +1131,7 @@ const InventoryReportPage: React.FC = () => {
                       <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Xuất
                       </th>
-                      {/* Hao hụt - luôn hiển thị cho single store vì có thể có kỳ đã chốt */}
+                      {/* Hao hụt - chỉ hiển thị cho single store vì có kỳ đã chốt */}
                       {!isAllStores && (
                         <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-orange-600 uppercase tracking-wider">
                           Hao hụt
@@ -1076,44 +1170,41 @@ const InventoryReportPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {reportType === 'summary' && isAllStores && allStoresReport && allStoresReport.length > 0 ? (
-                  // All stores mode - grouped by store (🔥 THEO BỂ)
+                  // All stores mode - grouped by store, then by product (🔥 THEO MẶT HÀNG)
                   allStoresReport.map((storeData: any, storeIndex: number) => (
                     <React.Fragment key={storeIndex}>
                       {storeData.data && storeData.data.length > 0 && (
                         <>
                           <tr className="bg-gray-100">
-                            <td colSpan={9} className="px-6 py-3 text-left text-sm font-bold text-gray-900">
+                            <td colSpan={8} className="px-6 py-3 text-left text-sm font-bold text-gray-900">
                               {storeData.storeName}
                             </td>
                           </tr>
-                          {storeData.data.map((item: any, itemIndex: number) => (
+                          {storeData.data.map((product: any, itemIndex: number) => (
                             <tr key={`${storeIndex}-${itemIndex}`} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {item.tankCode}
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {product.productName}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.tankName}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.productName}
-                              </td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {item.unitName}
+                                {product.unitName}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
-                                {Number(item.capacity).toLocaleString('vi-VN')}
+                                {product.tankCount}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-500">
+                                {Number(product.totalCapacity).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-gray-900">
-                                {Number(item.openingBalance).toLocaleString('vi-VN')}
+                                {Number(product.openingBalance).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600">
-                                {Number(item.importQuantity).toLocaleString('vi-VN')}
+                                {Number(product.importQuantity).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-red-600">
-                                {Number(item.exportQuantity).toLocaleString('vi-VN')}
+                                {Number(product.exportQuantity).toLocaleString('vi-VN')}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-right font-bold text-blue-600">
-                                {Number(item.closingBalance).toLocaleString('vi-VN')}
+                                {Number(product.closingBalance).toLocaleString('vi-VN')}
                               </td>
                             </tr>
                           ))}
@@ -1341,7 +1432,7 @@ const InventoryReportPage: React.FC = () => {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={reportType === 'summary' ? (isAllStores ? 9 : 10) : 7} className="px-6 py-12 text-center">
+                    <td colSpan={reportType === 'summary' ? (isAllStores ? 8 : 10) : 7} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <ArchiveBoxIcon className="h-12 w-12 mb-3 text-gray-400" />
                         <p className="text-sm font-medium">
