@@ -17,9 +17,18 @@ export class InventoryReportController {
       if (!startDate || !endDate) {
         throw new BadRequestException('start_date and end_date are required');
       }
-      return await this.reportService.getDetailedReport(startDate, endDate, warehouseId, supplierId, productId);
+      return await this.reportService.getDetailedReport(
+        startDate,
+        endDate,
+        warehouseId,
+        supplierId,
+        productId,
+      );
     } catch (error) {
-      console.error('[InventoryReportController] Error in getDetailedReport:', error);
+      console.error(
+        '[InventoryReportController] Error in getDetailedReport:',
+        error,
+      );
       throw error;
     }
   }
@@ -35,9 +44,17 @@ export class InventoryReportController {
       if (!startDate || !endDate) {
         throw new BadRequestException('start_date and end_date are required');
       }
-      return await this.reportService.getBatchReport(startDate, endDate, warehouseId, supplierId);
+      return await this.reportService.getBatchReport(
+        startDate,
+        endDate,
+        warehouseId,
+        supplierId,
+      );
     } catch (error) {
-      console.error('[InventoryReportController] Error in getBatchReport:', error);
+      console.error(
+        '[InventoryReportController] Error in getBatchReport:',
+        error,
+      );
       throw error;
     }
   }

@@ -48,7 +48,10 @@ export class CommercialCustomersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCommercialCustomerDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCustomerDto: UpdateCommercialCustomerDto,
+  ) {
     return this.customersService.update(+id, updateCustomerDto);
   }
 

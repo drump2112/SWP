@@ -33,10 +33,20 @@ export class InventoryCheck {
   checkAt: Date;
 
   // Thành viên kiểm kê
-  @Column({ name: 'member1_name', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'member1_name',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   member1Name: string | null;
 
-  @Column({ name: 'member2_name', type: 'varchar', length: 100, nullable: true })
+  @Column({
+    name: 'member2_name',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
   member2Name: string | null;
 
   // Chi tiết kiểm kê (lưu JSON)
@@ -54,7 +64,13 @@ export class InventoryCheck {
   conclusion: string | null;
 
   // Tổng hợp nhanh
-  @Column({ name: 'total_difference', type: 'decimal', precision: 15, scale: 3, default: 0 })
+  @Column({
+    name: 'total_difference',
+    type: 'decimal',
+    precision: 15,
+    scale: 3,
+    default: 0,
+  })
   totalDifference: number;
 
   // Audit

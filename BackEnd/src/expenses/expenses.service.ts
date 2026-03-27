@@ -51,10 +51,7 @@ export class ExpensesService {
   }
 
   // Tạo chi phí mới
-  async createExpense(
-    dto: CreateExpenseDto,
-    userId: number,
-  ): Promise<Expense> {
+  async createExpense(dto: CreateExpenseDto, userId: number): Promise<Expense> {
     const category = await this.categoryRepository.findOne({
       where: { id: dto.expenseCategoryId },
     });
@@ -77,10 +74,7 @@ export class ExpensesService {
   }
 
   // Cập nhật chi phí
-  async updateExpense(
-    id: number,
-    dto: UpdateExpenseDto,
-  ): Promise<Expense> {
+  async updateExpense(id: number, dto: UpdateExpenseDto): Promise<Expense> {
     const expense = await this.expenseRepository.findOne({
       where: { id },
       relations: ['expenseCategory'],

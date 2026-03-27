@@ -10,26 +10,23 @@ export class InventoryExportService {
   /**
    * Xuất biên bản giao nhận xăng dầu ra Excel
    */
-  async exportInventoryDocumentToExcel(
-    documentData: any,
-    response: Response,
-  ) {
+  async exportInventoryDocumentToExcel(documentData: any, response: Response) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Biên bản giao nhận');
 
     // Thiết lập chiều rộng cột
     worksheet.columns = [
-      { width: 5 },   // A - STT
-      { width: 15 },  // B - Ngăn
-      { width: 20 },  // C - Mặt hàng
-      { width: 12 },  // D - Chiều cao téc xe
-      { width: 12 },  // E - Nhiệt độ xe
-      { width: 15 },  // F - Lít tại xe
-      { width: 12 },  // G - Chiều cao téc kho
-      { width: 12 },  // H - Nhiệt độ thực tế
-      { width: 15 },  // I - Lít thực tế
-      { width: 15 },  // J - Thực nhận
-      { width: 15 },  // K - Hao hụt
+      { width: 5 }, // A - STT
+      { width: 15 }, // B - Ngăn
+      { width: 20 }, // C - Mặt hàng
+      { width: 12 }, // D - Chiều cao téc xe
+      { width: 12 }, // E - Nhiệt độ xe
+      { width: 15 }, // F - Lít tại xe
+      { width: 12 }, // G - Chiều cao téc kho
+      { width: 12 }, // H - Nhiệt độ thực tế
+      { width: 15 }, // I - Lít thực tế
+      { width: 15 }, // J - Thực nhận
+      { width: 15 }, // K - Hao hụt
     ];
 
     // TIÊU ĐỀ
@@ -41,14 +38,17 @@ export class InventoryExportService {
 
     // Thông tin phiếu
     worksheet.mergeCells('A3:K3');
-    worksheet.getCell('A3').value = `Số phiếu: ${documentData.invoiceNumber || 'N/A'}`;
+    worksheet.getCell('A3').value =
+      `Số phiếu: ${documentData.invoiceNumber || 'N/A'}`;
     worksheet.getCell('A3').font = { bold: true };
 
     worksheet.mergeCells('A4:K4');
-    worksheet.getCell('A4').value = `Ngày: ${new Date(documentData.docDate).toLocaleDateString('vi-VN')}`;
+    worksheet.getCell('A4').value =
+      `Ngày: ${new Date(documentData.docDate).toLocaleDateString('vi-VN')}`;
 
     worksheet.mergeCells('A5:K5');
-    worksheet.getCell('A5').value = `Nhà cung cấp: ${documentData.supplierName || 'N/A'}`;
+    worksheet.getCell('A5').value =
+      `Nhà cung cấp: ${documentData.supplierName || 'N/A'}`;
 
     worksheet.mergeCells('A6:K6');
     worksheet.getCell('A6').value = `Biển số xe: ${documentData.licensePlate}`;
@@ -79,7 +79,11 @@ export class InventoryExportService {
         pattern: 'solid',
         fgColor: { argb: 'FFD3D3D3' },
       };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      cell.alignment = {
+        horizontal: 'center',
+        vertical: 'middle',
+        wrapText: true,
+      };
       cell.border = {
         top: { style: 'thin' },
         left: { style: 'thin' },
@@ -209,7 +213,12 @@ export class InventoryExportService {
     worksheet.getCell(`A${currentRow}`).value = 'Trạng thái:';
     worksheet.getCell(`A${currentRow}`).font = { bold: true };
     const statusCell = worksheet.getCell(`B${currentRow}`);
-    statusCell.value = calc.status === 'EXCESS' ? 'THỪA' : calc.status === 'SHORTAGE' ? 'THIẾU' : 'BÌNH THƯỜNG';
+    statusCell.value =
+      calc.status === 'EXCESS'
+        ? 'THỪA'
+        : calc.status === 'SHORTAGE'
+          ? 'THIẾU'
+          : 'BÌNH THƯỜNG';
     statusCell.font = { bold: true };
 
     // CHỮ KÝ

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+  Query,
+} from '@nestjs/common';
 import { CashService } from './cash.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -47,7 +56,9 @@ export class CashController {
   @Get('opening-balance')
   @Roles('ADMIN', 'ACCOUNTING', 'DIRECTOR')
   getOpeningBalanceRecords(@Query('storeId') storeId?: string) {
-    return this.cashService.getOpeningBalanceRecords(storeId ? +storeId : undefined);
+    return this.cashService.getOpeningBalanceRecords(
+      storeId ? +storeId : undefined,
+    );
   }
 
   /**
@@ -56,7 +67,20 @@ export class CashController {
    */
   @Put('opening-balance')
   @Roles('ADMIN', 'ACCOUNTING')
-  updateOpeningBalance(@Body() body: { id: number; openingBalance: number; notes?: string; effectiveDate?: string }) {
-    return this.cashService.updateOpeningBalance(body.id, body.openingBalance, body.notes, body.effectiveDate);
+  updateOpeningBalance(
+    @Body()
+    body: {
+      id: number;
+      openingBalance: number;
+      notes?: string;
+      effectiveDate?: string;
+    },
+  ) {
+    return this.cashService.updateOpeningBalance(
+      body.id,
+      body.openingBalance,
+      body.notes,
+      body.effectiveDate,
+    );
   }
 }

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommercialCustomerGroup } from '../../entities/commercial-customer-group.entity';
@@ -12,13 +16,17 @@ export class CustomerGroupsService {
     private groupsRepository: Repository<CommercialCustomerGroup>,
   ) {}
 
-  async create(createGroupDto: CreateCustomerGroupDto): Promise<CommercialCustomerGroup> {
+  async create(
+    createGroupDto: CreateCustomerGroupDto,
+  ): Promise<CommercialCustomerGroup> {
     const existing = await this.groupsRepository.findOne({
       where: { code: createGroupDto.code },
     });
 
     if (existing) {
-      throw new ConflictException(`Customer group with code ${createGroupDto.code} already exists`);
+      throw new ConflictException(
+        `Customer group with code ${createGroupDto.code} already exists`,
+      );
     }
 
     const group = this.groupsRepository.create(createGroupDto);
@@ -43,7 +51,10 @@ export class CustomerGroupsService {
     return group;
   }
 
-  async update(id: number, updateGroupDto: UpdateCustomerGroupDto): Promise<CommercialCustomerGroup> {
+  async update(
+    id: number,
+    updateGroupDto: UpdateCustomerGroupDto,
+  ): Promise<CommercialCustomerGroup> {
     const group = await this.findOne(id);
 
     if (updateGroupDto.code && updateGroupDto.code !== group.code) {
@@ -52,7 +63,9 @@ export class CustomerGroupsService {
       });
 
       if (existing) {
-        throw new ConflictException(`Customer group with code ${updateGroupDto.code} already exists`);
+        throw new ConflictException(
+          `Customer group with code ${updateGroupDto.code} already exists`,
+        );
       }
     }
 

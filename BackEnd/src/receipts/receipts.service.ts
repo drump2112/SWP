@@ -24,7 +24,9 @@ export class ReceiptsService {
   async create(createReceiptDto: CreateReceiptDto) {
     return this.dataSource.transaction(async (manager) => {
       // 1. Tạo receipt
-      const receiptAt = createReceiptDto.receiptAt ? new Date(createReceiptDto.receiptAt) : new Date();
+      const receiptAt = createReceiptDto.receiptAt
+        ? new Date(createReceiptDto.receiptAt)
+        : new Date();
       const paymentMethod = createReceiptDto.paymentMethod || 'CASH';
 
       const receipt = manager.create(Receipt, {
@@ -95,7 +97,12 @@ export class ReceiptsService {
   async findOne(id: number) {
     return this.receiptRepository.findOne({
       where: { id },
-      relations: ['store', 'shift', 'receiptDetails', 'receiptDetails.customer'],
+      relations: [
+        'store',
+        'shift',
+        'receiptDetails',
+        'receiptDetails.customer',
+      ],
     });
   }
 }

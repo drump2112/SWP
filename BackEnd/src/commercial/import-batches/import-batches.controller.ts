@@ -59,7 +59,10 @@ export class ImportBatchesController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBatchDto: UpdateImportBatchDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateBatchDto: UpdateImportBatchDto,
+  ) {
     return this.batchesService.update(+id, updateBatchDto);
   }
 

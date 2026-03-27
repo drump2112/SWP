@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, Not } from 'typeorm';
 import * as XLSX from 'xlsx';
@@ -11,8 +15,14 @@ import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
 import { ImportCustomersResponseDto } from './dto/import-customers.dto';
-import { UpdateStoreCreditLimitDto, ToggleCustomerBypassDto } from './dto/update-store-credit-limit.dto';
-import { ImportOpeningBalanceDto, ImportOpeningBalanceResponseDto } from './dto/import-opening-balance.dto';
+import {
+  UpdateStoreCreditLimitDto,
+  ToggleCustomerBypassDto,
+} from './dto/update-store-credit-limit.dto';
+import {
+  ImportOpeningBalanceDto,
+  ImportOpeningBalanceResponseDto,
+} from './dto/import-opening-balance.dto';
 
 @Injectable()
 export class CustomersService {
@@ -39,7 +49,7 @@ export class CustomersService {
         });
         if (existByTax) {
           throw new BadRequestException(
-            `Khách hàng với MST ${createCustomerDto.taxCode} đã tồn tại: ${existByTax.name} (${existByTax.code})`
+            `Khách hàng với MST ${createCustomerDto.taxCode} đã tồn tại: ${existByTax.name} (${existByTax.code})`,
           );
         }
       }
@@ -48,13 +58,15 @@ export class CustomersService {
       if (createCustomerDto.phone) {
         const existByNamePhone = await manager
           .createQueryBuilder(Customer, 'c')
-          .where('LOWER(c.name) = LOWER(:name)', { name: createCustomerDto.name })
+          .where('LOWER(c.name) = LOWER(:name)', {
+            name: createCustomerDto.name,
+          })
           .andWhere('c.phone = :phone', { phone: createCustomerDto.phone })
           .getOne();
 
         if (existByNamePhone) {
           throw new BadRequestException(
-            `Khách hàng "${createCustomerDto.name}" với SĐT ${createCustomerDto.phone} đã tồn tại (${existByNamePhone.code})`
+            `Khách hàng "${createCustomerDto.name}" với SĐT ${createCustomerDto.phone} đã tồn tại (${existByNamePhone.code})`,
           );
         }
       }
@@ -63,7 +75,7 @@ export class CustomersService {
       if (!createCustomerDto.code) {
         createCustomerDto.code = await this.generateCustomerCode(
           createCustomerDto.storeId,
-          manager
+          manager,
         );
       } else {
         // 4. Kiểm tra mã không trùng (nếu nhập thủ công)
@@ -72,7 +84,7 @@ export class CustomersService {
         });
         if (existByCode) {
           throw new BadRequestException(
-            `Mã khách hàng ${createCustomerDto.code} đã tồn tại`
+            `Mã khách hàng ${createCustomerDto.code} đã tồn tại`,
           );
         }
       }
@@ -97,7 +109,7 @@ export class CustomersService {
 
   private async generateCustomerCode(
     storeId?: number,
-    manager?: any
+    manager?: any,
   ): Promise<string> {
     const repository = manager
       ? manager.getRepository(Customer)
@@ -162,7 +174,10 @@ export class CustomersService {
     return customer;
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto): Promise<Customer> {
+  async update(
+    id: number,
+    updateCustomerDto: UpdateCustomerDto,
+  ): Promise<Customer> {
     const { storeId, ...customerData } = updateCustomerDto;
     const customer = await this.findOne(id);
     Object.assign(customer, customerData);
@@ -202,7 +217,7 @@ export class CustomersService {
       .createQueryBuilder('dl')
       .select('SUM(dl.debit - dl.credit)', 'balance')
       .where('dl.customer_id = :customerId', { customerId });
-      // TODO: Thêm .andWhere('dl.superseded_by_shift_id IS NULL') sau khi chạy migration
+    // TODO: Thêm .andWhere('dl.superseded_by_shift_id IS NULL') sau khi chạy migration
 
     if (storeId) {
       query.andWhere('dl.store_id = :storeId', { storeId });
@@ -285,7 +300,8 @@ export class CustomersService {
 
   async getAllCreditStatus(storeId?: number) {
     // 1. Lấy danh sách khách hàng với credit status
-    let query = this.customerRepository.createQueryBuilder('c')
+    let query = this.customerRepository
+      .createQueryBuilder('c')
       .select([
         'c.id as "customerId"',
         'c.name as "customerName"',
@@ -293,9 +309,9 @@ export class CustomersService {
         'c.type as "customerType"',
         'c.credit_limit as "defaultCreditLimit"',
         'c.bypass_credit_limit as "globalBypassCreditLimit"',
-        'c.bypass_until as "globalBypassUntil"'
+        'c.bypass_until as "globalBypassUntil"',
       ])
-      .addSelect(subQuery => {
+      .addSelect((subQuery) => {
         return subQuery
           .select('COALESCE(SUM(dl.debit - dl.credit), 0)')
           .from(DebtLedger, 'dl')
@@ -306,7 +322,12 @@ export class CustomersService {
     // Nếu có storeId, join với customer_stores để lấy creditLimit riêng và bypass status của cửa hàng đó
     if (storeId) {
       query = query
-        .leftJoin('customer_stores', 'cs', 'cs.customer_id = c.id AND cs.store_id = :storeId', { storeId })
+        .leftJoin(
+          'customer_stores',
+          'cs',
+          'cs.customer_id = c.id AND cs.store_id = :storeId',
+          { storeId },
+        )
         .addSelect('cs.credit_limit', 'storeCreditLimit')
         .addSelect('cs.bypass_credit_limit', 'storeBypassCreditLimit')
         .addSelect('cs.bypass_until', 'storeBypassUntil');
@@ -316,14 +337,16 @@ export class CustomersService {
       // Admin (không có storeId) - lấy tất cả khách hàng
       // Lấy hạn mức cao nhất từ các cửa hàng nếu customers.credit_limit = 0 hoặc NULL
       query = query
-        .addSelect(subQuery => {
+        .addSelect((subQuery) => {
           return subQuery
-            .select('MAX(CASE WHEN cs.bypass_credit_limit = true AND (cs.bypass_until IS NULL OR cs.bypass_until >= NOW()) THEN 1 ELSE 0 END)')
+            .select(
+              'MAX(CASE WHEN cs.bypass_credit_limit = true AND (cs.bypass_until IS NULL OR cs.bypass_until >= NOW()) THEN 1 ELSE 0 END)',
+            )
             .from('customer_stores', 'cs')
             .where('cs.customer_id = c.id');
         }, 'anyStoreBypassActive')
         // Lấy hạn mức cao nhất từ tất cả các cửa hàng
-        .addSelect(subQuery => {
+        .addSelect((subQuery) => {
           return subQuery
             .select('MAX(cs.credit_limit)')
             .from('customer_stores', 'cs')
@@ -336,7 +359,7 @@ export class CustomersService {
 
     const results = await query.getRawMany();
 
-    return results.map(row => {
+    return results.map((row) => {
       const defaultCreditLimit = Number(row.defaultCreditLimit || 0);
       const storeCreditLimit = row.storeCreditLimit; // Khi có storeId cụ thể
       const maxStoreCreditLimit = row.maxStoreCreditLimit; // Hạn mức cao nhất từ tất cả cửa hàng (ADMIN view)
@@ -349,27 +372,37 @@ export class CustomersService {
       let creditLimit: number;
       if (storeId) {
         // User của cửa hàng cụ thể
-        creditLimit = storeCreditLimit !== null && storeCreditLimit !== undefined
-          ? Number(storeCreditLimit)
-          : defaultCreditLimit;
+        creditLimit =
+          storeCreditLimit !== null && storeCreditLimit !== undefined
+            ? Number(storeCreditLimit)
+            : defaultCreditLimit;
       } else {
         // Admin view - Ưu tiên default, nếu = 0 thì lấy max từ stores
         if (defaultCreditLimit > 0) {
           creditLimit = defaultCreditLimit;
         } else {
-          creditLimit = maxStoreCreditLimit !== null && maxStoreCreditLimit !== undefined
-            ? Number(maxStoreCreditLimit)
-            : 0;
+          creditLimit =
+            maxStoreCreditLimit !== null && maxStoreCreditLimit !== undefined
+              ? Number(maxStoreCreditLimit)
+              : 0;
         }
       }
 
       const currentDebt = Number(row.currentDebt || 0);
       const availableCredit = creditLimit - currentDebt;
-      const creditUsagePercent = creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
+      const creditUsagePercent =
+        creditLimit > 0 ? (currentDebt / creditLimit) * 100 : 0;
 
       // Check bypass status
       const isBypassSet = (value: any) => {
-        if (value === null || value === undefined || value === 0 || value === '0' || value === false) return false;
+        if (
+          value === null ||
+          value === undefined ||
+          value === 0 ||
+          value === '0' ||
+          value === false
+        )
+          return false;
         return true;
       };
 
@@ -385,13 +418,18 @@ export class CustomersService {
       // Nếu có storeId, check bypass của store đó; nếu không, check nếu có ANY store nào được bypass
       let storeBypassActive = false;
       if (storeId) {
-        storeBypassActive = !!(isBypassSet(row.storeBypassCreditLimit) && !isDateExpired(row.storeBypassUntil));
+        storeBypassActive = !!(
+          isBypassSet(row.storeBypassCreditLimit) &&
+          !isDateExpired(row.storeBypassUntil)
+        );
       } else {
         // Admin - check nếu có ANY store được bypass
         storeBypassActive = !!(Number(row.anyStoreBypassActive) === 1);
       }
 
-      const globalBypassActive = isBypassSet(row.globalBypassCreditLimit) && !isDateExpired(row.globalBypassUntil);
+      const globalBypassActive =
+        isBypassSet(row.globalBypassCreditLimit) &&
+        !isDateExpired(row.globalBypassUntil);
       const isBypassed = globalBypassActive || storeBypassActive;
 
       return {
@@ -405,9 +443,16 @@ export class CustomersService {
         availableCredit,
         creditUsagePercent: Math.round(creditUsagePercent * 100) / 100,
         isOverLimit: currentDebt > creditLimit,
-        bypassCreditLimit: storeId ? isBypassSet(row.storeBypassCreditLimit) : isBypassSet(row.globalBypassCreditLimit),
+        bypassCreditLimit: storeId
+          ? isBypassSet(row.storeBypassCreditLimit)
+          : isBypassSet(row.globalBypassCreditLimit),
         isBypassed,
-        warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed, row.customerType),
+        warningLevel: this.getCreditWarningLevel(
+          creditUsagePercent,
+          creditLimit,
+          isBypassed,
+          row.customerType,
+        ),
       };
     });
   }
@@ -425,29 +470,45 @@ export class CustomersService {
       : Number(customer.creditLimit || 0);
 
     const availableCredit = creditLimit - balance;
-    const creditUsagePercent = creditLimit > 0 ? (balance / creditLimit) * 100 : 0;
+    const creditUsagePercent =
+      creditLimit > 0 ? (balance / creditLimit) * 100 : 0;
 
     // Check bypass status - xét cả global và store-level bypass
     const isBypassSet = (value: any) => {
-      if (value === null || value === undefined || value === 0 || value === '0' || value === false) return false;
+      if (
+        value === null ||
+        value === undefined ||
+        value === 0 ||
+        value === '0' ||
+        value === false
+      )
+        return false;
       return true;
     };
 
     const isDateExpired = (date: any) => {
       if (!date) return false; // Null/undefined = vô thời hạn
       try {
-        return date.getTime ? date.getTime() < Date.now() : new Date(date).getTime() < Date.now();
+        return date.getTime
+          ? date.getTime() < Date.now()
+          : new Date(date).getTime() < Date.now();
       } catch {
         return false;
       }
     };
 
-    const globalBypassActive = isBypassSet(customer.bypassCreditLimit) && !isDateExpired(customer.bypassUntil);
+    const globalBypassActive =
+      isBypassSet(customer.bypassCreditLimit) &&
+      !isDateExpired(customer.bypassUntil);
 
     let storeBypassActive = false;
     if (storeId && customer.customerStores?.length > 0) {
-      const cs = customer.customerStores.find(cs => cs.storeId === storeId);
-      storeBypassActive = !!(cs && isBypassSet(cs.bypassCreditLimit) && !isDateExpired(cs.bypassUntil));
+      const cs = customer.customerStores.find((cs) => cs.storeId === storeId);
+      storeBypassActive = !!(
+        cs &&
+        isBypassSet(cs.bypassCreditLimit) &&
+        !isDateExpired(cs.bypassUntil)
+      );
     }
 
     const isBypassed = globalBypassActive || storeBypassActive;
@@ -465,11 +526,21 @@ export class CustomersService {
       isOverLimit: balance > creditLimit,
       bypassCreditLimit: customer.bypassCreditLimit || false,
       isBypassed,
-      warningLevel: this.getCreditWarningLevel(creditUsagePercent, creditLimit, isBypassed, customer.type),
+      warningLevel: this.getCreditWarningLevel(
+        creditUsagePercent,
+        creditLimit,
+        isBypassed,
+        customer.type,
+      ),
     };
   }
 
-  private getCreditWarningLevel(usagePercent: number, creditLimit: number = 0, isBypassed: boolean = false, customerType?: string): 'safe' | 'warning' | 'danger' | 'overlimit' | 'unlocked' {
+  private getCreditWarningLevel(
+    usagePercent: number,
+    creditLimit: number = 0,
+    isBypassed: boolean = false,
+    customerType?: string,
+  ): 'safe' | 'warning' | 'danger' | 'overlimit' | 'unlocked' {
     // Khách nội bộ không hiển thị cảnh báo
     if (customerType === 'INTERNAL') {
       return 'safe';
@@ -538,7 +609,10 @@ export class CustomersService {
     };
   }
 
-  async importFromExcel(buffer: Buffer, storeId?: number): Promise<ImportCustomersResponseDto> {
+  async importFromExcel(
+    buffer: Buffer,
+    storeId?: number,
+  ): Promise<ImportCustomersResponseDto> {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[sheetName];
@@ -550,7 +624,7 @@ export class CustomersService {
     // Parse data starting from row 5 (row 1=title, 2=instructions, 3=type, 4=headers, 5+=data)
     const rawData: any[] = XLSX.utils.sheet_to_json(worksheet, {
       range: 4, // Start from row 5 (0-indexed, so 4)
-      defval: null
+      defval: null,
     });
 
     const response: ImportCustomersResponseDto = {
@@ -605,7 +679,9 @@ export class CustomersService {
           while (!isUnique && attempts < 100) {
             code = `KH${String(nextNumber).padStart(5, '0')}`;
             // Kiểm tra trùng trong DB
-            const existsInDb = await this.customerRepository.findOne({ where: { code } });
+            const existsInDb = await this.customerRepository.findOne({
+              where: { code },
+            });
             if (!existsInDb && !generatedCodes.has(code)) {
               isUnique = true;
               generatedCodes.add(code);
@@ -615,15 +691,21 @@ export class CustomersService {
           }
 
           if (!isUnique) {
-            throw new Error('Không thể tạo mã khách hàng duy nhất sau 100 lần thử');
+            throw new Error(
+              'Không thể tạo mã khách hàng duy nhất sau 100 lần thử',
+            );
           }
         } else {
           // Kiểm tra mã thủ công không trùng
           if (generatedCodes.has(code)) {
-            throw new Error(`Mã ${code} trùng với mã đã tự sinh trong batch này`);
+            throw new Error(
+              `Mã ${code} trùng với mã đã tự sinh trong batch này`,
+            );
           }
           // Kiểm tra mã thủ công không trùng trong DB
-          const existsInDb = await this.customerRepository.findOne({ where: { code } });
+          const existsInDb = await this.customerRepository.findOne({
+            where: { code },
+          });
           if (existsInDb) {
             throw new Error(`Mã ${code} đã tồn tại trong hệ thống`);
           }
@@ -637,9 +719,10 @@ export class CustomersService {
           address: row['Địa chỉ'] || undefined,
           phone: row['Số điện thoại (*)'],
           type: customerType,
-          creditLimit: customerType === 'EXTERNAL' && row['Hạn mức công nợ']
-            ? Number(row['Hạn mức công nợ'])
-            : undefined,
+          creditLimit:
+            customerType === 'EXTERNAL' && row['Hạn mức công nợ']
+              ? Number(row['Hạn mức công nợ'])
+              : undefined,
           notes: row['Ghi chú'] || undefined,
           storeId,
         };
@@ -654,7 +737,6 @@ export class CustomersService {
           name: customer.name,
           phone: customer.phone,
         });
-
       } catch (error) {
         response.failed++;
         response.errors.push({
@@ -694,7 +776,7 @@ export class CustomersService {
 
     // Map để tra cứu nhanh
     const customerStoreMap = new Map(
-      customerStores.map(cs => [cs.storeId, cs])
+      customerStores.map((cs) => [cs.storeId, cs]),
     );
 
     // Tạo storeLimits cho TẤT CẢ stores
@@ -710,8 +792,11 @@ export class CustomersService {
         // Check bypass status - sửa logic để nhất quán
         const now = new Date();
         // Còn hiệu lực khi: bypassUntil NULL (vô thời hạn) HOẶC bypassUntil > now (chưa hết hạn)
-        const storeBypassActive = cs?.bypassCreditLimit && (!cs?.bypassUntil || cs.bypassUntil > now);
-        const globalBypassActive = customer.bypassCreditLimit && (!customer.bypassUntil || customer.bypassUntil > now);
+        const storeBypassActive =
+          cs?.bypassCreditLimit && (!cs?.bypassUntil || cs.bypassUntil > now);
+        const globalBypassActive =
+          customer.bypassCreditLimit &&
+          (!customer.bypassUntil || customer.bypassUntil > now);
 
         return {
           customerId,
@@ -724,15 +809,20 @@ export class CustomersService {
           effectiveLimit, // Hạn mức hiệu lực
           currentDebt,
           availableCredit,
-          creditUsagePercent: effectiveLimit > 0 ? (currentDebt / effectiveLimit) * 100 : 0,
+          creditUsagePercent:
+            effectiveLimit > 0 ? (currentDebt / effectiveLimit) * 100 : 0,
           isOverLimit: currentDebt > effectiveLimit,
           // Bypass info
           bypassCreditLimit: cs?.bypassCreditLimit ?? false,
           bypassUntil: cs?.bypassUntil ?? null,
           isBypassed: storeBypassActive || globalBypassActive,
-          bypassLevel: storeBypassActive ? 'store' : (globalBypassActive ? 'global' : 'none'),
+          bypassLevel: storeBypassActive
+            ? 'store'
+            : globalBypassActive
+              ? 'global'
+              : 'none',
         };
-      })
+      }),
     );
 
     return {
@@ -753,7 +843,7 @@ export class CustomersService {
   async updateStoreCreditLimit(
     customerId: number,
     storeId: number,
-    dto: UpdateStoreCreditLimitDto
+    dto: UpdateStoreCreditLimitDto,
   ) {
     // Validate customer exists
     const customer = await this.customerRepository.findOne({
@@ -794,7 +884,9 @@ export class CustomersService {
         customerStore.bypassCreditLimit = dto.bypassCreditLimit;
       }
       if (dto.bypassUntil !== undefined) {
-        customerStore.bypassUntil = dto.bypassUntil ? new Date(dto.bypassUntil) : null;
+        customerStore.bypassUntil = dto.bypassUntil
+          ? new Date(dto.bypassUntil)
+          : null;
       }
     }
 
@@ -832,7 +924,7 @@ export class CustomersService {
 
     if (!customerStore) {
       throw new NotFoundException(
-        `Khách hàng #${customerId} chưa được liên kết với cửa hàng #${storeId}`
+        `Khách hàng #${customerId} chưa được liên kết với cửa hàng #${storeId}`,
       );
     }
 
@@ -843,7 +935,7 @@ export class CustomersService {
 
     if (debtCount > 0) {
       throw new BadRequestException(
-        `Không thể xóa liên kết. Khách hàng đã có ${debtCount} giao dịch tại cửa hàng này. Vui lòng liên hệ quản trị viên.`
+        `Không thể xóa liên kết. Khách hàng đã có ${debtCount} giao dịch tại cửa hàng này. Vui lòng liên hệ quản trị viên.`,
       );
     }
 
@@ -854,7 +946,7 @@ export class CustomersService {
 
     if (salesCount > 0) {
       throw new BadRequestException(
-        `Không thể xóa liên kết. Khách hàng đã có ${salesCount} đơn hàng tại cửa hàng này. Vui lòng liên hệ quản trị viên.`
+        `Không thể xóa liên kết. Khách hàng đã có ${salesCount} đơn hàng tại cửa hàng này. Vui lòng liên hệ quản trị viên.`,
       );
     }
 
@@ -873,13 +965,19 @@ export class CustomersService {
   /**
    * Lấy hạn mức hiệu lực của khách hàng tại một cửa hàng
    */
-  async getEffectiveCreditLimit(customerId: number, storeId: number): Promise<number> {
+  async getEffectiveCreditLimit(
+    customerId: number,
+    storeId: number,
+  ): Promise<number> {
     const customerStore = await this.customerStoreRepository.findOne({
       where: { customerId, storeId },
     });
 
     // Ưu tiên hạn mức riêng của store
-    if (customerStore?.creditLimit !== null && customerStore?.creditLimit !== undefined) {
+    if (
+      customerStore?.creditLimit !== null &&
+      customerStore?.creditLimit !== undefined
+    ) {
       return customerStore.creditLimit;
     }
 
@@ -895,7 +993,10 @@ export class CustomersService {
    * Kiểm tra xem khách hàng có được bypass hạn mức không
    * Ưu tiên: 1. Bypass theo cửa hàng, 2. Bypass toàn bộ (ở customer)
    */
-  async checkBypassCreditLimit(customerId: number, storeId: number): Promise<{
+  async checkBypassCreditLimit(
+    customerId: number,
+    storeId: number,
+  ): Promise<{
     isBypassed: boolean;
     bypassLevel: 'none' | 'store' | 'global';
     bypassUntil: Date | null;
@@ -910,7 +1011,9 @@ export class CustomersService {
 
     if (customerStore?.bypassCreditLimit) {
       // Sửa: dùng <= để nhất quán - hết hạn khi bypassUntil <= now
-      const isExpired = customerStore.bypassUntil ? customerStore.bypassUntil <= now : false;
+      const isExpired = customerStore.bypassUntil
+        ? customerStore.bypassUntil <= now
+        : false;
       if (!isExpired) {
         return {
           isBypassed: true,
@@ -922,7 +1025,7 @@ export class CustomersService {
       // Bypass đã hết hạn, tự động tắt
       await this.customerStoreRepository.update(
         { customerId, storeId },
-        { bypassCreditLimit: false, bypassUntil: null }
+        { bypassCreditLimit: false, bypassUntil: null },
       );
     }
 
@@ -933,7 +1036,9 @@ export class CustomersService {
 
     if (customer?.bypassCreditLimit) {
       // Sửa: dùng <= để nhất quán
-      const isExpired = customer.bypassUntil ? customer.bypassUntil <= now : false;
+      const isExpired = customer.bypassUntil
+        ? customer.bypassUntil <= now
+        : false;
       if (!isExpired) {
         return {
           isBypassed: true,
@@ -983,7 +1088,7 @@ export class CustomersService {
     customerId: number,
     storeId: number,
     bypassCreditLimit: boolean,
-    bypassUntil?: string | null
+    bypassUntil?: string | null,
   ) {
     // Validate
     const customer = await this.customerRepository.findOne({
@@ -1027,7 +1132,11 @@ export class CustomersService {
    * Validate xem debt mới có vượt hạn mức không
    * Bao gồm check bypass
    */
-  async validateDebtLimit(customerId: number, storeId: number, newDebtAmount: number) {
+  async validateDebtLimit(
+    customerId: number,
+    storeId: number,
+    newDebtAmount: number,
+  ) {
     // 1. Kiểm tra bypass trước
     const bypassStatus = await this.checkBypassCreditLimit(customerId, storeId);
 
@@ -1083,11 +1192,15 @@ export class CustomersService {
    * Nhập số dư đầu kỳ công nợ cho cửa hàng
    * Mỗi cửa hàng nhập riêng số dư đầu kỳ của khách hàng tại cửa hàng đó
    */
-  async importOpeningBalance(dto: ImportOpeningBalanceDto): Promise<ImportOpeningBalanceResponseDto> {
+  async importOpeningBalance(
+    dto: ImportOpeningBalanceDto,
+  ): Promise<ImportOpeningBalanceResponseDto> {
     const { storeId, transactionDate, items } = dto;
 
     // Kiểm tra store tồn tại
-    const store = await this.storeRepository.findOne({ where: { id: storeId } });
+    const store = await this.storeRepository.findOne({
+      where: { id: storeId },
+    });
     if (!store) {
       throw new NotFoundException(`Cửa hàng ${storeId} không tồn tại`);
     }
@@ -1208,7 +1321,12 @@ export class CustomersService {
   /**
    * Cập nhật số dư đầu kỳ
    */
-  async updateOpeningBalance(id: number, newBalance: number, notes?: string, createdAt?: string) {
+  async updateOpeningBalance(
+    id: number,
+    newBalance: number,
+    notes?: string,
+    createdAt?: string,
+  ) {
     const record = await this.debtLedgerRepository.findOne({
       where: { id, refType: 'OPENING_BALANCE' },
     });
@@ -1271,7 +1389,7 @@ export class CustomersService {
 
     if (otherTransactions > 0) {
       throw new BadRequestException(
-        `Không thể xóa số dư đầu kỳ. Khách hàng đã có ${otherTransactions} giao dịch khác tại cửa hàng này.`
+        `Không thể xóa số dư đầu kỳ. Khách hàng đã có ${otherTransactions} giao dịch khác tại cửa hàng này.`,
       );
     }
 
@@ -1287,4 +1405,3 @@ export class CustomersService {
     };
   }
 }
-

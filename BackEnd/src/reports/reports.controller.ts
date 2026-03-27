@@ -11,7 +11,10 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RevenueSalesReportQueryDto, SalesByCustomerReportQueryDto } from './dto/revenue-sales-report.dto';
+import {
+  RevenueSalesReportQueryDto,
+  SalesByCustomerReportQueryDto,
+} from './dto/revenue-sales-report.dto';
 
 @Controller('reports')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -299,7 +302,7 @@ export class ReportsController {
   ) {
     // Nếu user là STORE, tự động lấy storeId của user
     const effectiveStoreId =
-      user.roleCode === 'STORE' ? user.storeId : (storeId ? +storeId : undefined);
+      user.roleCode === 'STORE' ? user.storeId : storeId ? +storeId : undefined;
 
     return this.reportsService.getSalesByShiftReport(
       effectiveStoreId,

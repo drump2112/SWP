@@ -1,4 +1,12 @@
-import { IsInt, IsNotEmpty, IsNumber, IsISO8601, IsOptional, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsISO8601,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class ProductPriceItem {

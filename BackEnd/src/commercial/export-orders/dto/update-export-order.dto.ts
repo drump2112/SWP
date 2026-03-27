@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, IsString, IsDateString, MaxLength } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsDateString,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateExportOrderDto {
   @IsOptional()

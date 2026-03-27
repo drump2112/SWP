@@ -48,15 +48,15 @@ export class ExportOrdersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateOrderDto: UpdateExportOrderDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateOrderDto: UpdateExportOrderDto,
+  ) {
     return this.ordersService.update(+id, updateOrderDto);
   }
 
   @Patch(':id/payment-status')
-  updatePaymentStatus(
-    @Param('id') id: string,
-    @Body('status') status: string,
-  ) {
+  updatePaymentStatus(@Param('id') id: string, @Body('status') status: string) {
     return this.ordersService.updatePaymentStatus(+id, status);
   }
 

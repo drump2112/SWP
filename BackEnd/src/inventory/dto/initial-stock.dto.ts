@@ -1,4 +1,10 @@
-import { IsNumber, IsString, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import {
+  IsNumber,
+  IsString,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class InitialStockItem {

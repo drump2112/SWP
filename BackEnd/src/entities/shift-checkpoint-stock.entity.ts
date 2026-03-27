@@ -27,14 +27,28 @@ export class ShiftCheckpointStock {
   @Column({ name: 'product_id', nullable: true })
   productId: number | null;
 
-  @Column({ name: 'system_quantity', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'system_quantity',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   systemQuantity: number | null;
 
   @Column({ name: 'actual_quantity', type: 'decimal', precision: 15, scale: 2 })
   actualQuantity: number;
 
   // difference is a generated column in DB, but we need to map it
-  @Column({ name: 'difference', type: 'decimal', precision: 15, scale: 2, nullable: true, insert: false, update: false })
+  @Column({
+    name: 'difference',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+    insert: false,
+    update: false,
+  })
   difference: number | null;
 
   @Column({ type: 'text', nullable: true })

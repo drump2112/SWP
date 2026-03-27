@@ -98,7 +98,9 @@ export class CashService {
     }
 
     // 3. Kiểm tra xem đã có OPENING_BALANCE trong ngày này chưa (dựa trên ledgerAt)
-    const effectiveDateValue = effectiveDate ? new Date(effectiveDate) : new Date();
+    const effectiveDateValue = effectiveDate
+      ? new Date(effectiveDate)
+      : new Date();
     const startOfDay = new Date(effectiveDateValue);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(effectiveDateValue);
@@ -165,7 +167,7 @@ export class CashService {
 
     const records = await queryBuilder.getMany();
 
-    return records.map(record => ({
+    return records.map((record) => ({
       id: record.id,
       storeId: record.storeId,
       storeName: record.store?.name,
@@ -180,7 +182,12 @@ export class CashService {
   /**
    * Cập nhật số dư đầu kỳ
    */
-  async updateOpeningBalance(id: number, newOpeningBalance: number, notes?: string, effectiveDate?: string) {
+  async updateOpeningBalance(
+    id: number,
+    newOpeningBalance: number,
+    notes?: string,
+    effectiveDate?: string,
+  ) {
     // 1. Tìm record cũ
     const oldRecord = await this.cashLedgerRepository.findOne({
       where: { id, refType: 'OPENING_BALANCE' },
@@ -191,7 +198,8 @@ export class CashService {
     }
 
     // 2. Tính số dư đầu kỳ cũ
-    const oldOpeningBalance = Number(oldRecord.cashIn) - Number(oldRecord.cashOut);
+    const oldOpeningBalance =
+      Number(oldRecord.cashIn) - Number(oldRecord.cashOut);
 
     // 3. Kiểm tra có thay đổi không
     if (oldOpeningBalance === newOpeningBalance && !effectiveDate) {

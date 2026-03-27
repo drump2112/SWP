@@ -1,4 +1,10 @@
-import { Entity, PrimaryGeneratedColumn, Column, OneToMany, BeforeInsert } from 'typeorm';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  OneToMany,
+  BeforeInsert,
+} from 'typeorm';
 
 @Entity('customers')
 export class Customer {
@@ -23,7 +29,13 @@ export class Customer {
   @Column({ length: 20, default: 'EXTERNAL' })
   type: string; // EXTERNAL, INTERNAL
 
-  @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'credit_limit',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   creditLimit: number;
 
   @Column({ name: 'bypass_credit_limit', type: 'boolean', default: false })

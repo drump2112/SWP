@@ -6,10 +6,7 @@ import { Tank } from '../entities/tank.entity';
 import { InventoryModule } from '../inventory/inventory.module';
 
 @Module({
-  imports: [
-    TypeOrmModule.forFeature([Tank]),
-    InventoryModule,
-  ],
+  imports: [TypeOrmModule.forFeature([Tank]), InventoryModule],
   controllers: [TanksController],
   providers: [TanksService],
   exports: [TanksService],

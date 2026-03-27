@@ -73,7 +73,11 @@ export class InventoryClosingController {
     @Query('fromDate') fromDate: string,
     @Query('toDate') toDate: string,
   ) {
-    return this.closingService.getReportByClosedPeriods(storeId, fromDate, toDate);
+    return this.closingService.getReportByClosedPeriods(
+      storeId,
+      fromDate,
+      toDate,
+    );
   }
 
   /**

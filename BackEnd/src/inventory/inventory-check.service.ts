@@ -2,7 +2,10 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
 import { InventoryCheck } from '../entities/inventory-check.entity';
-import { CreateInventoryCheckDto, InventoryCheckQueryDto } from './dto/inventory-check.dto';
+import {
+  CreateInventoryCheckDto,
+  InventoryCheckQueryDto,
+} from './dto/inventory-check.dto';
 
 @Injectable()
 export class InventoryCheckService {
@@ -14,7 +17,10 @@ export class InventoryCheckService {
   /**
    * Tạo biên bản kiểm kê mới
    */
-  async create(dto: CreateInventoryCheckDto, userId: number): Promise<InventoryCheck> {
+  async create(
+    dto: CreateInventoryCheckDto,
+    userId: number,
+  ): Promise<InventoryCheck> {
     const inventoryCheck = this.inventoryCheckRepository.create({
       storeId: dto.storeId,
       shiftId: dto.shiftId || null,
@@ -48,11 +54,16 @@ export class InventoryCheckService {
     }
 
     if (query.fromDate && query.toDate) {
-      whereConditions.checkAt = Between(new Date(query.fromDate), new Date(query.toDate + 'T23:59:59'));
+      whereConditions.checkAt = Between(
+        new Date(query.fromDate),
+        new Date(query.toDate + 'T23:59:59'),
+      );
     } else if (query.fromDate) {
       whereConditions.checkAt = MoreThanOrEqual(new Date(query.fromDate));
     } else if (query.toDate) {
-      whereConditions.checkAt = LessThanOrEqual(new Date(query.toDate + 'T23:59:59'));
+      whereConditions.checkAt = LessThanOrEqual(
+        new Date(query.toDate + 'T23:59:59'),
+      );
     }
 
     return this.inventoryCheckRepository.find({
@@ -81,7 +92,10 @@ export class InventoryCheckService {
   /**
    * Cập nhật biên bản
    */
-  async update(id: number, dto: Partial<CreateInventoryCheckDto>): Promise<InventoryCheck> {
+  async update(
+    id: number,
+    dto: Partial<CreateInventoryCheckDto>,
+  ): Promise<InventoryCheck> {
     const inventoryCheck = await this.findOne(id);
 
     Object.assign(inventoryCheck, {

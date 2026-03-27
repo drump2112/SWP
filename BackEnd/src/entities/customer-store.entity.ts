@@ -10,7 +10,13 @@ export class CustomerStore {
   @PrimaryColumn({ name: 'store_id' })
   storeId: number;
 
-  @Column({ name: 'credit_limit', type: 'decimal', precision: 15, scale: 2, nullable: true })
+  @Column({
+    name: 'credit_limit',
+    type: 'decimal',
+    precision: 15,
+    scale: 2,
+    nullable: true,
+  })
   creditLimit: number | null;
 
   @Column({ name: 'bypass_credit_limit', type: 'boolean', default: false })

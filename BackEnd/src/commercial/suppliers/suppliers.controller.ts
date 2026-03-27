@@ -39,7 +39,10 @@ export class SuppliersController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateSupplierDto: UpdateSupplierDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateSupplierDto: UpdateSupplierDto,
+  ) {
     return this.suppliersService.update(+id, updateSupplierDto);
   }
 

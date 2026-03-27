@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Put, Delete, Patch, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { StoresService } from './stores.service';
 import { CreateStoreDto } from './dto/create-store.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -34,7 +44,10 @@ export class StoresController {
 
   @Put(':id')
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() updateStoreDto: Partial<CreateStoreDto>) {
+  update(
+    @Param('id') id: string,
+    @Body() updateStoreDto: Partial<CreateStoreDto>,
+  ) {
     return this.storesService.update(+id, updateStoreDto);
   }
 

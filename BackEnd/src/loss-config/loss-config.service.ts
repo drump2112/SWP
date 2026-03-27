@@ -1,9 +1,22 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, MoreThanOrEqual, IsNull, Or } from 'typeorm';
+import {
+  Repository,
+  LessThanOrEqual,
+  MoreThanOrEqual,
+  IsNull,
+  Or,
+} from 'typeorm';
 import { StoreLossConfig } from '../entities/store-loss-config.entity';
 import { ProductCategory } from '../entities/product.entity';
-import { CreateLossConfigDto, UpdateLossConfigDto } from './dto/loss-config.dto';
+import {
+  CreateLossConfigDto,
+  UpdateLossConfigDto,
+} from './dto/loss-config.dto';
 
 @Injectable()
 export class LossConfigService {
@@ -62,7 +75,9 @@ export class LossConfigService {
       .where('slc.storeId = :storeId', { storeId })
       .andWhere('slc.productCategory = :productCategory', { productCategory })
       .andWhere('slc.effectiveFrom <= :date', { date: dateStr })
-      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :date)', { date: dateStr })
+      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :date)', {
+        date: dateStr,
+      })
       .orderBy('slc.effectiveFrom', 'DESC')
       .getOne();
 
@@ -72,7 +87,10 @@ export class LossConfigService {
   /**
    * Tạo cấu hình mới
    */
-  async create(dto: CreateLossConfigDto, userId?: number): Promise<StoreLossConfig> {
+  async create(
+    dto: CreateLossConfigDto,
+    userId?: number,
+  ): Promise<StoreLossConfig> {
     // Kiểm tra xem đã có cấu hình trùng không
     const existing = await this.lossConfigRepository.findOne({
       where: {
@@ -89,7 +107,11 @@ export class LossConfigService {
     }
 
     // Tự động đóng cấu hình cũ nếu có
-    await this.closeOldConfigs(dto.storeId, dto.productCategory, dto.effectiveFrom);
+    await this.closeOldConfigs(
+      dto.storeId,
+      dto.productCategory,
+      dto.effectiveFrom,
+    );
 
     const config = this.lossConfigRepository.create({
       storeId: dto.storeId,
@@ -134,10 +156,13 @@ export class LossConfigService {
   async update(id: number, dto: UpdateLossConfigDto): Promise<StoreLossConfig> {
     const config = await this.findById(id);
 
-    if (dto.productCategory !== undefined) config.productCategory = dto.productCategory;
+    if (dto.productCategory !== undefined)
+      config.productCategory = dto.productCategory;
     if (dto.lossRate !== undefined) config.lossRate = dto.lossRate;
-    if (dto.effectiveFrom !== undefined) config.effectiveFrom = new Date(dto.effectiveFrom);
-    if (dto.effectiveTo !== undefined) config.effectiveTo = dto.effectiveTo ? new Date(dto.effectiveTo) : null;
+    if (dto.effectiveFrom !== undefined)
+      config.effectiveFrom = new Date(dto.effectiveFrom);
+    if (dto.effectiveTo !== undefined)
+      config.effectiveTo = dto.effectiveTo ? new Date(dto.effectiveTo) : null;
     if (dto.notes !== undefined) config.notes = dto.notes || null;
 
     return this.lossConfigRepository.save(config);
@@ -161,7 +186,9 @@ export class LossConfigService {
       .createQueryBuilder('slc')
       .where('slc.storeId = :storeId', { storeId })
       .andWhere('slc.effectiveFrom <= :today', { today })
-      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :today)', { today })
+      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :today)', {
+        today,
+      })
       .orderBy('slc.productCategory', 'ASC')
       .getMany();
   }

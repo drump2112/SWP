@@ -1,10 +1,26 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UploadedFile, UseInterceptors, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UploadedFile,
+  UseInterceptors,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto } from './dto/create-customer.dto';
 import { UpdateCustomerDto } from './dto/update-customer.dto';
 import { CreateDebtSaleDto } from './dto/create-debt-sale.dto';
-import { UpdateStoreCreditLimitDto, ToggleCustomerBypassDto } from './dto/update-store-credit-limit.dto';
+import {
+  UpdateStoreCreditLimitDto,
+  ToggleCustomerBypassDto,
+} from './dto/update-store-credit-limit.dto';
 import { ImportOpeningBalanceDto } from './dto/import-opening-balance.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -33,7 +49,9 @@ export class CustomersController {
   @Get('opening-balance')
   @Roles('ADMIN', 'ACCOUNTING', 'DIRECTOR')
   getOpeningBalanceRecords(@Query('storeId') storeId?: string) {
-    return this.customersService.getOpeningBalanceRecords(storeId ? +storeId : undefined);
+    return this.customersService.getOpeningBalanceRecords(
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Post('opening-balance/import')
@@ -46,9 +64,14 @@ export class CustomersController {
   @Roles('ADMIN', 'ACCOUNTING')
   updateOpeningBalance(
     @Param('id') id: string,
-    @Body() body: { balance: number; notes?: string; createdAt?: string }
+    @Body() body: { balance: number; notes?: string; createdAt?: string },
   ) {
-    return this.customersService.updateOpeningBalance(+id, body.balance, body.notes, body.createdAt);
+    return this.customersService.updateOpeningBalance(
+      +id,
+      body.balance,
+      body.notes,
+      body.createdAt,
+    );
   }
 
   @Delete('opening-balance/:id')
@@ -69,7 +92,10 @@ export class CustomersController {
 
   @Put(':id')
   @Roles('SALES', 'ADMIN')
-  update(@Param('id') id: string, @Body() updateCustomerDto: UpdateCustomerDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateCustomerDto: UpdateCustomerDto,
+  ) {
     const numId = +id;
     if (isNaN(numId)) {
       throw new BadRequestException(`Invalid customer ID: ${id}`);
@@ -99,11 +125,11 @@ export class CustomersController {
 
   @Get(':id/balance')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getDebtBalance(
-    @Param('id') id: string,
-    @Query('storeId') storeId?: string,
-  ) {
-    return this.customersService.getDebtBalance(+id, storeId ? +storeId : undefined);
+  getDebtBalance(@Param('id') id: string, @Query('storeId') storeId?: string) {
+    return this.customersService.getDebtBalance(
+      +id,
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Get(':id/statement')
@@ -112,22 +138,27 @@ export class CustomersController {
     @Param('id') id: string,
     @Query('storeId') storeId?: string,
   ) {
-    return this.customersService.getDebtStatement(+id, storeId ? +storeId : undefined);
+    return this.customersService.getDebtStatement(
+      +id,
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Get('credit-status/all')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
   getAllCreditStatus(@Query('storeId') storeId?: string) {
-    return this.customersService.getAllCreditStatus(storeId ? +storeId : undefined);
+    return this.customersService.getAllCreditStatus(
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Get(':id/credit-status')
   @Roles('STORE', 'SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  getCreditStatus(
-    @Param('id') id: string,
-    @Query('storeId') storeId?: string,
-  ) {
-    return this.customersService.getCreditStatus(+id, storeId ? +storeId : undefined);
+  getCreditStatus(@Param('id') id: string, @Query('storeId') storeId?: string) {
+    return this.customersService.getCreditStatus(
+      +id,
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Post('import')
@@ -137,12 +168,17 @@ export class CustomersController {
     @UploadedFile() file: Express.Multer.File,
     @Query('storeId') storeId?: string,
   ) {
-    return this.customersService.importFromExcel(file.buffer, storeId ? +storeId : undefined);
+    return this.customersService.importFromExcel(
+      file.buffer,
+      storeId ? +storeId : undefined,
+    );
   }
 
   @Post('check-duplicate')
   @Roles('SALES', 'ADMIN')
-  checkDuplicate(@Body() body: { name?: string; phone?: string; taxCode?: string }) {
+  checkDuplicate(
+    @Body() body: { name?: string; phone?: string; taxCode?: string },
+  ) {
     return this.customersService.checkDuplicate(body);
   }
 
@@ -165,16 +201,20 @@ export class CustomersController {
   updateStoreCreditLimit(
     @Param('customerId') customerId: string,
     @Param('storeId') storeId: string,
-    @Body() dto: UpdateStoreCreditLimitDto
+    @Body() dto: UpdateStoreCreditLimitDto,
   ) {
-    return this.customersService.updateStoreCreditLimit(+customerId, +storeId, dto);
+    return this.customersService.updateStoreCreditLimit(
+      +customerId,
+      +storeId,
+      dto,
+    );
   }
 
   @Delete(':customerId/stores/:storeId')
   @Roles('ADMIN')
   removeCustomerFromStore(
     @Param('customerId') customerId: string,
-    @Param('storeId') storeId: string
+    @Param('storeId') storeId: string,
   ) {
     return this.customersService.removeCustomerFromStore(+customerId, +storeId);
   }
@@ -183,12 +223,12 @@ export class CustomersController {
   @Roles('STORE', 'SALES', 'ADMIN')
   validateDebtLimit(
     @Param('customerId') customerId: string,
-    @Body() body: { storeId: number; newDebtAmount: number }
+    @Body() body: { storeId: number; newDebtAmount: number },
   ) {
     return this.customersService.validateDebtLimit(
       +customerId,
       body.storeId,
-      body.newDebtAmount
+      body.newDebtAmount,
     );
   }
 
@@ -198,7 +238,7 @@ export class CustomersController {
   @Roles('ADMIN')
   toggleCustomerBypass(
     @Param('customerId') customerId: string,
-    @Body() dto: ToggleCustomerBypassDto
+    @Body() dto: ToggleCustomerBypassDto,
   ) {
     return this.customersService.toggleCustomerBypass(+customerId, dto);
   }
@@ -208,13 +248,13 @@ export class CustomersController {
   toggleStoreBypass(
     @Param('customerId') customerId: string,
     @Param('storeId') storeId: string,
-    @Body() body: { bypassCreditLimit: boolean; bypassUntil?: string | null }
+    @Body() body: { bypassCreditLimit: boolean; bypassUntil?: string | null },
   ) {
     return this.customersService.toggleStoreBypass(
       +customerId,
       +storeId,
       body.bypassCreditLimit,
-      body.bypassUntil
+      body.bypassUntil,
     );
   }
 
@@ -222,7 +262,7 @@ export class CustomersController {
   @Roles('STORE', 'SALES', 'ADMIN')
   getBypassStatus(
     @Param('customerId') customerId: string,
-    @Param('storeId') storeId: string
+    @Param('storeId') storeId: string,
   ) {
     return this.customersService.checkBypassCreditLimit(+customerId, +storeId);
   }

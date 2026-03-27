@@ -9,7 +9,15 @@ import { CustomersService } from './customers.service';
 import { CustomersController } from './customers.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Customer, CustomerStore, DebtLedger, Sale, Store])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Customer,
+      CustomerStore,
+      DebtLedger,
+      Sale,
+      Store,
+    ]),
+  ],
   controllers: [CustomersController],
   providers: [CustomersService],
   exports: [CustomersService],

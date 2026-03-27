@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommercialCustomer } from '../../entities/commercial-customer.entity';
@@ -12,13 +16,17 @@ export class CommercialCustomersService {
     private customersRepository: Repository<CommercialCustomer>,
   ) {}
 
-  async create(createCustomerDto: CreateCommercialCustomerDto): Promise<CommercialCustomer> {
+  async create(
+    createCustomerDto: CreateCommercialCustomerDto,
+  ): Promise<CommercialCustomer> {
     const existing = await this.customersRepository.findOne({
       where: { code: createCustomerDto.code },
     });
 
     if (existing) {
-      throw new ConflictException(`Customer with code ${createCustomerDto.code} already exists`);
+      throw new ConflictException(
+        `Customer with code ${createCustomerDto.code} already exists`,
+      );
     }
 
     const customer = this.customersRepository.create(createCustomerDto);
@@ -45,7 +53,10 @@ export class CommercialCustomersService {
     return customer;
   }
 
-  async update(id: number, updateCustomerDto: UpdateCommercialCustomerDto): Promise<CommercialCustomer> {
+  async update(
+    id: number,
+    updateCustomerDto: UpdateCommercialCustomerDto,
+  ): Promise<CommercialCustomer> {
     const customer = await this.findOne(id);
 
     if (updateCustomerDto.code && updateCustomerDto.code !== customer.code) {
@@ -54,7 +65,9 @@ export class CommercialCustomersService {
       });
 
       if (existing) {
-        throw new ConflictException(`Customer with code ${updateCustomerDto.code} already exists`);
+        throw new ConflictException(
+          `Customer with code ${updateCustomerDto.code} already exists`,
+        );
       }
     }
 

@@ -35,11 +35,15 @@ export class AnalyticsService {
     const { fromDate, toDate } = params;
 
     const now = new Date();
-    const effectiveFromDate = fromDate || new Date(now.getFullYear(), now.getMonth(), 1);
+    const effectiveFromDate =
+      fromDate || new Date(now.getFullYear(), now.getMonth(), 1);
     const effectiveToDate = toDate || now;
 
     // Tính kỳ trước để so sánh
-    const daysDiff = Math.ceil((effectiveToDate.getTime() - effectiveFromDate.getTime()) / (1000 * 60 * 60 * 24));
+    const daysDiff = Math.ceil(
+      (effectiveToDate.getTime() - effectiveFromDate.getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
     const previousFromDate = new Date(effectiveFromDate);
     previousFromDate.setDate(previousFromDate.getDate() - daysDiff);
     const previousToDate = new Date(effectiveFromDate);
@@ -118,17 +122,22 @@ export class AnalyticsService {
 
     const currentRevenueValue = Number(currentRevenue?.total || 0);
     const previousRevenueValue = Number(previousRevenue?.total || 0);
-    const revenueChange = previousRevenueValue > 0
-      ? ((currentRevenueValue - previousRevenueValue) / previousRevenueValue) * 100
-      : 0;
+    const revenueChange =
+      previousRevenueValue > 0
+        ? ((currentRevenueValue - previousRevenueValue) /
+            previousRevenueValue) *
+          100
+        : 0;
 
-    const shiftsChange = previousShifts > 0
-      ? ((currentShifts - previousShifts) / previousShifts) * 100
-      : 0;
+    const shiftsChange =
+      previousShifts > 0
+        ? ((currentShifts - previousShifts) / previousShifts) * 100
+        : 0;
 
-    const salesChange = previousSalesCount > 0
-      ? ((currentSalesCount - previousSalesCount) / previousSalesCount) * 100
-      : 0;
+    const salesChange =
+      previousSalesCount > 0
+        ? ((currentSalesCount - previousSalesCount) / previousSalesCount) * 100
+        : 0;
 
     return {
       revenue: {
@@ -167,8 +176,19 @@ export class AnalyticsService {
 
     for (let i = months - 1; i >= 0; i--) {
       const targetDate = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const startDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1);
-      const endDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0, 23, 59, 59);
+      const startDate = new Date(
+        targetDate.getFullYear(),
+        targetDate.getMonth(),
+        1,
+      );
+      const endDate = new Date(
+        targetDate.getFullYear(),
+        targetDate.getMonth() + 1,
+        0,
+        23,
+        59,
+        59,
+      );
 
       const query = this.saleRepository
         .createQueryBuilder('sale')
@@ -270,8 +290,19 @@ export class AnalyticsService {
       stores.map(async (store) => {
         const monthlyRevenues = await Promise.all(
           monthsData.map(async (monthInfo) => {
-            const startDate = new Date(monthInfo.year, monthInfo.monthNumber - 1, 1);
-            const endDate = new Date(monthInfo.year, monthInfo.monthNumber, 0, 23, 59, 59);
+            const startDate = new Date(
+              monthInfo.year,
+              monthInfo.monthNumber - 1,
+              1,
+            );
+            const endDate = new Date(
+              monthInfo.year,
+              monthInfo.monthNumber,
+              0,
+              23,
+              59,
+              59,
+            );
 
             const revenue = await this.saleRepository
               .createQueryBuilder('sale')
@@ -301,7 +332,7 @@ export class AnalyticsService {
     );
 
     return {
-      months: monthsData.map(m => m.month),
+      months: monthsData.map((m) => m.month),
       stores: results,
     };
   }
@@ -336,7 +367,10 @@ export class AnalyticsService {
       }),
     );
 
-    const totalValue = inventoryByProduct.reduce((sum, item) => sum + item.totalValue, 0);
+    const totalValue = inventoryByProduct.reduce(
+      (sum, item) => sum + item.totalValue,
+      0,
+    );
 
     // Nhóm theo kho/chi nhánh
     const stores = await this.storeRepository.find();
@@ -366,7 +400,9 @@ export class AnalyticsService {
     return {
       totalValue,
       byStore,
-      byProduct: inventoryByProduct.filter(item => item.quantity > 0).slice(0, 20),
+      byProduct: inventoryByProduct
+        .filter((item) => item.quantity > 0)
+        .slice(0, 20),
     };
   }
 
@@ -402,7 +438,7 @@ export class AnalyticsService {
     );
 
     return inventoryData
-      .filter(item => item.quantity > 0)
+      .filter((item) => item.quantity > 0)
       .sort((a, b) => b.totalValue - a.totalValue)
       .slice(0, limit);
   }
@@ -421,7 +457,10 @@ export class AnalyticsService {
       .where('il.ref_type = :refType', { refType: 'EXPORT' })
       .andWhere('il.superseded_by_shift_id IS NULL')
       .andWhere('shift.status = :status', { status: 'CLOSED' })
-      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
       .groupBy('il.product_id')
       .orderBy('SUM(il.quantity_out)', 'DESC')
       .limit(limit)
@@ -435,12 +474,18 @@ export class AnalyticsService {
       .addSelect('SUM(sale.amount)', 'totalRevenue')
       .addSelect('COUNT(sale.id)', 'salesCount')
       .where('shift.status = :status', { status: 'CLOSED' })
-      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .andWhere('shift.closed_at BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
       .groupBy('sale.product_id')
       .getRawMany();
 
     // Tạo map để tra cứu doanh thu theo productId
-    const revenueMap = new Map<number, { totalRevenue: number; salesCount: number }>();
+    const revenueMap = new Map<
+      number,
+      { totalRevenue: number; salesCount: number }
+    >();
     revenueData.forEach((item) => {
       revenueMap.set(Number(item.productId), {
         totalRevenue: Number(item.totalRevenue || 0),
@@ -454,7 +499,10 @@ export class AnalyticsService {
           where: { id: item.productId },
         });
 
-        const revenueInfo = revenueMap.get(Number(item.productId)) || { totalRevenue: 0, salesCount: 0 };
+        const revenueInfo = revenueMap.get(Number(item.productId)) || {
+          totalRevenue: 0,
+          salesCount: 0,
+        };
 
         return {
           productId: item.productId,
@@ -563,9 +611,8 @@ export class AnalyticsService {
           .getCount();
 
         // Trung bình doanh thu mỗi ca
-        const avgRevenuePerShift = shiftsCount > 0
-          ? Number(revenue?.total || 0) / shiftsCount
-          : 0;
+        const avgRevenuePerShift =
+          shiftsCount > 0 ? Number(revenue?.total || 0) / shiftsCount : 0;
 
         return {
           storeId: store.id,

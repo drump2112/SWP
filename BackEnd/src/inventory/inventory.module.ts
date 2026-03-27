@@ -39,7 +39,11 @@ import { InventoryStockCalculatorService } from './inventory-stock-calculator.se
       InventoryCheck,
     ]),
   ],
-  controllers: [InventoryController, InventoryClosingController, InventoryCheckController],
+  controllers: [
+    InventoryController,
+    InventoryClosingController,
+    InventoryCheckController,
+  ],
   providers: [
     InventoryService,
     InventoryClosingService,
@@ -48,6 +52,11 @@ import { InventoryStockCalculatorService } from './inventory-stock-calculator.se
     InventoryExportService,
     InventoryStockCalculatorService,
   ],
-  exports: [InventoryService, InventoryStockCalculatorService, InventoryClosingService, InventoryCheckService],
+  exports: [
+    InventoryService,
+    InventoryStockCalculatorService,
+    InventoryClosingService,
+    InventoryCheckService,
+  ],
 })
 export class InventoryModule {}

@@ -23,6 +23,7 @@ import {
   RevenueSalesReportResponse,
   StoreDetail,
   ProductDetail,
+  ShiftDetail,
   PricePeriod,
   SalesByCustomerReportQueryDto,
   SalesByCustomerReportResponse,
@@ -98,7 +99,9 @@ export class ReportsService {
 
     if (customerId) {
       if (storeId) {
-        customerIdsQuery.andWhere('dl.customer_id = :customerId', { customerId });
+        customerIdsQuery.andWhere('dl.customer_id = :customerId', {
+          customerId,
+        });
       } else {
         customerIdsQuery.where('dl.customer_id = :customerId', { customerId });
       }
@@ -127,7 +130,12 @@ export class ReportsService {
         if (fromDate) {
           const dayBefore = new Date(fromDate);
           dayBefore.setDate(dayBefore.getDate() - 1);
-          openingBalance = await this.getCustomerBalance(customer.id, storeId, new Date(0), dayBefore);
+          openingBalance = await this.getCustomerBalance(
+            customer.id,
+            storeId,
+            new Date(0),
+            dayBefore,
+          );
         }
 
         const ledgerQuery = this.debtLedgerRepository
@@ -146,9 +154,13 @@ export class ReportsService {
         }
 
         // Loại OPENING_BALANCE khỏi report (không tính vào phát sinh nợ)
-        ledgerQuery.andWhere('dl.ref_type != :refType', { refType: 'OPENING_BALANCE' });
+        ledgerQuery.andWhere('dl.ref_type != :refType', {
+          refType: 'OPENING_BALANCE',
+        });
 
-        const ledgers = await ledgerQuery.orderBy('dl.ledger_at', 'ASC').getMany();
+        const ledgers = await ledgerQuery
+          .orderBy('dl.ledger_at', 'ASC')
+          .getMany();
 
         const ledgersWithDetails = await Promise.all(
           ledgers.map(async (l) => {
@@ -189,7 +201,10 @@ export class ReportsService {
         );
 
         const totalDebit = ledgers.reduce((sum, l) => sum + Number(l.debit), 0);
-        const totalCredit = ledgers.reduce((sum, l) => sum + Number(l.credit), 0);
+        const totalCredit = ledgers.reduce(
+          (sum, l) => sum + Number(l.credit),
+          0,
+        );
         const closingBalance = openingBalance + totalDebit - totalCredit;
 
         return {
@@ -212,7 +227,11 @@ export class ReportsService {
 
     // Only show customers with activity or non-zero balances
     return results.filter(
-      (r) => r.openingBalance !== 0 || r.totalDebit !== 0 || r.totalCredit !== 0 || r.closingBalance !== 0,
+      (r) =>
+        r.openingBalance !== 0 ||
+        r.totalDebit !== 0 ||
+        r.totalCredit !== 0 ||
+        r.closingBalance !== 0,
     );
   }
 
@@ -260,11 +279,17 @@ export class ReportsService {
       where: { shiftId },
     });
 
-    const totalDeposits = depositsInShift.reduce((sum, d) => sum + Number(d.amount || 0), 0);
+    const totalDeposits = depositsInShift.reduce(
+      (sum, d) => sum + Number(d.amount || 0),
+      0,
+    );
 
     // Tính toán
     const totalFromPumps = shift.pumpReadings.reduce((sum, reading) => {
-      return sum + Math.round(Number(reading.quantity) * Number(reading.unitPrice || 0)); // Làm tròn để tránh số lẻ thập phân
+      return (
+        sum +
+        Math.round(Number(reading.quantity) * Number(reading.unitPrice || 0))
+      ); // Làm tròn để tránh số lẻ thập phân
     }, 0);
 
     // Lấy doanh số bán công nợ từ shift_debt_sales
@@ -335,7 +360,8 @@ export class ReportsService {
             inv.exportQuantity += qty;
           }
 
-          inv.closingStock = inv.openingStock + inv.importQuantity - inv.exportQuantity;
+          inv.closingStock =
+            inv.openingStock + inv.importQuantity - inv.exportQuantity;
         });
       }
     });
@@ -398,9 +424,17 @@ export class ReportsService {
       );
 
       // Calculate previous shift's retail sales
-      const prevTotalFromPumps = previousShift.pumpReadings.reduce((sum, reading) => {
-        return sum + Math.round(Number(reading.quantity) * Number(reading.unitPrice || 0));
-      }, 0);
+      const prevTotalFromPumps = previousShift.pumpReadings.reduce(
+        (sum, reading) => {
+          return (
+            sum +
+            Math.round(
+              Number(reading.quantity) * Number(reading.unitPrice || 0),
+            )
+          );
+        },
+        0,
+      );
 
       const prevDebtSalesData = await this.shiftDebtSaleRepository.find({
         where: { shiftId: previousShift.id },
@@ -448,7 +482,9 @@ export class ReportsService {
         testExport: Number(reading.testExport ?? 0), // Xuất kiểm thử/Quay kho
         quantity: Number(reading.quantity ?? 0), // Số lượng BÁN (đã trừ testExport)
         unitPrice: Number(reading.unitPrice ?? 0),
-        amount: Math.round(Number(reading.quantity ?? 0) * Number(reading.unitPrice ?? 0)), // Làm tròn để tránh phần thập phân
+        amount: Math.round(
+          Number(reading.quantity ?? 0) * Number(reading.unitPrice ?? 0),
+        ), // Làm tròn để tránh phần thập phân
       })),
       debtSales: debtSalesData.map((sale) => ({
         id: sale.id,
@@ -473,7 +509,10 @@ export class ReportsService {
         // - Bán lẻ & thu nợ tiền mặt = tiền mặt thực tế trong quỹ
         // - Nộp tiền = tiền được nộp ra khỏi quỹ
         // - Thu nợ chuyển khoản = tiền được chuyển vào tk ngân hàng, không còn trong quỹ
-        cashBalance: totalRetailSales + totalReceiptsCash - (totalDeposits + totalReceiptsBankTransfer),
+        cashBalance:
+          totalRetailSales +
+          totalReceiptsCash -
+          (totalDeposits + totalReceiptsBankTransfer),
       },
       receipts: receiptsInShiftData.map((receipt) => ({
         id: receipt.id,
@@ -482,12 +521,13 @@ export class ReportsService {
         paymentMethod: receipt.paymentMethod || '',
         receiptAt: receipt.receiptAt || new Date(),
         notes: receipt.notes,
-        details: receipt.receiptDetails?.map((d) => ({
-          id: d.id,
-          customerId: d.customerId,
-          customerName: d.customer?.name || '',
-          amount: Number(d.amount || 0),
-        })) || [],
+        details:
+          receipt.receiptDetails?.map((d) => ({
+            id: d.id,
+            customerId: d.customerId,
+            customerName: d.customer?.name || '',
+            amount: Number(d.amount || 0),
+          })) || [],
       })),
       deposits: depositsInShift.map((d) => ({
         id: d.id,
@@ -707,24 +747,51 @@ export class ReportsService {
 
       // Nếu có shiftId, kiểm tra toàn bộ phát sinh trong cùng ca
       if (ledger.shiftId) {
-        const entriesInShift = ledgersWithDetails.filter((l) => l.shiftId === ledger.shiftId);
+        const entriesInShift = ledgersWithDetails.filter(
+          (l) => l.shiftId === ledger.shiftId,
+        );
 
         // Tổng tiền nộp (DEPOSIT)
-        const depositsInSameShift = entriesInShift.filter((l) => l.refType === 'DEPOSIT');
-        const totalDeposit = depositsInSameShift.reduce((sum, d) => sum + (d.cashOut || 0), 0);
+        const depositsInSameShift = entriesInShift.filter(
+          (l) => l.refType === 'DEPOSIT',
+        );
+        const totalDeposit = depositsInSameShift.reduce(
+          (sum, d) => sum + (d.cashOut || 0),
+          0,
+        );
 
         // Tổng tiền thu trong ca = tổng cashIn của SHIFT_CLOSE + RECEIPT
-        const cashInEntries = entriesInShift.filter((l) => l.refType === 'SHIFT_CLOSE' || l.refType === 'RECEIPT');
-        const totalCashIn = cashInEntries.reduce((sum, c) => sum + (c.cashIn || 0), 0);
+        const cashInEntries = entriesInShift.filter(
+          (l) => l.refType === 'SHIFT_CLOSE' || l.refType === 'RECEIPT',
+        );
+        const totalCashIn = cashInEntries.reduce(
+          (sum, c) => sum + (c.cashIn || 0),
+          0,
+        );
 
         // ✅ FIX: CHỈ gộp khi tất cả tiền thu trong ca đều được nộp ra (cân bằng tuyệt đối)
         // Nếu không cân bằng, hiển thị từng dòng riêng để không ẩn thông tin
-        if (depositsInSameShift.length > 0 && totalDeposit > 0 && totalDeposit === totalCashIn) {
-          const shiftCloseEntry = entriesInShift.find((l) => l.refType === 'SHIFT_CLOSE') || null;
-          const receiptEntries = entriesInShift.filter((l) => l.refType === 'RECEIPT');
+        if (
+          depositsInSameShift.length > 0 &&
+          totalDeposit > 0 &&
+          totalDeposit === totalCashIn
+        ) {
+          const shiftCloseEntry =
+            entriesInShift.find((l) => l.refType === 'SHIFT_CLOSE') || null;
+          const receiptEntries = entriesInShift.filter(
+            (l) => l.refType === 'RECEIPT',
+          );
 
-          const primaryId = shiftCloseEntry?.id || receiptEntries[0]?.id || depositsInSameShift[0]?.id || ledger.id;
-          const primaryDate = shiftCloseEntry?.date || receiptEntries[0]?.date || depositsInSameShift[0]?.date || ledger.date;
+          const primaryId =
+            shiftCloseEntry?.id ||
+            receiptEntries[0]?.id ||
+            depositsInSameShift[0]?.id ||
+            ledger.id;
+          const primaryDate =
+            shiftCloseEntry?.date ||
+            receiptEntries[0]?.date ||
+            depositsInSameShift[0]?.date ||
+            ledger.date;
 
           mergedLedgers.push({
             id: primaryId,
@@ -739,7 +806,12 @@ export class ReportsService {
             details: {
               type: 'SHIFT_CLOSE_DEPOSIT',
               shiftCloses: shiftCloseEntry
-                ? [{ cashIn: shiftCloseEntry.cashIn, notes: shiftCloseEntry.details?.notes }]
+                ? [
+                    {
+                      cashIn: shiftCloseEntry.cashIn,
+                      notes: shiftCloseEntry.details?.notes,
+                    },
+                  ]
                 : [],
               receipts: receiptEntries.map((r) => ({
                 id: r.id,
@@ -771,10 +843,12 @@ export class ReportsService {
 
     // ✅ GỘP THEO NGÀY: Tổng hợp tất cả giao dịch trong cùng ngày
     const dailyLedgers: typeof mergedLedgers = [];
-    const dailyMap = new Map<string, typeof mergedLedgers[0]>();
+    const dailyMap = new Map<string, (typeof mergedLedgers)[0]>();
 
     for (const ledger of mergedLedgers) {
-      const dateKey = ledger.date ? new Date(ledger.date).toISOString().split('T')[0] : 'unknown';
+      const dateKey = ledger.date
+        ? new Date(ledger.date).toISOString().split('T')[0]
+        : 'unknown';
 
       if (dailyMap.has(dateKey)) {
         const existing = dailyMap.get(dateKey)!;
@@ -783,7 +857,10 @@ export class ReportsService {
         // ✅ FIX: Gộp details từ tất cả shifts trong cùng ngày
         if (ledger.details && existing.details) {
           // Nếu cả hai đều có details, gộp receipts và deposits
-          if (existing.details.type === 'SHIFT_CLOSE_DEPOSIT' && ledger.details.type === 'SHIFT_CLOSE_DEPOSIT') {
+          if (
+            existing.details.type === 'SHIFT_CLOSE_DEPOSIT' &&
+            ledger.details.type === 'SHIFT_CLOSE_DEPOSIT'
+          ) {
             existing.details.shiftCloses = [
               ...(existing.details.shiftCloses || []),
               ...(ledger.details.shiftCloses || []),
@@ -812,8 +889,8 @@ export class ReportsService {
     }
 
     // Chuyển Map về Array và sort theo ngày
-    const dailySummary = Array.from(dailyMap.values()).sort((a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+    const dailySummary = Array.from(dailyMap.values()).sort(
+      (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 
     // Tính toán số dư luỹ kế cho từng ngày
@@ -961,8 +1038,16 @@ export class ReportsService {
     const documents = await qb.getMany();
 
     return documents.map((doc) => {
-      const totalQuantity = (doc.items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-      const totalAmount = (doc.items || []).reduce((sum: number, item: any) => sum + Math.round(Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
+      const totalQuantity = (doc.items || []).reduce(
+        (sum: number, item: any) => sum + Number(item.quantity || 0),
+        0,
+      );
+      const totalAmount = (doc.items || []).reduce(
+        (sum: number, item: any) =>
+          sum +
+          Math.round(Number(item.quantity || 0) * Number(item.unitPrice || 0)),
+        0,
+      );
 
       return {
         id: doc.id,
@@ -986,7 +1071,9 @@ export class ReportsService {
           productName: item.product?.name || '',
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice || 0),
-          amount: Math.round(Number(item.quantity) * Number(item.unitPrice || 0)),
+          amount: Math.round(
+            Number(item.quantity) * Number(item.unitPrice || 0),
+          ),
           tankCode: item.tank?.tankCode || null,
           tankName: item.tank?.name || null,
         })),
@@ -1265,7 +1352,9 @@ export class ReportsService {
       .leftJoin('pr.shift', 'shift')
       .leftJoin('shift.store', 'store')
       .leftJoin('pr.product', 'product')
-      .where('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] })
+      .where('shift.status IN (:...statuses)', {
+        statuses: ['CLOSED', 'ADJUSTED'],
+      })
       .select([
         'shift.storeId AS "storeId"',
         'store.code AS "storeCode"',
@@ -1310,7 +1399,9 @@ export class ReportsService {
       .createQueryBuilder('sds')
       .leftJoin('sds.shift', 'shift')
       .leftJoin('shift.store', 'store')
-      .where('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] })
+      .where('shift.status IN (:...statuses)', {
+        statuses: ['CLOSED', 'ADJUSTED'],
+      })
       .select([
         'shift.storeId AS "storeId"',
         'sds.productId AS "productId"',
@@ -1346,7 +1437,10 @@ export class ReportsService {
     ]);
 
     // Create a map for debt data lookup: storeId-productId -> {debtQuantity, debtAmount}
-    const debtMap = new Map<string, { debtQuantity: number; debtAmount: number }>();
+    const debtMap = new Map<
+      string,
+      { debtQuantity: number; debtAmount: number }
+    >();
     for (const row of debtResults) {
       const key = `${row.storeId}-${row.productId}`;
       debtMap.set(key, {
@@ -1413,11 +1507,277 @@ export class ReportsService {
       store.retailAmount += retailAmt;
     }
 
+    // Nếu query có storeId thì bổ sung chi tiết ca (shift level)
+    if (storeId) {
+      const pumpShiftQuery = this.pumpReadingRepository
+        .createQueryBuilder('pr')
+        .leftJoin('pr.shift', 'shift')
+        .leftJoin('pr.product', 'product')
+        .where('shift.status IN (:...statuses)', {
+          statuses: ['CLOSED', 'ADJUSTED'],
+        })
+        .select([
+          'shift.id AS "shiftId"',
+          'shift.shiftDate AS "shiftDate"',
+          'shift.shiftNo AS "shiftNo"',
+          'shift.openedAt AS "openedAt"',
+          'shift.closedAt AS "closedAt"',
+          'SUM(pr.quantity) AS "totalQuantity"',
+          'SUM(ROUND(pr.quantity * pr.unitPrice)) AS "totalAmount"',
+        ])
+        .groupBy('shift.id')
+        .addGroupBy('shift.shiftDate')
+        .addGroupBy('shift.shiftNo')
+        .addGroupBy('shift.openedAt')
+        .addGroupBy('shift.closedAt');
+
+      const debtShiftQuery = this.shiftDebtSaleRepository
+        .createQueryBuilder('sds')
+        .leftJoin('sds.shift', 'shift')
+        .select([
+          'shift.id AS "shiftId"',
+          'SUM(sds.quantity) AS "debtQuantity"',
+          'SUM(sds.amount) AS "debtAmount"',
+        ])
+        .where('shift.status IN (:...statuses)', {
+          statuses: ['CLOSED', 'ADJUSTED'],
+        })
+        .groupBy('shift.id');
+
+      if (storeId) {
+        pumpShiftQuery.andWhere('shift.storeId = :storeId', { storeId });
+        debtShiftQuery.andWhere('shift.storeId = :storeId', { storeId });
+      }
+      if (productId) {
+        pumpShiftQuery.andWhere('pr.productId = :productId', { productId });
+        debtShiftQuery.andWhere('sds.productId = :productId', { productId });
+      }
+      if (fromDateTime) {
+        pumpShiftQuery.andWhere('shift.closedAt >= :fromDateTime', {
+          fromDateTime: new Date(fromDateTime),
+        });
+        debtShiftQuery.andWhere('shift.closedAt >= :fromDateTime', {
+          fromDateTime: new Date(fromDateTime),
+        });
+      }
+      if (toDateTime) {
+        pumpShiftQuery.andWhere('shift.closedAt <= :toDateTime', {
+          toDateTime: new Date(toDateTime),
+        });
+        debtShiftQuery.andWhere('shift.closedAt <= :toDateTime', {
+          toDateTime: new Date(toDateTime),
+        });
+      }
+
+      const [pumpShiftResults, debtShiftResults] = await Promise.all([
+        pumpShiftQuery.getRawMany(),
+        debtShiftQuery.getRawMany(),
+      ]);
+
+      // Shift detail map
+      const shiftMap = new Map<number, ShiftDetail>();
+      for (const row of pumpShiftResults) {
+        shiftMap.set(Number(row.shiftId), {
+          shiftId: Number(row.shiftId),
+          shiftDate: row.shiftDate,
+          shiftNo: Number(row.shiftNo),
+          openedAt: row.openedAt,
+          closedAt: row.closedAt,
+          totalQuantity: Number(row.totalQuantity) || 0,
+          totalAmount: Number(row.totalAmount) || 0,
+          debtQuantity: 0,
+          debtAmount: 0,
+          retailQuantity: 0,
+          retailAmount: 0,
+          products: [],
+        });
+      }
+
+      for (const row of debtShiftResults) {
+        const shiftId = Number(row.shiftId);
+        const shift = shiftMap.get(shiftId);
+        if (shift) {
+          shift.debtQuantity = Number(row.debtQuantity) || 0;
+          shift.debtAmount = Number(row.debtAmount) || 0;
+        } else {
+          shiftMap.set(shiftId, {
+            shiftId,
+            shiftDate: null,
+            shiftNo: 0,
+            openedAt: null,
+            closedAt: null,
+            totalQuantity: 0,
+            totalAmount: 0,
+            debtQuantity: Number(row.debtQuantity) || 0,
+            debtAmount: Number(row.debtAmount) || 0,
+            retailQuantity: 0,
+            retailAmount: 0,
+            products: [],
+          });
+        }
+      }
+
+      // Put products for each shift (pump + debt)
+      const pumpShiftProductQuery = this.pumpReadingRepository
+        .createQueryBuilder('pr')
+        .leftJoin('pr.shift', 'shift')
+        .leftJoin('pr.product', 'product')
+        .where('shift.status IN (:...statuses)', {
+          statuses: ['CLOSED', 'ADJUSTED'],
+        })
+        .select([
+          'shift.id AS "shiftId"',
+          'pr.productId AS "productId"',
+          'product.code AS "productCode"',
+          'product.name AS "productName"',
+          'SUM(pr.quantity) AS "totalQuantity"',
+          'SUM(ROUND(pr.quantity * pr.unitPrice)) AS "totalAmount"',
+        ])
+        .groupBy('shift.id')
+        .addGroupBy('pr.productId')
+        .addGroupBy('product.code')
+        .addGroupBy('product.name');
+
+      const debtShiftProductQuery = this.shiftDebtSaleRepository
+        .createQueryBuilder('sds')
+        .leftJoin('sds.shift', 'shift')
+        .leftJoin('sds.product', 'product')
+        .where('shift.status IN (:...statuses)', {
+          statuses: ['CLOSED', 'ADJUSTED'],
+        })
+        .select([
+          'shift.id AS "shiftId"',
+          'sds.productId AS "productId"',
+          'product.code AS "productCode"',
+          'product.name AS "productName"',
+          'SUM(sds.quantity) AS "debtQuantity"',
+          'SUM(sds.amount) AS "debtAmount"',
+        ])
+        .groupBy('shift.id')
+        .addGroupBy('sds.productId')
+        .addGroupBy('product.code')
+        .addGroupBy('product.name');
+
+      if (storeId) {
+        pumpShiftProductQuery.andWhere('shift.storeId = :storeId', { storeId });
+        debtShiftProductQuery.andWhere('shift.storeId = :storeId', { storeId });
+      }
+      if (productId) {
+        pumpShiftProductQuery.andWhere('pr.productId = :productId', {
+          productId,
+        });
+        debtShiftProductQuery.andWhere('sds.productId = :productId', {
+          productId,
+        });
+      }
+      if (fromDateTime) {
+        pumpShiftProductQuery.andWhere('shift.closedAt >= :fromDateTime', {
+          fromDateTime: new Date(fromDateTime),
+        });
+        debtShiftProductQuery.andWhere('shift.closedAt >= :fromDateTime', {
+          fromDateTime: new Date(fromDateTime),
+        });
+      }
+      if (toDateTime) {
+        pumpShiftProductQuery.andWhere('shift.closedAt <= :toDateTime', {
+          toDateTime: new Date(toDateTime),
+        });
+        debtShiftProductQuery.andWhere('shift.closedAt <= :toDateTime', {
+          toDateTime: new Date(toDateTime),
+        });
+      }
+
+      const [pumpShiftProductResults, debtShiftProductResults] =
+        await Promise.all([
+          pumpShiftProductQuery.getRawMany(),
+          debtShiftProductQuery.getRawMany(),
+        ]);
+
+      const shiftProductMap = new Map<string, ProductDetail>();
+      for (const row of pumpShiftProductResults) {
+        const key = `${row.shiftId}-${row.productId}`;
+        const totalQuantity = Number(row.totalQuantity) || 0;
+        const totalAmount = Number(row.totalAmount) || 0;
+        shiftProductMap.set(key, {
+          productId: Number(row.productId),
+          productCode: row.productCode || '',
+          productName: row.productName || '',
+          totalQuantity,
+          totalAmount,
+          debtQuantity: 0,
+          debtAmount: 0,
+          retailQuantity: totalQuantity,
+          retailAmount: totalAmount,
+        });
+      }
+
+      for (const row of debtShiftProductResults) {
+        const key = `${row.shiftId}-${row.productId}`;
+        const existing = shiftProductMap.get(key);
+        if (existing) {
+          existing.debtQuantity = Number(row.debtQuantity) || 0;
+          existing.debtAmount = Number(row.debtAmount) || 0;
+          existing.retailQuantity =
+            existing.totalQuantity - existing.debtQuantity;
+          existing.retailAmount = existing.totalAmount - existing.debtAmount;
+        } else {
+          const debtQuantity = Number(row.debtQuantity) || 0;
+          const debtAmount = Number(row.debtAmount) || 0;
+          shiftProductMap.set(key, {
+            productId: Number(row.productId),
+            productCode: row.productCode || '',
+            productName: row.productName || '',
+            totalQuantity: 0,
+            totalAmount: 0,
+            debtQuantity,
+            debtAmount,
+            retailQuantity: -debtQuantity,
+            retailAmount: -debtAmount,
+          });
+        }
+      }
+
+      // Recalculate retail values on all products after merging pump + debt data
+      for (const product of shiftProductMap.values()) {
+        product.retailQuantity = product.totalQuantity - product.debtQuantity;
+        product.retailAmount = product.totalAmount - product.debtAmount;
+      }
+
+      // Build one-time map by shiftId
+      const shiftProductsByShift = new Map<number, ProductDetail[]>();
+      for (const [key, productDetail] of shiftProductMap.entries()) {
+        const [shiftIdStr] = key.split('-');
+        const shiftId = Number(shiftIdStr);
+        const list = shiftProductsByShift.get(shiftId) || [];
+        list.push(productDetail);
+        shiftProductsByShift.set(shiftId, list);
+      }
+
+      for (const shiftDetail of shiftMap.values()) {
+        shiftDetail.debtQuantity = shiftDetail.debtQuantity || 0;
+        shiftDetail.debtAmount = shiftDetail.debtAmount || 0;
+        shiftDetail.retailQuantity =
+          shiftDetail.totalQuantity - shiftDetail.debtQuantity;
+        shiftDetail.retailAmount =
+          shiftDetail.totalAmount - shiftDetail.debtAmount;
+        shiftDetail.products =
+          shiftProductsByShift.get(shiftDetail.shiftId) || [];
+      }
+
+      // Attach to the only store in query
+      const storeWithShift = storesMap.get(storeId);
+      if (storeWithShift) {
+        storeWithShift.shifts = Array.from(shiftMap.values()).sort((a, b) => {
+          const dateA = a.shiftDate ? new Date(a.shiftDate).getTime() : 0;
+          const dateB = b.shiftDate ? new Date(b.shiftDate).getTime() : 0;
+          return dateA - dateB || a.shiftNo - b.shiftNo;
+        });
+      }
+    }
+
     // Convert map to array and sort
     const stores: StoreDetail[] = Array.from(storesMap.values());
-    stores.sort((a, b) =>
-      (a.storeCode || '').localeCompare(b.storeCode || ''),
-    );
+    stores.sort((a, b) => (a.storeCode || '').localeCompare(b.storeCode || ''));
     stores.forEach((store) => {
       store.products.sort((a, b) =>
         (a.productCode || '').localeCompare(b.productCode || ''),
@@ -1495,13 +1855,17 @@ export class ReportsService {
     // Ví dụ: Ca mở 23h ngày 23, đóng 7h ngày 24 → doanh thu thuộc ngày 23
     if (fromDateTime) {
       // Nếu chưa có timestamp (YYYY-MM-DD), thêm vào. Nếu đã có (ISO string) thì giữ nguyên
-      const fromDateStr = fromDateTime.includes('T') ? fromDateTime : fromDateTime + 'T00:00:00';
+      const fromDateStr = fromDateTime.includes('T')
+        ? fromDateTime
+        : fromDateTime + 'T00:00:00';
       salesQuery.andWhere('shift.openedAt >= :fromDateTime', {
         fromDateTime: new Date(fromDateStr),
       });
     }
     if (toDateTime) {
-      const toDateStr = toDateTime.includes('T') ? toDateTime : toDateTime + 'T23:59:59.999';
+      const toDateStr = toDateTime.includes('T')
+        ? toDateTime
+        : toDateTime + 'T23:59:59.999';
       salesQuery.andWhere('shift.openedAt <= :toDateTime', {
         toDateTime: new Date(toDateStr),
       });
@@ -1599,7 +1963,9 @@ export class ReportsService {
       .addSelect('COALESCE(pr.unit_price, 0)', 'unitPrice')
       .addSelect('COALESCE(ROUND(pr.quantity * pr.unit_price), 0)', 'amount')
       .where('shift.store_id = :storeId', { storeId })
-      .andWhere('shift.status IN (:...statuses)', { statuses: ['CLOSED', 'ADJUSTED'] }); // Bao gồm cả ca điều chỉnh
+      .andWhere('shift.status IN (:...statuses)', {
+        statuses: ['CLOSED', 'ADJUSTED'],
+      }); // Bao gồm cả ca điều chỉnh
 
     if (fromDate) {
       query.andWhere('shift.shift_date >= :fromDate', { fromDate });
@@ -1655,4 +2021,3 @@ export class ReportsService {
     return Number(res?.balance || 0);
   }
 }
-

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { RegionsService } from './regions.service';
 import { CreateRegionDto } from './dto/create-region.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -28,7 +37,10 @@ export class RegionsController {
 
   @Put(':id')
   @Roles('ADMIN')
-  update(@Param('id') id: string, @Body() updateRegionDto: Partial<CreateRegionDto>) {
+  update(
+    @Param('id') id: string,
+    @Body() updateRegionDto: Partial<CreateRegionDto>,
+  ) {
     return this.regionsService.update(+id, updateRegionDto);
   }
 

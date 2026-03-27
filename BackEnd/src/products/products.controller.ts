@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Put, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  Put,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { CreateProductPriceDto } from './dto/create-product-price.dto';
@@ -94,7 +104,11 @@ export class ProductsController {
     @Query('atTime') atTime?: string,
   ) {
     const targetTime = atTime ? new Date(atTime) : undefined;
-    return this.productsService.getCurrentPrice(+productId, +regionId, targetTime);
+    return this.productsService.getCurrentPrice(
+      +productId,
+      +regionId,
+      targetTime,
+    );
   }
 
   @Get(':productId/price-history/:regionId')

@@ -7,7 +7,9 @@ import { ExportOrderItem } from '../../entities/export-order-item.entity';
 import { ImportBatch } from '../../entities/import-batch.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ExportOrder, ExportOrderItem, ImportBatch])],
+  imports: [
+    TypeOrmModule.forFeature([ExportOrder, ExportOrderItem, ImportBatch]),
+  ],
   controllers: [ExportOrdersController],
   providers: [ExportOrdersService],
   exports: [ExportOrdersService],

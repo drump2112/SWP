@@ -1,4 +1,10 @@
-import { IsString, IsNumber, IsOptional, IsBoolean, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsBoolean,
+  MaxLength,
+} from 'class-validator';
 
 export class CreateCommercialCustomerDto {
   @IsString()

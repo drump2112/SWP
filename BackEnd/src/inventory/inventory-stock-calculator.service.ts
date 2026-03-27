@@ -39,7 +39,10 @@ export class InventoryStockCalculatorService {
     const results = await this.inventoryLedgerRepository
       .createQueryBuilder('il')
       .select('il.tank_id', 'tankId')
-      .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
+      .addSelect(
+        'COALESCE(SUM(il.quantity_in - il.quantity_out), 0)',
+        'balance',
+      )
       .where('il.tank_id IN (:...tankIds)', { tankIds })
       // TODO: Thêm .andWhere('il.superseded_by_shift_id IS NULL') sau khi chạy migration
       .groupBy('il.tank_id')
@@ -93,7 +96,10 @@ export class InventoryStockCalculatorService {
       .select('il.product_id', 'productId')
       .addSelect('p.code', 'productCode')
       .addSelect('p.name', 'productName')
-      .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
+      .addSelect(
+        'COALESCE(SUM(il.quantity_in - il.quantity_out), 0)',
+        'balance',
+      )
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('il.warehouse_id = :warehouseId', { warehouseId })
       .groupBy('il.product_id, p.code, p.name')
@@ -133,12 +139,17 @@ export class InventoryStockCalculatorService {
       .addSelect('il.product_id', 'productId')
       .addSelect('p.code', 'productCode')
       .addSelect('p.name', 'productName')
-      .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'currentStock')
+      .addSelect(
+        'COALESCE(SUM(il.quantity_in - il.quantity_out), 0)',
+        'currentStock',
+      )
       .leftJoin('tanks', 't', 't.id = il.tank_id')
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('t.store_id = :storeId', { storeId })
       .andWhere('t.is_active = true')
-      .groupBy('il.tank_id, t.tank_code, t.name, t.capacity, il.product_id, p.code, p.name')
+      .groupBy(
+        'il.tank_id, t.tank_code, t.name, t.capacity, il.product_id, p.code, p.name',
+      )
       .getRawMany();
 
     return results.map((row) => {
@@ -178,7 +189,10 @@ export class InventoryStockCalculatorService {
       .addSelect('il.product_id', 'productId')
       .addSelect('p.code', 'productCode')
       .addSelect('p.name', 'productName')
-      .addSelect('COALESCE(SUM(il.quantity_in - il.quantity_out), 0)', 'balance')
+      .addSelect(
+        'COALESCE(SUM(il.quantity_in - il.quantity_out), 0)',
+        'balance',
+      )
       .leftJoin('tanks', 't', 't.id = il.tank_id')
       .leftJoin('products', 'p', 'p.id = il.product_id')
       .where('il.warehouse_id = :warehouseId', { warehouseId })
@@ -220,7 +234,12 @@ export class InventoryStockCalculatorService {
   async willExceedCapacity(
     tankId: number,
     additionalQuantity: number,
-  ): Promise<{ willExceed: boolean; currentStock: number; capacity: number; available: number }> {
+  ): Promise<{
+    willExceed: boolean;
+    currentStock: number;
+    capacity: number;
+    available: number;
+  }> {
     const currentStock = await this.getTankCurrentStock(tankId);
 
     // Lấy thông tin capacity từ tank
@@ -231,7 +250,7 @@ export class InventoryStockCalculatorService {
 
     const capacity = tankInfo && tankInfo[0] ? Number(tankInfo[0].capacity) : 0;
     const available = capacity - currentStock;
-    const willExceed = (currentStock + additionalQuantity) > capacity;
+    const willExceed = currentStock + additionalQuantity > capacity;
 
     return {
       willExceed,

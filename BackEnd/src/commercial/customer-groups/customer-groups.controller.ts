@@ -39,7 +39,10 @@ export class CustomerGroupsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateGroupDto: UpdateCustomerGroupDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateGroupDto: UpdateCustomerGroupDto,
+  ) {
     return this.customerGroupsService.update(+id, updateGroupDto);
   }
 

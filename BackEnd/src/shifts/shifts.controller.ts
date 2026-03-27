@@ -228,6 +228,10 @@ export class ShiftsController {
     @Param('checkpointId') checkpointId: string,
     @CurrentUser() user: any,
   ) {
-    return this.shiftsService.deleteCheckpoint(+shiftId, +checkpointId, user.id);
+    return this.shiftsService.deleteCheckpoint(
+      +shiftId,
+      +checkpointId,
+      user.id,
+    );
   }
 }

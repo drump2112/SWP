@@ -34,16 +34,40 @@ export class InventoryClosing {
   @Column({ name: 'opening_balance', type: 'decimal', precision: 15, scale: 3 })
   openingBalance: number;
 
-  @Column({ name: 'import_quantity', type: 'decimal', precision: 15, scale: 3, default: 0 })
+  @Column({
+    name: 'import_quantity',
+    type: 'decimal',
+    precision: 15,
+    scale: 3,
+    default: 0,
+  })
   importQuantity: number;
 
-  @Column({ name: 'export_quantity', type: 'decimal', precision: 15, scale: 3, default: 0 })
+  @Column({
+    name: 'export_quantity',
+    type: 'decimal',
+    precision: 15,
+    scale: 3,
+    default: 0,
+  })
   exportQuantity: number;
 
-  @Column({ name: 'loss_rate', type: 'decimal', precision: 10, scale: 6, default: 0 })
+  @Column({
+    name: 'loss_rate',
+    type: 'decimal',
+    precision: 10,
+    scale: 6,
+    default: 0,
+  })
   lossRate: number;
 
-  @Column({ name: 'loss_amount', type: 'decimal', precision: 15, scale: 3, default: 0 })
+  @Column({
+    name: 'loss_amount',
+    type: 'decimal',
+    precision: 15,
+    scale: 3,
+    default: 0,
+  })
   lossAmount: number;
 
   @Column({ name: 'closing_balance', type: 'decimal', precision: 15, scale: 3 })
@@ -52,7 +76,12 @@ export class InventoryClosing {
   @Column({ name: 'loss_config_id', nullable: true })
   lossConfigId: number | null;
 
-  @Column({ name: 'product_category', type: 'varchar', length: 20, nullable: true })
+  @Column({
+    name: 'product_category',
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+  })
   productCategory: string | null;
 
   @Column({ type: 'text', nullable: true })

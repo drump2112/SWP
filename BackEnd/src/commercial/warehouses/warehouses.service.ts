@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CommercialWarehouse } from '../../entities/commercial-warehouse.entity';
@@ -12,13 +16,17 @@ export class WarehousesService {
     private warehousesRepository: Repository<CommercialWarehouse>,
   ) {}
 
-  async create(createWarehouseDto: CreateWarehouseDto): Promise<CommercialWarehouse> {
+  async create(
+    createWarehouseDto: CreateWarehouseDto,
+  ): Promise<CommercialWarehouse> {
     const existing = await this.warehousesRepository.findOne({
       where: { code: createWarehouseDto.code },
     });
 
     if (existing) {
-      throw new ConflictException(`Warehouse with code ${createWarehouseDto.code} already exists`);
+      throw new ConflictException(
+        `Warehouse with code ${createWarehouseDto.code} already exists`,
+      );
     }
 
     const warehouse = this.warehousesRepository.create(createWarehouseDto);
@@ -45,7 +53,10 @@ export class WarehousesService {
     return warehouse;
   }
 
-  async update(id: number, updateWarehouseDto: UpdateWarehouseDto): Promise<CommercialWarehouse> {
+  async update(
+    id: number,
+    updateWarehouseDto: UpdateWarehouseDto,
+  ): Promise<CommercialWarehouse> {
     const warehouse = await this.findOne(id);
 
     if (updateWarehouseDto.code && updateWarehouseDto.code !== warehouse.code) {
@@ -54,7 +65,9 @@ export class WarehousesService {
       });
 
       if (existing) {
-        throw new ConflictException(`Warehouse with code ${updateWarehouseDto.code} already exists`);
+        throw new ConflictException(
+          `Warehouse with code ${updateWarehouseDto.code} already exists`,
+        );
       }
     }
 

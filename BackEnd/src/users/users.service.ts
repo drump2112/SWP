@@ -14,7 +14,9 @@ export class UsersService {
   ) {}
 
   async create(createUserDto: CreateUserDto): Promise<User> {
-    const passwordHash = await this.authService.hashPassword(createUserDto.password);
+    const passwordHash = await this.authService.hashPassword(
+      createUserDto.password,
+    );
 
     const user = this.userRepository.create({
       ...createUserDto,
@@ -27,7 +29,15 @@ export class UsersService {
   async findAll() {
     return this.userRepository.find({
       relations: ['role', 'store'],
-      select: ['id', 'username', 'fullName', 'roleId', 'storeId', 'isActive', 'createdAt']
+      select: [
+        'id',
+        'username',
+        'fullName',
+        'roleId',
+        'storeId',
+        'isActive',
+        'createdAt',
+      ],
     });
   }
 
@@ -35,7 +45,15 @@ export class UsersService {
     return this.userRepository.find({
       where: { storeId },
       relations: ['role', 'store'],
-      select: ['id', 'username', 'fullName', 'roleId', 'storeId', 'isActive', 'createdAt']
+      select: [
+        'id',
+        'username',
+        'fullName',
+        'roleId',
+        'storeId',
+        'isActive',
+        'createdAt',
+      ],
     });
   }
 
@@ -43,7 +61,15 @@ export class UsersService {
     return this.userRepository.findOne({
       where: { id },
       relations: ['role', 'store'],
-      select: ['id', 'username', 'fullName', 'roleId', 'storeId', 'isActive', 'createdAt']
+      select: [
+        'id',
+        'username',
+        'fullName',
+        'roleId',
+        'storeId',
+        'isActive',
+        'createdAt',
+      ],
     });
   }
 
@@ -51,7 +77,9 @@ export class UsersService {
     const updateData: any = { ...updateUserDto };
 
     if (updateUserDto.password) {
-      updateData.passwordHash = await this.authService.hashPassword(updateUserDto.password);
+      updateData.passwordHash = await this.authService.hashPassword(
+        updateUserDto.password,
+      );
       delete updateData.password;
     }
 

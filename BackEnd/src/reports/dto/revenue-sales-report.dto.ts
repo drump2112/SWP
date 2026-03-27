@@ -51,6 +51,24 @@ export interface ProductDetail {
 /**
  * Chi tiết cửa hàng
  */
+export interface ShiftDetail {
+  shiftId: number;
+  shiftDate: Date | null;
+  shiftNo: number;
+  openedAt: Date | null;
+  closedAt: Date | null;
+  // Tổng xuất bán
+  totalQuantity: number;
+  totalAmount: number;
+  // Bán công nợ
+  debtQuantity: number;
+  debtAmount: number;
+  // Bán lẻ
+  retailQuantity: number;
+  retailAmount: number;
+  products: ProductDetail[];
+}
+
 export interface StoreDetail {
   storeId: number;
   storeCode: string;
@@ -65,6 +83,7 @@ export interface StoreDetail {
   retailQuantity: number;
   retailAmount: number;
   products: ProductDetail[];
+  shifts?: ShiftDetail[];
 }
 
 /**

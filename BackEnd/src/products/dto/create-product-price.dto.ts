@@ -1,4 +1,10 @@
-import { IsInt, IsNotEmpty, IsNumber, IsISO8601, IsOptional } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsISO8601,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateProductPriceDto {
   @IsInt()

@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Supplier } from '../../entities/supplier.entity';
@@ -19,7 +23,9 @@ export class SuppliersService {
     });
 
     if (existing) {
-      throw new ConflictException(`Supplier with code ${createSupplierDto.code} already exists`);
+      throw new ConflictException(
+        `Supplier with code ${createSupplierDto.code} already exists`,
+      );
     }
 
     const supplier = this.suppliersRepository.create(createSupplierDto);
@@ -44,7 +50,10 @@ export class SuppliersService {
     return supplier;
   }
 
-  async update(id: number, updateSupplierDto: UpdateSupplierDto): Promise<Supplier> {
+  async update(
+    id: number,
+    updateSupplierDto: UpdateSupplierDto,
+  ): Promise<Supplier> {
     const supplier = await this.findOne(id);
 
     // Check code uniqueness if code is being updated
@@ -54,7 +63,9 @@ export class SuppliersService {
       });
 
       if (existing) {
-        throw new ConflictException(`Supplier with code ${updateSupplierDto.code} already exists`);
+        throw new ConflictException(
+          `Supplier with code ${updateSupplierDto.code} already exists`,
+        );
       }
     }
 

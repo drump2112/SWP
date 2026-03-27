@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { ExportOrder } from '../../entities/export-order.entity';
@@ -38,12 +42,14 @@ export class ExportOrdersService {
         });
 
         if (!batch) {
-          throw new NotFoundException(`Batch with ID ${itemDto.batch_id} not found`);
+          throw new NotFoundException(
+            `Batch with ID ${itemDto.batch_id} not found`,
+          );
         }
 
         if (batch.remaining_quantity < itemDto.quantity) {
           throw new BadRequestException(
-            `Insufficient stock in batch ${batch.batch_code}. Available: ${batch.remaining_quantity}, Requested: ${itemDto.quantity}`
+            `Insufficient stock in batch ${batch.batch_code}. Available: ${batch.remaining_quantity}, Requested: ${itemDto.quantity}`,
           );
         }
 
@@ -51,10 +57,14 @@ export class ExportOrdersService {
       }
 
       // Get warehouse_id from first batch if not provided
-      const warehouse_id = createOrderDto.warehouse_id || Array.from(batchMap.values())[0]?.warehouse_id;
+      const warehouse_id =
+        createOrderDto.warehouse_id ||
+        Array.from(batchMap.values())[0]?.warehouse_id;
 
       if (!warehouse_id) {
-        throw new BadRequestException('warehouse_id is required or could not be determined from batches');
+        throw new BadRequestException(
+          'warehouse_id is required or could not be determined from batches',
+        );
       }
 
       // Get customer_id from first item
@@ -69,7 +79,9 @@ export class ExportOrdersService {
         warehouse_id: warehouse_id,
         customer_id: customer_id,
         order_code: createOrderDto.order_number || `XB${Date.now()}`,
-        order_date: createOrderDto.order_date ? new Date(createOrderDto.order_date) : new Date(),
+        order_date: createOrderDto.order_date
+          ? new Date(createOrderDto.order_date)
+          : new Date(),
         vehicle_number: createOrderDto.vehicle_number || '',
         driver_name: createOrderDto.driver_name || '',
         driver_phone: createOrderDto.driver_phone || '',
@@ -89,16 +101,22 @@ export class ExportOrdersService {
         const batch = batchMap.get(itemDto.batch_id);
 
         if (!batch) {
-          throw new NotFoundException(`Batch with ID ${itemDto.batch_id} not found`);
+          throw new NotFoundException(
+            `Batch with ID ${itemDto.batch_id} not found`,
+          );
         }
 
-        const discount_per_unit = (itemDto.discount_amount || 0) / itemDto.quantity;
+        const discount_per_unit =
+          (itemDto.discount_amount || 0) / itemDto.quantity;
         const line_total = itemDto.quantity * itemDto.unit_price;
-        const discount_amount = itemDto.discount_amount || (itemDto.quantity * (batch.discount_per_unit || 0));
+        const discount_amount =
+          itemDto.discount_amount ||
+          itemDto.quantity * (batch.discount_per_unit || 0);
         const net_amount = line_total - discount_amount;
 
         // Calculate discount percent for backward compatibility
-        const discount_percent = line_total > 0 ? (discount_amount / line_total) * 100 : 0;
+        const discount_percent =
+          line_total > 0 ? (discount_amount / line_total) * 100 : 0;
 
         const orderItem = queryRunner.manager.create(ExportOrderItem, {
           export_order_id: savedOrder.id,
@@ -163,23 +181,33 @@ export class ExportOrdersService {
       .leftJoinAndSelect('import_batch.product', 'product');
 
     if (filters?.customer_id) {
-      query.andWhere('items.customer_id = :customerId', { customerId: filters.customer_id });
+      query.andWhere('items.customer_id = :customerId', {
+        customerId: filters.customer_id,
+      });
     }
 
     if (filters?.warehouse_id) {
-      query.andWhere('order.warehouse_id = :warehouseId', { warehouseId: filters.warehouse_id });
+      query.andWhere('order.warehouse_id = :warehouseId', {
+        warehouseId: filters.warehouse_id,
+      });
     }
 
     if (filters?.from_date) {
-      query.andWhere('order.order_date >= :fromDate', { fromDate: filters.from_date });
+      query.andWhere('order.order_date >= :fromDate', {
+        fromDate: filters.from_date,
+      });
     }
 
     if (filters?.to_date) {
-      query.andWhere('order.order_date <= :toDate', { toDate: filters.to_date });
+      query.andWhere('order.order_date <= :toDate', {
+        toDate: filters.to_date,
+      });
     }
 
     if (filters?.payment_status) {
-      query.andWhere('order.payment_status = :status', { status: filters.payment_status });
+      query.andWhere('order.payment_status = :status', {
+        status: filters.payment_status,
+      });
     }
 
     query.orderBy('order.order_date', 'DESC');
@@ -190,7 +218,13 @@ export class ExportOrdersService {
   async findOne(id: number): Promise<ExportOrder> {
     const order = await this.ordersRepository.findOne({
       where: { id },
-      relations: ['warehouse', 'items', 'items.customer', 'items.import_batch', 'items.import_batch.product'],
+      relations: [
+        'warehouse',
+        'items',
+        'items.customer',
+        'items.import_batch',
+        'items.import_batch.product',
+      ],
     });
 
     if (!order) {
@@ -200,7 +234,10 @@ export class ExportOrdersService {
     return order;
   }
 
-  async update(id: number, updateOrderDto: UpdateExportOrderDto): Promise<ExportOrder> {
+  async update(
+    id: number,
+    updateOrderDto: UpdateExportOrderDto,
+  ): Promise<ExportOrder> {
     const order = await this.findOne(id);
 
     // Only allow updates for certain fields, not items

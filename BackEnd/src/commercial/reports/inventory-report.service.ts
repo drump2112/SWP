@@ -117,236 +117,285 @@ export class InventoryReportService {
     try {
       // Get imports with supplier info
       const importsQuery = this.importBatchRepo
-      .createQueryBuilder('batch')
-      .leftJoinAndSelect('batch.warehouse', 'warehouse')
-      .leftJoinAndSelect('batch.product', 'product')
-      .leftJoinAndSelect('batch.supplier', 'supplier')
-      .where('batch.import_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+        .createQueryBuilder('batch')
+        .leftJoinAndSelect('batch.warehouse', 'warehouse')
+        .leftJoinAndSelect('batch.product', 'product')
+        .leftJoinAndSelect('batch.supplier', 'supplier')
+        .where('batch.import_date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
 
-    if (warehouseId) {
-      importsQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
-    }
-
-    if (supplierId) {
-      importsQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
-    }
-
-    if (productId) {
-      importsQuery.andWhere('batch.product_id = :productId', { productId });
-    }
-
-    const imports = await importsQuery.getMany();
-    console.log(`[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`);
-
-    // Get exports with customer and group info
-    const exportsQuery = this.exportOrderItemRepo
-      .createQueryBuilder('item')
-      .leftJoinAndSelect('item.import_batch', 'batch')
-      .leftJoinAndSelect('batch.warehouse', 'warehouse')
-      .leftJoinAndSelect('batch.product', 'product')
-      .leftJoinAndSelect('item.customer', 'customer')
-      .leftJoinAndSelect('customer.customer_group', 'customer_group')
-      .leftJoinAndSelect('item.export_order', 'order')
-      .where('order.order_date BETWEEN :startDate AND :endDate', { startDate, endDate });
-
-    if (warehouseId) {
-      exportsQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
-    }
-
-    if (productId) {
-      exportsQuery.andWhere('batch.product_id = :productId', { productId });
-    }
-
-    const exports = await exportsQuery.getMany();
-    console.log(`[InventoryReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
-
-    // Group imports by supplier and product
-    const importMap = new Map<string, ImportDetailDto>();
-    imports.forEach((batch) => {
-      // Validate batch data before processing
-      if (!batch.warehouse || !batch.product) {
-        console.warn(`[InventoryReport] Skipping batch ${batch.id} - missing warehouse or product`);
-        return;
-      }
-
-      const key = `${batch.supplier_id}-${batch.product_id}-${batch.warehouse_id}`;
-      if (!importMap.has(key)) {
-        importMap.set(key, {
-          supplier_id: batch.supplier_id,
-          supplier_name: batch.supplier?.name || 'N/A',
-          product_id: batch.product_id,
-          product_name: batch.product.name,
-          warehouse_id: batch.warehouse_id,
-          warehouse_name: batch.warehouse.name,
-          quantity_a95: 0,
-          quantity_do: 0,
-          quantity_e5: 0,
-          quantity_do001: 0,
-          total_quantity: 0,
-          total_amount: 0,
+      if (warehouseId) {
+        importsQuery.andWhere('batch.warehouse_id = :warehouseId', {
+          warehouseId,
         });
       }
-      const record = importMap.get(key)!;
-      const productName = batch.product.name.toUpperCase();
-      const importQty = Number(batch.import_quantity) || 0;
-      const unitPrice = Number(batch.unit_price) || 0;
-      const productCategory = batch.product.category;
 
-      console.log(`[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}", category="${productCategory}", quantity=${importQty}`);
+      if (supplierId) {
+        importsQuery.andWhere('batch.supplier_id = :supplierId', {
+          supplierId,
+        });
+      }
 
-      // Match sản phẩm vào category dựa vào product.category
-      if (productCategory === 'GASOLINE') {
-        // Xăng: A95 hoặc E5
-        if (productName.includes('E5')) {
-          console.log(`  → Matched to E5 (GASOLINE E5)`);
-          record.quantity_e5 += importQty;
-        } else if (productName.includes('A95') || productName.includes('95') || productName.includes('RON')) {
-          console.log(`  → Matched to A95 (GASOLINE A95)`);
-          record.quantity_a95 += importQty;
-        } else {
-          console.log(`  → Default to A95 (GASOLINE, no E5 match)`);
-          record.quantity_a95 += importQty;
+      if (productId) {
+        importsQuery.andWhere('batch.product_id = :productId', { productId });
+      }
+
+      const imports = await importsQuery.getMany();
+      console.log(
+        `[InventoryReport] Found ${imports.length} imports from ${startDate} to ${endDate}`,
+      );
+
+      // Get exports with customer and group info
+      const exportsQuery = this.exportOrderItemRepo
+        .createQueryBuilder('item')
+        .leftJoinAndSelect('item.import_batch', 'batch')
+        .leftJoinAndSelect('batch.warehouse', 'warehouse')
+        .leftJoinAndSelect('batch.product', 'product')
+        .leftJoinAndSelect('item.customer', 'customer')
+        .leftJoinAndSelect('customer.customer_group', 'customer_group')
+        .leftJoinAndSelect('item.export_order', 'order')
+        .where('order.order_date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
+
+      if (warehouseId) {
+        exportsQuery.andWhere('batch.warehouse_id = :warehouseId', {
+          warehouseId,
+        });
+      }
+
+      if (productId) {
+        exportsQuery.andWhere('batch.product_id = :productId', { productId });
+      }
+
+      const exports = await exportsQuery.getMany();
+      console.log(
+        `[InventoryReport] Found ${exports.length} exports from ${startDate} to ${endDate}`,
+      );
+
+      // Group imports by supplier and product
+      const importMap = new Map<string, ImportDetailDto>();
+      imports.forEach((batch) => {
+        // Validate batch data before processing
+        if (!batch.warehouse || !batch.product) {
+          console.warn(
+            `[InventoryReport] Skipping batch ${batch.id} - missing warehouse or product`,
+          );
+          return;
         }
-      } else if (productCategory === 'DIESEL') {
-        // Dầu: DO hoặc DO001
-        if (productName.includes('0.001') || productName.includes('0,001')) {
-          console.log(`  → Matched to DO001 (DIESEL 0.001S)`);
-          record.quantity_do001 += importQty;
-        } else {
-          console.log(`  → Matched to DO (DIESEL)`);
-          record.quantity_do += importQty;
+
+        const key = `${batch.supplier_id}-${batch.product_id}-${batch.warehouse_id}`;
+        if (!importMap.has(key)) {
+          importMap.set(key, {
+            supplier_id: batch.supplier_id,
+            supplier_name: batch.supplier?.name || 'N/A',
+            product_id: batch.product_id,
+            product_name: batch.product.name,
+            warehouse_id: batch.warehouse_id,
+            warehouse_name: batch.warehouse.name,
+            quantity_a95: 0,
+            quantity_do: 0,
+            quantity_e5: 0,
+            quantity_do001: 0,
+            total_quantity: 0,
+            total_amount: 0,
+          });
         }
-      } else {
-        console.log(`  ⚠ Unknown category: ${productCategory}`);
-      }
+        const record = importMap.get(key)!;
+        const productName = batch.product.name.toUpperCase();
+        const importQty = Number(batch.import_quantity) || 0;
+        const unitPrice = Number(batch.unit_price) || 0;
+        const productCategory = batch.product.category;
 
-      record.total_quantity += importQty;
-      record.total_amount += importQty * unitPrice;
-    });
+        console.log(
+          `[InventoryReport] Processing import batch ${batch.id}: product="${batch.product.name}", category="${productCategory}", quantity=${importQty}`,
+        );
 
-    // Group exports by customer group and individual customer
-    const exportGroupMap = new Map<string, ExportDetailDto>();
-    const exportCustomerMap = new Map<string, ExportDetailDto>();
+        // Match sản phẩm vào category dựa vào product.category
+        if (productCategory === 'GASOLINE') {
+          // Xăng: A95 hoặc E5
+          if (productName.includes('E5')) {
+            console.log(`  → Matched to E5 (GASOLINE E5)`);
+            record.quantity_e5 += importQty;
+          } else if (
+            productName.includes('A95') ||
+            productName.includes('95') ||
+            productName.includes('RON')
+          ) {
+            console.log(`  → Matched to A95 (GASOLINE A95)`);
+            record.quantity_a95 += importQty;
+          } else {
+            console.log(`  → Default to A95 (GASOLINE, no E5 match)`);
+            record.quantity_a95 += importQty;
+          }
+        } else if (productCategory === 'DIESEL') {
+          // Dầu: DO hoặc DO001
+          if (productName.includes('0.001') || productName.includes('0,001')) {
+            console.log(`  → Matched to DO001 (DIESEL 0.001S)`);
+            record.quantity_do001 += importQty;
+          } else {
+            console.log(`  → Matched to DO (DIESEL)`);
+            record.quantity_do += importQty;
+          }
+        } else {
+          console.log(`  ⚠ Unknown category: ${productCategory}`);
+        }
 
-    exports.forEach((item) => {
-      if (!item.import_batch || !item.import_batch.warehouse || !item.import_batch.product) {
-        console.warn(`[InventoryReport] Skipping export item ${item.id} - missing batch data`);
-        return;
-      }
+        record.total_quantity += importQty;
+        record.total_amount += importQty * unitPrice;
+      });
 
-      const batch = item.import_batch;
-      const customer = item.customer;
-      const groupId = customer?.customer_group_id || null;
-      const groupName = customer?.customer_group?.name || 'Không nhóm';
+      // Group exports by customer group and individual customer
+      const exportGroupMap = new Map<string, ExportDetailDto>();
+      const exportCustomerMap = new Map<string, ExportDetailDto>();
 
-      console.log(`[InventoryReport] Processing export item ${item.id}: product="${batch.product.name}", quantity=${item.quantity}, customer="${customer?.name}"`);
+      exports.forEach((item) => {
+        if (
+          !item.import_batch ||
+          !item.import_batch.warehouse ||
+          !item.import_batch.product
+        ) {
+          console.warn(
+            `[InventoryReport] Skipping export item ${item.id} - missing batch data`,
+          );
+          return;
+        }
 
-      // Create/update customer group total
-      const groupKey = `group-${groupId}-${batch.warehouse_id}`;
-      if (!exportGroupMap.has(groupKey)) {
-        exportGroupMap.set(groupKey, {
-          customer_group_id: groupId,
-          customer_group_name: groupName,
-          customer_id: null,
-          customer_name: null,
-          warehouse_id: batch.warehouse_id,
-          warehouse_name: batch.warehouse.name,
-          quantity_a95: 0,
-          quantity_do: 0,
-          quantity_e5: 0,
-          quantity_do001: 0,
-          total_quantity: 0,
-          revenue_a95: 0,
-          revenue_do: 0,
-          revenue_e5: 0,
-          revenue_do001: 0,
-          revenue: 0,
-          cost: 0,
-          profit_a95: 0,
-          profit_do: 0,
-          profit_e5: 0,
-          profit: 0,
-        });
-      }
-      const groupRecord = exportGroupMap.get(groupKey)!;
-      this.addExportData(groupRecord, item, batch);
+        const batch = item.import_batch;
+        const customer = item.customer;
+        const groupId = customer?.customer_group_id || null;
+        const groupName = customer?.customer_group?.name || 'Không nhóm';
 
-      // Create/update individual customer
-      const customerKey = `customer-${item.customer_id}-${batch.warehouse_id}`;
-      if (!exportCustomerMap.has(customerKey)) {
-        exportCustomerMap.set(customerKey, {
-          customer_group_id: groupId,
-          customer_group_name: groupName,
-          customer_id: item.customer_id,
-          customer_name: customer?.name || 'N/A',
-          warehouse_id: batch.warehouse_id,
-          warehouse_name: batch.warehouse.name,
-          quantity_a95: 0,
-          quantity_do: 0,
-          quantity_e5: 0,
-          quantity_do001: 0,
-          total_quantity: 0,
-          revenue_a95: 0,
-          revenue_do: 0,
-          revenue_e5: 0,
-          revenue_do001: 0,
-          revenue: 0,
-          cost: 0,
-          profit_a95: 0,
-          profit_do: 0,
-          profit_e5: 0,
-          profit: 0,
-        });
-      }
-      const customerRecord = exportCustomerMap.get(customerKey)!;
-      this.addExportData(customerRecord, item, batch);
-    });
+        console.log(
+          `[InventoryReport] Processing export item ${item.id}: product="${batch.product.name}", quantity=${item.quantity}, customer="${customer?.name}"`,
+        );
 
-    // Combine: groups first, then their customers
-    const exportDetails: ExportDetailDto[] = [];
-    const groupsArray = Array.from(exportGroupMap.values());
+        // Create/update customer group total
+        const groupKey = `group-${groupId}-${batch.warehouse_id}`;
+        if (!exportGroupMap.has(groupKey)) {
+          exportGroupMap.set(groupKey, {
+            customer_group_id: groupId,
+            customer_group_name: groupName,
+            customer_id: null,
+            customer_name: null,
+            warehouse_id: batch.warehouse_id,
+            warehouse_name: batch.warehouse.name,
+            quantity_a95: 0,
+            quantity_do: 0,
+            quantity_e5: 0,
+            quantity_do001: 0,
+            total_quantity: 0,
+            revenue_a95: 0,
+            revenue_do: 0,
+            revenue_e5: 0,
+            revenue_do001: 0,
+            revenue: 0,
+            cost: 0,
+            profit_a95: 0,
+            profit_do: 0,
+            profit_e5: 0,
+            profit: 0,
+          });
+        }
+        const groupRecord = exportGroupMap.get(groupKey)!;
+        this.addExportData(groupRecord, item, batch);
 
-    groupsArray.forEach(group => {
-      // Add group total
-      exportDetails.push(group);
+        // Create/update individual customer
+        const customerKey = `customer-${item.customer_id}-${batch.warehouse_id}`;
+        if (!exportCustomerMap.has(customerKey)) {
+          exportCustomerMap.set(customerKey, {
+            customer_group_id: groupId,
+            customer_group_name: groupName,
+            customer_id: item.customer_id,
+            customer_name: customer?.name || 'N/A',
+            warehouse_id: batch.warehouse_id,
+            warehouse_name: batch.warehouse.name,
+            quantity_a95: 0,
+            quantity_do: 0,
+            quantity_e5: 0,
+            quantity_do001: 0,
+            total_quantity: 0,
+            revenue_a95: 0,
+            revenue_do: 0,
+            revenue_e5: 0,
+            revenue_do001: 0,
+            revenue: 0,
+            cost: 0,
+            profit_a95: 0,
+            profit_do: 0,
+            profit_e5: 0,
+            profit: 0,
+          });
+        }
+        const customerRecord = exportCustomerMap.get(customerKey)!;
+        this.addExportData(customerRecord, item, batch);
+      });
 
-      // Add individual customers in this group
-      const customersInGroup = Array.from(exportCustomerMap.values())
-        .filter(c => c.customer_group_id === group.customer_group_id);
-      exportDetails.push(...customersInGroup);
-    });
+      // Combine: groups first, then their customers
+      const exportDetails: ExportDetailDto[] = [];
+      const groupsArray = Array.from(exportGroupMap.values());
 
-    // Add customers without group
-    const customersWithoutGroup = Array.from(exportCustomerMap.values())
-      .filter(c => c.customer_group_id === null);
-    exportDetails.push(...customersWithoutGroup);
+      groupsArray.forEach((group) => {
+        // Add group total
+        exportDetails.push(group);
 
-    const importDetails = Array.from(importMap.values());
+        // Add individual customers in this group
+        const customersInGroup = Array.from(exportCustomerMap.values()).filter(
+          (c) => c.customer_group_id === group.customer_group_id,
+        );
+        exportDetails.push(...customersInGroup);
+      });
 
-    // Only count group totals for summary (not individual customers)
-    const groupTotals = exportDetails.filter(d => d.customer_id === null);
+      // Add customers without group
+      const customersWithoutGroup = Array.from(
+        exportCustomerMap.values(),
+      ).filter((c) => c.customer_group_id === null);
+      exportDetails.push(...customersWithoutGroup);
 
-    const result = {
-      imports: importDetails,
-      exports: exportDetails,
-      summary: {
-        total_import_quantity: importDetails.reduce((sum, d) => sum + d.total_quantity, 0),
-        total_import_amount: importDetails.reduce((sum, d) => sum + d.total_amount, 0),
-        total_export_quantity: groupTotals.reduce((sum, d) => sum + d.total_quantity, 0),
-        total_revenue: groupTotals.reduce((sum, d) => sum + d.revenue, 0),
-        total_cost: groupTotals.reduce((sum, d) => sum + d.cost, 0),
-        total_profit: groupTotals.reduce((sum, d) => sum + d.profit, 0),
-      },
-    };
-    console.log(`[InventoryReport] Report generated: ${importDetails.length} imports, ${exportDetails.length} export lines`);
-    return result;
+      const importDetails = Array.from(importMap.values());
+
+      // Only count group totals for summary (not individual customers)
+      const groupTotals = exportDetails.filter((d) => d.customer_id === null);
+
+      const result = {
+        imports: importDetails,
+        exports: exportDetails,
+        summary: {
+          total_import_quantity: importDetails.reduce(
+            (sum, d) => sum + d.total_quantity,
+            0,
+          ),
+          total_import_amount: importDetails.reduce(
+            (sum, d) => sum + d.total_amount,
+            0,
+          ),
+          total_export_quantity: groupTotals.reduce(
+            (sum, d) => sum + d.total_quantity,
+            0,
+          ),
+          total_revenue: groupTotals.reduce((sum, d) => sum + d.revenue, 0),
+          total_cost: groupTotals.reduce((sum, d) => sum + d.cost, 0),
+          total_profit: groupTotals.reduce((sum, d) => sum + d.profit, 0),
+        },
+      };
+      console.log(
+        `[InventoryReport] Report generated: ${importDetails.length} imports, ${exportDetails.length} export lines`,
+      );
+      return result;
     } catch (error) {
       console.error('[InventoryReport] Error generating report:', error);
       throw error;
     }
   }
 
-  private addExportData(record: ExportDetailDto, item: ExportOrderItem, batch: ImportBatch | null): void {
+  private addExportData(
+    record: ExportDetailDto,
+    item: ExportOrderItem,
+    batch: ImportBatch | null,
+  ): void {
     if (!batch || !batch.product) {
       console.warn(`[InventoryReport] addExportData: Batch or product is null`);
       return;
@@ -356,12 +405,15 @@ export class InventoryReportService {
     const itemQty = Number(item.quantity) || 0;
     const itemRevenue = Number(item.total_amount) || 0;
     // Use final_unit_price (giá sau trừ chiết khấu) để tính lợi nhuận chính xác
-    const unitCost = Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
+    const unitCost =
+      Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
     const itemCost = itemQty * unitCost;
     const itemProfit = itemRevenue - itemCost;
     const productCategory = batch.product.category;
 
-    console.log(`[addExportData] product="${batch.product.name}", category="${productCategory}", qty=${itemQty}, revenue=${itemRevenue}`);
+    console.log(
+      `[addExportData] product="${batch.product.name}", category="${productCategory}", qty=${itemQty}, revenue=${itemRevenue}`,
+    );
 
     // Match sản phẩm vào category dựa vào product.category
     if (productCategory === 'GASOLINE') {
@@ -371,7 +423,11 @@ export class InventoryReportService {
         record.quantity_e5 += itemQty;
         record.revenue_e5 += itemRevenue;
         record.profit_e5 += itemProfit;
-      } else if (productName.includes('A95') || productName.includes('95') || productName.includes('RON')) {
+      } else if (
+        productName.includes('A95') ||
+        productName.includes('95') ||
+        productName.includes('RON')
+      ) {
         console.log(`  ✓ Matched to A95 (GASOLINE A95)`);
         record.quantity_a95 += itemQty;
         record.revenue_a95 += itemRevenue;
@@ -417,99 +473,154 @@ export class InventoryReportService {
         .leftJoinAndSelect('batch.warehouse', 'warehouse')
         .leftJoinAndSelect('batch.product', 'product')
         .leftJoinAndSelect('batch.supplier', 'supplier')
-        .where('batch.import_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+        .where('batch.import_date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
 
       if (warehouseId) {
-        batchesQuery.andWhere('batch.warehouse_id = :warehouseId', { warehouseId });
+        batchesQuery.andWhere('batch.warehouse_id = :warehouseId', {
+          warehouseId,
+        });
       }
 
       if (supplierId) {
-        batchesQuery.andWhere('batch.supplier_id = :supplierId', { supplierId });
+        batchesQuery.andWhere('batch.supplier_id = :supplierId', {
+          supplierId,
+        });
       }
 
-      const batches = await batchesQuery.orderBy('batch.import_date', 'ASC').getMany();
-      console.log(`[BatchReport] Found ${batches.length} batches from ${startDate} to ${endDate}`);
+      const batches = await batchesQuery
+        .orderBy('batch.import_date', 'ASC')
+        .getMany();
+      console.log(
+        `[BatchReport] Found ${batches.length} batches from ${startDate} to ${endDate}`,
+      );
 
       // Get all exports for these batches
       const exportsQuery = this.exportOrderItemRepo
         .createQueryBuilder('item')
         .leftJoinAndSelect('item.export_order', 'order')
-        .where('order.order_date BETWEEN :startDate AND :endDate', { startDate, endDate });
+        .where('order.order_date BETWEEN :startDate AND :endDate', {
+          startDate,
+          endDate,
+        });
 
       const exports = await exportsQuery.getMany();
-      console.log(`[BatchReport] Found ${exports.length} exports from ${startDate} to ${endDate}`);
+      console.log(
+        `[BatchReport] Found ${exports.length} exports from ${startDate} to ${endDate}`,
+      );
 
       // Group exports by batch_id
       const exportsByBatch = new Map<number, ExportOrderItem[]>();
-      exports.forEach(item => {
+      exports.forEach((item) => {
         if (!exportsByBatch.has(item.import_batch_id)) {
           exportsByBatch.set(item.import_batch_id, []);
         }
         exportsByBatch.get(item.import_batch_id)!.push(item);
       });
 
-      const batchDetails: BatchDetailDto[] = batches.map(batch => {
-        // Validate batch data
-        if (!batch.warehouse || !batch.product) {
-          console.warn(`[BatchReport] Skipping batch ${batch.id} - missing warehouse or product`);
-          return null as any;
-        }
+      const batchDetails: BatchDetailDto[] = batches
+        .map((batch) => {
+          // Validate batch data
+          if (!batch.warehouse || !batch.product) {
+            console.warn(
+              `[BatchReport] Skipping batch ${batch.id} - missing warehouse or product`,
+            );
+            return null as any;
+          }
 
-        const batchExports = exportsByBatch.get(batch.id) || [];
+          const batchExports = exportsByBatch.get(batch.id) || [];
 
-      // Calculate export totals
-      const exportQuantity = batchExports.reduce((sum, item) => sum + Number(item.quantity), 0);
-      const exportTotal = batchExports.reduce((sum, item) => sum + Number(item.total_amount), 0);
-      // Use final_unit_price (giá sau trừ chiết khấu) để tính lợi nhuận chính xác
-      const unitCost = Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
-      const exportCost = batchExports.reduce((sum, item) => sum + (Number(item.quantity) * unitCost), 0);
-      const exportProfit = exportTotal - exportCost;
+          // Calculate export totals
+          const exportQuantity = batchExports.reduce(
+            (sum, item) => sum + Number(item.quantity),
+            0,
+          );
+          const exportTotal = batchExports.reduce(
+            (sum, item) => sum + Number(item.total_amount),
+            0,
+          );
+          // Use final_unit_price (giá sau trừ chiết khấu) để tính lợi nhuận chính xác
+          const unitCost =
+            Number(batch.final_unit_price) || Number(batch.unit_price) || 0;
+          const exportCost = batchExports.reduce(
+            (sum, item) => sum + Number(item.quantity) * unitCost,
+            0,
+          );
+          const exportProfit = exportTotal - exportCost;
 
-      // Calculate closing inventory
-      const closingQuantity = Number(batch.import_quantity) - exportQuantity;
-      const closingTotal = closingQuantity * Number(batch.unit_price);
+          // Calculate closing inventory
+          const closingQuantity =
+            Number(batch.import_quantity) - exportQuantity;
+          const closingTotal = closingQuantity * Number(batch.unit_price);
 
-      return {
-        batch_id: batch.id,
-        batch_code: batch.batch_code || `BATCH-${batch.id}`,
-        import_date: batch.import_date.toISOString().split('T')[0],
-        product_name: batch.product.name,
-        supplier_name: batch.supplier?.name || 'N/A',
-        warehouse_name: batch.warehouse.name,
-        // Import
-        import_quantity: Number(batch.import_quantity) || 0,
-        import_discount: Number(batch.discount_amount) || 0,
-        import_eco_fee: 0,
-        import_env_tax: Number(batch.environmental_tax_amount) || 0,
-        import_total: Number(batch.import_quantity) * Number(batch.unit_price),
-        // Export
-        export_unit: 'Lít',
-        export_quantity: exportQuantity,
-        export_discount: 0, // TODO: calculate from items
-        export_eco_fee: 0,
-        export_total: exportTotal,
-        export_env_tax: 0,
-        export_profit: exportProfit,
-        // Closing
-        closing_quantity: closingQuantity,
-        closing_total: closingTotal,
-        note: '',
-      };
-      }).filter(b => b !== null);
+          return {
+            batch_id: batch.id,
+            batch_code: batch.batch_code || `BATCH-${batch.id}`,
+            import_date: batch.import_date.toISOString().split('T')[0],
+            product_name: batch.product.name,
+            supplier_name: batch.supplier?.name || 'N/A',
+            warehouse_name: batch.warehouse.name,
+            // Import
+            import_quantity: Number(batch.import_quantity) || 0,
+            import_discount: Number(batch.discount_amount) || 0,
+            import_eco_fee: 0,
+            import_env_tax: Number(batch.environmental_tax_amount) || 0,
+            import_total:
+              Number(batch.import_quantity) * Number(batch.unit_price),
+            // Export
+            export_unit: 'Lít',
+            export_quantity: exportQuantity,
+            export_discount: 0, // TODO: calculate from items
+            export_eco_fee: 0,
+            export_total: exportTotal,
+            export_env_tax: 0,
+            export_profit: exportProfit,
+            // Closing
+            closing_quantity: closingQuantity,
+            closing_total: closingTotal,
+            note: '',
+          };
+        })
+        .filter((b) => b !== null);
 
       const result = {
         batches: batchDetails,
         summary: {
-          total_import_quantity: batchDetails.reduce((sum, b) => sum + b.import_quantity, 0),
-          total_import_amount: batchDetails.reduce((sum, b) => sum + b.import_total, 0),
-          total_export_quantity: batchDetails.reduce((sum, b) => sum + b.export_quantity, 0),
-          total_export_amount: batchDetails.reduce((sum, b) => sum + b.export_total, 0),
-          total_closing_quantity: batchDetails.reduce((sum, b) => sum + b.closing_quantity, 0),
-          total_closing_amount: batchDetails.reduce((sum, b) => sum + b.closing_total, 0),
-          total_profit: batchDetails.reduce((sum, b) => sum + b.export_profit, 0),
+          total_import_quantity: batchDetails.reduce(
+            (sum, b) => sum + b.import_quantity,
+            0,
+          ),
+          total_import_amount: batchDetails.reduce(
+            (sum, b) => sum + b.import_total,
+            0,
+          ),
+          total_export_quantity: batchDetails.reduce(
+            (sum, b) => sum + b.export_quantity,
+            0,
+          ),
+          total_export_amount: batchDetails.reduce(
+            (sum, b) => sum + b.export_total,
+            0,
+          ),
+          total_closing_quantity: batchDetails.reduce(
+            (sum, b) => sum + b.closing_quantity,
+            0,
+          ),
+          total_closing_amount: batchDetails.reduce(
+            (sum, b) => sum + b.closing_total,
+            0,
+          ),
+          total_profit: batchDetails.reduce(
+            (sum, b) => sum + b.export_profit,
+            0,
+          ),
         },
       };
-      console.log(`[BatchReport] Report generated: ${batchDetails.length} batches`);
+      console.log(
+        `[BatchReport] Report generated: ${batchDetails.length} batches`,
+      );
       return result;
     } catch (error) {
       console.error('[BatchReport] Error generating report:', error);

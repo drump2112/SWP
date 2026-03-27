@@ -1,4 +1,16 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, Query, Res, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  UseGuards,
+  Query,
+  Res,
+  BadRequestException,
+} from '@nestjs/common';
 import type { Response } from 'express';
 import { InventoryService } from './inventory.service';
 import { InventoryExportService } from './inventory-export.service';
@@ -39,7 +51,12 @@ export class InventoryController {
     @Query('toDate') toDate?: string,
     @Query('priceId') priceId?: string,
   ) {
-    return this.inventoryService.getInventoryReport(+warehouseId, fromDate, toDate, priceId ? +priceId : undefined);
+    return this.inventoryService.getInventoryReport(
+      +warehouseId,
+      fromDate,
+      toDate,
+      priceId ? +priceId : undefined,
+    );
   }
 
   @Get('report-by-store/:storeId')
@@ -52,9 +69,15 @@ export class InventoryController {
     @Query('priceId') priceId?: string,
   ) {
     // Nếu user là STORE, tự động dùng storeId của user, bỏ qua tham số
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : +storeId;
 
-    return this.inventoryService.getInventoryReportByStore(effectiveStoreId, fromDate, toDate, priceId ? +priceId : undefined);
+    return this.inventoryService.getInventoryReportByStore(
+      effectiveStoreId,
+      fromDate,
+      toDate,
+      priceId ? +priceId : undefined,
+    );
   }
 
   /**
@@ -69,8 +92,13 @@ export class InventoryController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
-    return this.inventoryService.getInventoryReportByTank(effectiveStoreId, fromDate, toDate);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : +storeId;
+    return this.inventoryService.getInventoryReportByTank(
+      effectiveStoreId,
+      fromDate,
+      toDate,
+    );
   }
 
   /**
@@ -85,8 +113,13 @@ export class InventoryController {
     @Query('fromDate') fromDate?: string,
     @Query('toDate') toDate?: string,
   ) {
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
-    return this.inventoryService.getInventoryReportByTankWithPeriods(effectiveStoreId, fromDate, toDate);
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : +storeId;
+    return this.inventoryService.getInventoryReportByTankWithPeriods(
+      effectiveStoreId,
+      fromDate,
+      toDate,
+    );
   }
 
   @Get('documents')
@@ -99,9 +132,15 @@ export class InventoryController {
     @Query('toDate') toDate: string,
   ) {
     // Nếu user là STORE, tự động dùng storeId của user, bỏ qua tham số
-    const effectiveStoreId = user.roleCode === 'STORE' ? user.storeId : +storeId;
+    const effectiveStoreId =
+      user.roleCode === 'STORE' ? user.storeId : +storeId;
 
-    return this.inventoryService.getDocuments(effectiveStoreId, type, fromDate, toDate);
+    return this.inventoryService.getDocuments(
+      effectiveStoreId,
+      type,
+      fromDate,
+      toDate,
+    );
   }
 
   @Get('all-stores')
@@ -118,7 +157,9 @@ export class InventoryController {
    */
   @Post('documents/with-truck')
   @Roles('STORE', 'SALES', 'ADMIN')
-  createDocumentWithTruck(@Body() createDto: CreateInventoryDocumentWithTruckDto) {
+  createDocumentWithTruck(
+    @Body() createDto: CreateInventoryDocumentWithTruckDto,
+  ) {
     return this.inventoryService.createDocumentWithTruck(createDto);
   }
 
@@ -142,8 +183,12 @@ export class InventoryController {
     @Param('documentId') documentId: string,
     @Res() response: Response,
   ) {
-    const documentData = await this.inventoryService.getDocumentWithTruck(+documentId);
-    return this.inventoryExportService.exportInventoryDocumentToExcel(documentData, response);
+    const documentData =
+      await this.inventoryService.getDocumentWithTruck(+documentId);
+    return this.inventoryExportService.exportInventoryDocumentToExcel(
+      documentData,
+      response,
+    );
   }
 
   // ==================== API NHẬP TỒN ĐẦU KỲ ====================
@@ -195,7 +240,6 @@ export class InventoryController {
     throw new BadRequestException('Đây là lỗi thử nghiệm');
   }
 
-
   /**
    * POST /inventory/simple-initial-stock
    * Nhập tồn đầu đơn giản theo cửa hàng + mặt hàng (KHÔNG cần tank)
@@ -215,7 +259,9 @@ export class InventoryController {
   @Get('initial-stock-records')
   @Roles('ADMIN', 'ACCOUNTING')
   getInitialStockRecords(@Query('storeId') storeId?: string) {
-    return this.inventoryService.getInitialStockRecords(storeId ? +storeId : undefined);
+    return this.inventoryService.getInitialStockRecords(
+      storeId ? +storeId : undefined,
+    );
   }
 
   /**

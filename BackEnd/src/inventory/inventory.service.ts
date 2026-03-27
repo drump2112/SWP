@@ -58,7 +58,8 @@ export class InventoryService {
           storeId: createDto.storeId,
           type: 'STORE',
         });
-        const savedWarehouse = await this.warehouseRepository.save(newWarehouse);
+        const savedWarehouse =
+          await this.warehouseRepository.save(newWarehouse);
         warehouseId = savedWarehouse.id;
       }
     }
@@ -127,8 +128,18 @@ export class InventoryService {
     return query.getRawMany();
   }
 
-  async getInventoryReport(warehouseId: number, fromDate?: string, toDate?: string, priceId?: number) {
-    console.log('📊 getInventoryReport called:', { warehouseId, fromDate, toDate, priceId });
+  async getInventoryReport(
+    warehouseId: number,
+    fromDate?: string,
+    toDate?: string,
+    priceId?: number,
+  ) {
+    console.log('📊 getInventoryReport called:', {
+      warehouseId,
+      fromDate,
+      toDate,
+      priceId,
+    });
 
     // ✅ FIX: Sử dụng raw SQL để lấy chỉ ID của bản ghi mới nhất
     // DISTINCT ON trong PostgreSQL chỉ lấy bản ghi đầu tiên trong mỗi nhóm
@@ -170,7 +181,7 @@ export class InventoryService {
             new Brackets((qb) => {
               qb.where('il_all.shift_id IS NULL') // Ledger không liên quan shift (nhập hàng, điều chỉnh)
                 .orWhere(`il_all.id IN (${latestLedgerIdsQuery})`); // Hoặc là bản ghi mới nhất của shift
-            })
+            }),
           );
       }, 'il')
       .leftJoin('products', 'p', 'p.id = il.product_id')
@@ -179,13 +190,17 @@ export class InventoryService {
 
     // Filter theo kỳ giá nếu có
     if (priceFilter) {
-      openingQuery.andWhere('il.product_id = :productId', { productId: priceFilter.productId });
+      openingQuery.andWhere('il.product_id = :productId', {
+        productId: priceFilter.productId,
+      });
     }
 
     if (fromDate) {
       const fromDateTime = new Date(fromDate);
       console.log('📅 Opening balance query: before', fromDateTime);
-      openingQuery.andWhere('il.created_at < :fromDate', { fromDate: fromDateTime });
+      openingQuery.andWhere('il.created_at < :fromDate', {
+        fromDate: fromDateTime,
+      });
     } else {
       // Nếu không có fromDate, tồn đầu = 0
       openingQuery.andWhere('1=0');
@@ -208,9 +223,10 @@ export class InventoryService {
           .where('il_all.warehouse_id = :warehouseId', { warehouseId })
           .andWhere(
             new Brackets((qb) => {
-              qb.where('il_all.shift_id IS NULL')
-                .orWhere(`il_all.id IN (${latestLedgerIdsQuery})`);
-            })
+              qb.where('il_all.shift_id IS NULL').orWhere(
+                `il_all.id IN (${latestLedgerIdsQuery})`,
+              );
+            }),
           );
       }, 'il')
       .groupBy('il.product_id')
@@ -218,13 +234,17 @@ export class InventoryService {
 
     // Filter theo kỳ giá nếu có
     if (priceFilter) {
-      periodQuery.andWhere('il.product_id = :productId', { productId: priceFilter.productId });
+      periodQuery.andWhere('il.product_id = :productId', {
+        productId: priceFilter.productId,
+      });
     }
 
     if (fromDate) {
       const fromDateTime = new Date(fromDate);
       console.log('📅 Period query: from', fromDateTime);
-      periodQuery.andWhere('il.created_at >= :fromDate', { fromDate: fromDateTime });
+      periodQuery.andWhere('il.created_at >= :fromDate', {
+        fromDate: fromDateTime,
+      });
     }
     if (toDate) {
       // Add 1 day to include the end date fully
@@ -249,9 +269,10 @@ export class InventoryService {
           .where('il_all.warehouse_id = :warehouseId', { warehouseId })
           .andWhere(
             new Brackets((qb) => {
-              qb.where('il_all.shift_id IS NULL')
-                .orWhere(`il_all.id IN (${latestLedgerIdsQuery})`);
-            })
+              qb.where('il_all.shift_id IS NULL').orWhere(
+                `il_all.id IN (${latestLedgerIdsQuery})`,
+              );
+            }),
           );
       }, 'il')
       .groupBy('il.product_id')
@@ -259,7 +280,9 @@ export class InventoryService {
 
     // Filter theo kỳ giá nếu có
     if (priceFilter) {
-      closingQuery.andWhere('il.product_id = :productId', { productId: priceFilter.productId });
+      closingQuery.andWhere('il.product_id = :productId', {
+        productId: priceFilter.productId,
+      });
     }
 
     if (toDate) {
@@ -330,8 +353,16 @@ export class InventoryService {
    * Ưu tiên: Nếu có kỳ chốt trước fromDate → Tồn đầu = Tồn cuối kỳ chốt đó
    * Nếu không có kỳ chốt → Tính từ current_stock + ledger trước fromDate
    */
-  async getInventoryReportByTank(storeId: number, fromDate?: string, toDate?: string) {
-    console.log('📊 getInventoryReportByTank called:', { storeId, fromDate, toDate });
+  async getInventoryReportByTank(
+    storeId: number,
+    fromDate?: string,
+    toDate?: string,
+  ) {
+    console.log('📊 getInventoryReportByTank called:', {
+      storeId,
+      fromDate,
+      toDate,
+    });
 
     const warehouse = await this.warehouseRepository.findOne({
       where: { storeId, type: 'STORE' },
@@ -368,7 +399,9 @@ export class InventoryService {
 
         // 🔥 Sử dụng date string YYYY-MM-DD để so sánh với column type DATE
         const fromDateStr = fromDate.split('T')[0]; // Lấy phần date từ ISO string
-        console.log(`🔍 Tank ${tank.tankCode}: Tìm kỳ chốt với tankId=${tank.id}, storeId=${storeId}, fromDate='${fromDateStr}'`);
+        console.log(
+          `🔍 Tank ${tank.tankCode}: Tìm kỳ chốt với tankId=${tank.id}, storeId=${storeId}, fromDate='${fromDateStr}'`,
+        );
 
         // 🔥 Tìm kỳ chốt mà periodTo >= ngày trước fromDate (tức là kỳ đã bao gồm dữ liệu đến trước fromDate)
         // Logic: Nếu có kỳ chốt kết thúc ngày 31/01 và fromDate là 22/01,
@@ -389,15 +422,22 @@ export class InventoryService {
           .orderBy('ic.periodTo', 'DESC')
           .getOne();
 
-        console.log(`🔍 Tank ${tank.tankCode}: lastClosing =`, lastClosing ? `id=${lastClosing.id}, periodFrom=${lastClosing.periodFrom}, periodTo=${lastClosing.periodTo}, openingBalance=${lastClosing.openingBalance}, closingBalance=${lastClosing.closingBalance}` : 'NULL');
+        console.log(
+          `🔍 Tank ${tank.tankCode}: lastClosing =`,
+          lastClosing
+            ? `id=${lastClosing.id}, periodFrom=${lastClosing.periodFrom}, periodTo=${lastClosing.periodTo}, openingBalance=${lastClosing.openingBalance}, closingBalance=${lastClosing.closingBalance}`
+            : 'NULL',
+        );
 
         if (lastClosing) {
-          const periodFromDate = typeof lastClosing.periodFrom === 'string'
-            ? new Date(lastClosing.periodFrom)
-            : lastClosing.periodFrom;
-          const periodToDate = typeof lastClosing.periodTo === 'string'
-            ? new Date(lastClosing.periodTo)
-            : lastClosing.periodTo;
+          const periodFromDate =
+            typeof lastClosing.periodFrom === 'string'
+              ? new Date(lastClosing.periodFrom)
+              : lastClosing.periodFrom;
+          const periodToDate =
+            typeof lastClosing.periodTo === 'string'
+              ? new Date(lastClosing.periodTo)
+              : lastClosing.periodTo;
 
           const fromDateOnly = new Date(fromDateStr);
 
@@ -406,7 +446,9 @@ export class InventoryService {
           periodToDate.setHours(0, 0, 0, 0);
           fromDateOnly.setHours(0, 0, 0, 0);
 
-          console.log(`🔍 Tank ${tank.tankCode}: So sánh dates - fromDateOnly=${fromDateOnly.toISOString()}, periodFrom=${periodFromDate.toISOString()}, periodTo=${periodToDate.toISOString()}`);
+          console.log(
+            `🔍 Tank ${tank.tankCode}: So sánh dates - fromDateOnly=${fromDateOnly.toISOString()}, periodFrom=${periodFromDate.toISOString()}, periodTo=${periodToDate.toISOString()}`,
+          );
 
           if (fromDateOnly.getTime() > periodToDate.getTime()) {
             // ✅ Case 1: fromDate SAU kỳ chốt → Tồn đầu = Tồn cuối kỳ chốt + ledger từ sau kỳ chốt đến trước fromDate
@@ -415,46 +457,79 @@ export class InventoryService {
             dayAfterClosing.setDate(dayAfterClosing.getDate() + 1);
             dayAfterClosing.setHours(0, 0, 0, 0);
 
-            const ledgerAfterClosingResult = await this.inventoryLedgerRepository
-              .createQueryBuilder('il')
-              .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
-              .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
-              .andWhere('il.tankId = :tankId', { tankId: tank.id })
-              .andWhere('il.createdAt >= :dayAfterClosing', { dayAfterClosing })
-              .andWhere('il.createdAt < :fromDate', { fromDate: fromDateTime })
-              .getRawOne();
+            const ledgerAfterClosingResult =
+              await this.inventoryLedgerRepository
+                .createQueryBuilder('il')
+                .select(
+                  'COALESCE(SUM(il.quantityIn - il.quantityOut), 0)',
+                  'balance',
+                )
+                .where('il.warehouseId = :warehouseId', {
+                  warehouseId: warehouse.id,
+                })
+                .andWhere('il.tankId = :tankId', { tankId: tank.id })
+                .andWhere('il.createdAt >= :dayAfterClosing', {
+                  dayAfterClosing,
+                })
+                .andWhere('il.createdAt < :fromDate', {
+                  fromDate: fromDateTime,
+                })
+                .getRawOne();
 
-            openingBalance = closingBalance + Number(ledgerAfterClosingResult?.balance || 0);
+            openingBalance =
+              closingBalance + Number(ledgerAfterClosingResult?.balance || 0);
             usedClosingPeriod = true;
-            console.log(`🔒 Tank ${tank.tankCode}: [SAU KỲ CHỐT] closingBalance=${closingBalance}, ledgerAfter=${ledgerAfterClosingResult?.balance || 0}, openingBalance=${openingBalance}`);
+            console.log(
+              `🔒 Tank ${tank.tankCode}: [SAU KỲ CHỐT] closingBalance=${closingBalance}, ledgerAfter=${ledgerAfterClosingResult?.balance || 0}, openingBalance=${openingBalance}`,
+            );
           } else if (fromDateOnly.getTime() === periodToDate.getTime()) {
             // ✅ Case 2: fromDate = ngày cuối kỳ chốt → Tồn đầu = Tồn cuối kỳ chốt (đã bao gồm tất cả ledger và hao hụt)
             openingBalance = Number(lastClosing.closingBalance);
             usedClosingPeriod = true;
-            console.log(`🔒 Tank ${tank.tankCode}: [ĐÚNG NGÀY CUỐI KỲ] closingBalance=${openingBalance}`);
-          } else if (fromDateOnly.getTime() >= periodFromDate.getTime() && fromDateOnly.getTime() < periodToDate.getTime()) {
+            console.log(
+              `🔒 Tank ${tank.tankCode}: [ĐÚNG NGÀY CUỐI KỲ] closingBalance=${openingBalance}`,
+            );
+          } else if (
+            fromDateOnly.getTime() >= periodFromDate.getTime() &&
+            fromDateOnly.getTime() < periodToDate.getTime()
+          ) {
             // ✅ Case 3: fromDate TRONG kỳ chốt (không phải ngày cuối) → Tồn đầu = openingBalance + ledger từ periodFrom đến trước fromDate
             const periodOpeningBalance = Number(lastClosing.openingBalance);
 
-            console.log(`🔍 Tank ${tank.tankCode}: [TRONG KỲ CHỐT] Query ledger từ ${periodFromDate.toISOString()} đến ${fromDateTime.toISOString()}`);
+            console.log(
+              `🔍 Tank ${tank.tankCode}: [TRONG KỲ CHỐT] Query ledger từ ${periodFromDate.toISOString()} đến ${fromDateTime.toISOString()}`,
+            );
 
             const ledgerInPeriodResult = await this.inventoryLedgerRepository
               .createQueryBuilder('il')
-              .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
+              .select(
+                'COALESCE(SUM(il.quantityIn - il.quantityOut), 0)',
+                'balance',
+              )
               .addSelect('COALESCE(SUM(il.quantityIn), 0)', 'totalIn')
               .addSelect('COALESCE(SUM(il.quantityOut), 0)', 'totalOut')
               .addSelect('COUNT(*)', 'count')
-              .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
+              .where('il.warehouseId = :warehouseId', {
+                warehouseId: warehouse.id,
+              })
               .andWhere('il.tankId = :tankId', { tankId: tank.id })
-              .andWhere('il.createdAt >= :periodFrom', { periodFrom: periodFromDate })
+              .andWhere('il.createdAt >= :periodFrom', {
+                periodFrom: periodFromDate,
+              })
               .andWhere('il.createdAt < :fromDate', { fromDate: fromDateTime })
               .getRawOne();
 
-            console.log(`🔍 Tank ${tank.tankCode}: ledgerInPeriodResult =`, ledgerInPeriodResult);
+            console.log(
+              `🔍 Tank ${tank.tankCode}: ledgerInPeriodResult =`,
+              ledgerInPeriodResult,
+            );
 
-            openingBalance = periodOpeningBalance + Number(ledgerInPeriodResult?.balance || 0);
+            openingBalance =
+              periodOpeningBalance + Number(ledgerInPeriodResult?.balance || 0);
             usedClosingPeriod = true;
-            console.log(`🔒 Tank ${tank.tankCode}: [TRONG KỲ CHỐT] periodOpeningBalance=${periodOpeningBalance}, ledgerInPeriod=${ledgerInPeriodResult?.balance || 0}, openingBalance=${openingBalance}`);
+            console.log(
+              `🔒 Tank ${tank.tankCode}: [TRONG KỲ CHỐT] periodOpeningBalance=${periodOpeningBalance}, ledgerInPeriod=${ledgerInPeriodResult?.balance || 0}, openingBalance=${openingBalance}`,
+            );
           }
         }
 
@@ -462,16 +537,24 @@ export class InventoryService {
           const ledgerBeforeResult = await this.inventoryLedgerRepository
             .createQueryBuilder('il')
             .leftJoin('il.shift', 's')
-            .select('COALESCE(SUM(il.quantityIn - il.quantityOut), 0)', 'balance')
-            .where('il.warehouseId = :warehouseId', { warehouseId: warehouse.id })
+            .select(
+              'COALESCE(SUM(il.quantityIn - il.quantityOut), 0)',
+              'balance',
+            )
+            .where('il.warehouseId = :warehouseId', {
+              warehouseId: warehouse.id,
+            })
             .andWhere('il.tankId = :tankId', { tankId: tank.id })
             .andWhere(
               '(s.openedAt IS NOT NULL AND s.openedAt < :fromDate) OR (s.openedAt IS NULL AND il.createdAt < :fromDate)',
-              { fromDate: fromDateTime }
+              { fromDate: fromDateTime },
             )
             .getRawOne();
-          openingBalance = initialStock + Number(ledgerBeforeResult?.balance || 0);
-          console.log(`📦 Tank ${tank.tankCode}: Không có kỳ chốt, tính từ ledger. initialStock=${initialStock}, ledgerBefore=${ledgerBeforeResult?.balance || 0}, openingBalance=${openingBalance}`);
+          openingBalance =
+            initialStock + Number(ledgerBeforeResult?.balance || 0);
+          console.log(
+            `📦 Tank ${tank.tankCode}: Không có kỳ chốt, tính từ ledger. initialStock=${initialStock}, ledgerBefore=${ledgerBeforeResult?.balance || 0}, openingBalance=${openingBalance}`,
+          );
         }
       }
 
@@ -490,14 +573,14 @@ export class InventoryService {
         const fromDateTime = new Date(fromDate + 'T00:00:00');
         importQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt >= :fromDate) OR (s.openedAt IS NULL AND il.createdAt >= :fromDate)',
-          { fromDate: fromDateTime }
+          { fromDate: fromDateTime },
         );
       }
       if (toDate) {
         const toDateTime = new Date(toDate + 'T23:59:59.999');
         importQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt <= :toDate)',
-          { toDate: toDateTime }
+          { toDate: toDateTime },
         );
       }
 
@@ -513,20 +596,25 @@ export class InventoryService {
         const fromDateTime = new Date(fromDate + 'T00:00:00');
         exportQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt >= :fromDate) OR (s.openedAt IS NULL AND il.createdAt >= :fromDate)',
-          { fromDate: fromDateTime }
+          { fromDate: fromDateTime },
         );
       }
       if (toDate) {
         const toDateTime = new Date(toDate + 'T23:59:59.999');
         exportQueryBuilder.andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt <= :toDate)',
-          { toDate: toDateTime }
+          { toDate: toDateTime },
         );
       }
 
       const importResult = await importQueryBuilder.getRawOne();
       const exportResult = await exportQueryBuilder.getRawOne();
-      console.log(`📊 Tank ${tank.tankCode} - import (IMPORT only):`, importResult, 'export (all):', exportResult);
+      console.log(
+        `📊 Tank ${tank.tankCode} - import (IMPORT only):`,
+        importResult,
+        'export (all):',
+        exportResult,
+      );
       const importQuantity = Number(importResult?.totalIn || 0);
       const exportQuantity = Number(exportResult?.totalOut || 0);
 
@@ -543,10 +631,11 @@ export class InventoryService {
           .andWhere('il.tankId = :tankId', { tankId: tank.id })
           .andWhere(
             '(s.openedAt IS NOT NULL AND s.openedAt <= :toDate) OR (s.openedAt IS NULL AND il.createdAt <= :toDate)',
-            { toDate: toDateTime }
+            { toDate: toDateTime },
           )
           .getRawOne();
-        closingBalance = initialStock + Number(ledgerToDateResult?.balance || 0);
+        closingBalance =
+          initialStock + Number(ledgerToDateResult?.balance || 0);
       } else {
         // Nếu không có toDate, lấy tồn hiện tại = current_stock + tất cả ledger
         const allLedgerResult = await this.inventoryLedgerRepository
@@ -582,8 +671,16 @@ export class InventoryService {
    * 🔥 NEW: Báo cáo nhập xuất tồn TÁCH THEO KỲ CHỐT
    * Trả về nhiều segments: kỳ đã chốt + kỳ chưa chốt
    */
-  async getInventoryReportByTankWithPeriods(storeId: number, fromDate?: string, toDate?: string) {
-    console.log('📊 getInventoryReportByTankWithPeriods called:', { storeId, fromDate, toDate });
+  async getInventoryReportByTankWithPeriods(
+    storeId: number,
+    fromDate?: string,
+    toDate?: string,
+  ) {
+    console.log('📊 getInventoryReportByTankWithPeriods called:', {
+      storeId,
+      fromDate,
+      toDate,
+    });
 
     const warehouse = await this.warehouseRepository.findOne({
       where: { storeId, type: 'STORE' },
@@ -610,7 +707,7 @@ export class InventoryService {
       fromDate,
       toDate,
       fromDateTime: fromDateTime?.toISOString(),
-      toDateTime: toDateTime?.toISOString()
+      toDateTime: toDateTime?.toISOString(),
     });
 
     // Lấy tất cả kỳ chốt trong khoảng thời gian (dựa trên tank đầu tiên làm reference)
@@ -621,7 +718,9 @@ export class InventoryService {
       .addSelect('MAX(ic.closingDate)', 'closingDate')
       .where('ic.storeId = :storeId', { storeId })
       .andWhere('ic.periodFrom <= :toDate', { toDate: toDateTime })
-      .andWhere('ic.periodTo >= :fromDate', { fromDate: fromDateTime || new Date('1970-01-01') })
+      .andWhere('ic.periodTo >= :fromDate', {
+        fromDate: fromDateTime || new Date('1970-01-01'),
+      })
       .groupBy('ic.periodFrom')
       .addGroupBy('ic.periodTo')
       .orderBy('ic.periodFrom', 'ASC')
@@ -661,7 +760,9 @@ export class InventoryService {
 
         if (openPeriodEnd >= currentStart) {
           const items = await this.calculatePeriodItems(
-            tanks, warehouse.id, storeId,
+            tanks,
+            warehouse.id,
+            storeId,
             this.formatDateStr(currentStart),
             this.formatDateStr(openPeriodEnd),
             lastClosedPeriod, // Truyền kỳ chốt trước đó
@@ -676,12 +777,18 @@ export class InventoryService {
       }
 
       // Kỳ chốt - lấy dữ liệu từ inventory_closing
-      const closedItems = await this.getClosedPeriodItems(storeId, closing.periodFrom, closing.periodTo);
+      const closedItems = await this.getClosedPeriodItems(
+        storeId,
+        closing.periodFrom,
+        closing.periodTo,
+      );
       periods.push({
         periodType: 'CLOSED',
         periodFrom: this.formatDateStr(closingFrom),
         periodTo: this.formatDateStr(closingTo),
-        closingDate: closing.closingDate ? new Date(closing.closingDate).toISOString() : undefined,
+        closingDate: closing.closingDate
+          ? new Date(closing.closingDate).toISOString()
+          : undefined,
         items: closedItems,
       });
 
@@ -689,23 +796,32 @@ export class InventoryService {
       lastClosedPeriod = {
         periodTo: closingTo,
         closingDate: closing.closingDate ? new Date(closing.closingDate) : null,
-        closingBalances: closedItems.reduce((acc, item) => {
-          acc[item.tankId] = item.closingBalance;
-          return acc;
-        }, {} as Record<number, number>),
+        closingBalances: closedItems.reduce(
+          (acc, item) => {
+            acc[item.tankId] = item.closingBalance;
+            return acc;
+          },
+          {} as Record<number, number>,
+        ),
       };
 
       // Di chuyển currentStart đến ngày sau kỳ chốt
       currentStart = new Date(closingTo);
       currentStart.setDate(currentStart.getDate() + 1);
-      console.log(`📅 [getInventoryReportByTankWithPeriods] Moved currentStart after closing period: ${currentStart.toISOString()}`);
+      console.log(
+        `📅 [getInventoryReportByTankWithPeriods] Moved currentStart after closing period: ${currentStart.toISOString()}`,
+      );
     }
 
     // Nếu còn khoảng thời gian SAU tất cả kỳ chốt (kỳ mở)
     if (currentStart <= endDate) {
-      console.log(`📅 [getInventoryReportByTankWithPeriods] Creating OPEN period AFTER closings: ${this.formatDateStr(currentStart)} to ${this.formatDateStr(endDate)}`);
+      console.log(
+        `📅 [getInventoryReportByTankWithPeriods] Creating OPEN period AFTER closings: ${this.formatDateStr(currentStart)} to ${this.formatDateStr(endDate)}`,
+      );
       const items = await this.calculatePeriodItems(
-        tanks, warehouse.id, storeId,
+        tanks,
+        warehouse.id,
+        storeId,
         this.formatDateStr(currentStart),
         this.formatDateStr(endDate),
         lastClosedPeriod, // Truyền kỳ chốt cuối cùng
@@ -721,7 +837,9 @@ export class InventoryService {
     // Nếu không có kỳ chốt nào trong range, trả về 1 kỳ mở
     if (periods.length === 0 && fromDateTime && toDateTime) {
       const items = await this.calculatePeriodItems(
-        tanks, warehouse.id, storeId,
+        tanks,
+        warehouse.id,
+        storeId,
         fromDate!,
         toDate!,
         null, // Không có kỳ chốt trước
@@ -736,7 +854,7 @@ export class InventoryService {
 
     return {
       periods,
-      tanks: tanks.map(t => ({
+      tanks: tanks.map((t) => ({
         tankId: t.id,
         tankCode: t.tankCode,
         tankName: t.name,
@@ -761,8 +879,14 @@ export class InventoryService {
   /**
    * Helper: Lấy dữ liệu kỳ đã chốt từ inventory_closing
    */
-  private async getClosedPeriodItems(storeId: number, periodFrom: Date, periodTo: Date) {
-    console.log(`📊 [getClosedPeriodItems] Fetching closed period: ${periodFrom} to ${periodTo}`);
+  private async getClosedPeriodItems(
+    storeId: number,
+    periodFrom: Date,
+    periodTo: Date,
+  ) {
+    console.log(
+      `📊 [getClosedPeriodItems] Fetching closed period: ${periodFrom} to ${periodTo}`,
+    );
     const closings = await this.inventoryClosingRepository.find({
       where: {
         storeId,
@@ -773,12 +897,16 @@ export class InventoryService {
       order: { tankId: 'ASC' },
     });
 
-    console.log(`📊 [getClosedPeriodItems] Found ${closings.length} closing records`);
+    console.log(
+      `📊 [getClosedPeriodItems] Found ${closings.length} closing records`,
+    );
     if (closings.length > 0) {
-      console.log(`📊 [getClosedPeriodItems] Sample - Tank ${closings[0].tank?.tankCode}: import=${closings[0].importQuantity}, export=${closings[0].exportQuantity}`);
+      console.log(
+        `📊 [getClosedPeriodItems] Sample - Tank ${closings[0].tank?.tankCode}: import=${closings[0].importQuantity}, export=${closings[0].exportQuantity}`,
+      );
     }
 
-    return closings.map(c => ({
+    return closings.map((c) => ({
       tankId: c.tankId,
       tankCode: c.tank?.tankCode || '',
       tankName: c.tank?.name || '',
@@ -815,40 +943,60 @@ export class InventoryService {
   ) {
     const items: any[] = [];
     // Parse dates - đảm bảo có timestamp
-    const fromDateTime = new Date(fromDate.includes('T') ? fromDate : fromDate + 'T00:00:00');
-    const toDateTime = new Date(toDate.includes('T') ? toDate : toDate + 'T23:59:59.999');
+    const fromDateTime = new Date(
+      fromDate.includes('T') ? fromDate : fromDate + 'T00:00:00',
+    );
+    const toDateTime = new Date(
+      toDate.includes('T') ? toDate : toDate + 'T23:59:59.999',
+    );
     console.log('🔍 [calculatePeriodItems] Date range:', {
       fromDate,
       toDate,
       fromDateTime: fromDateTime.toISOString(),
-      toDateTime: toDateTime.toISOString()
+      toDateTime: toDateTime.toISOString(),
     });
 
     // 🔥 Xác định thời điểm bắt đầu tính ledger
     // QUAN TRỌNG: ledgerStartTime KHÔNG ĐƯỢC LÙI VỀ TRƯỚC fromDateTime
     let ledgerStartTime = fromDateTime;
 
-    console.log(`🔍 [calculatePeriodItems] Input dates - fromDate: ${fromDate}, toDate: ${toDate}`);
-    console.log(`🔍 [calculatePeriodItems] Parsed dates - fromDateTime: ${fromDateTime.toISOString()}, toDateTime: ${toDateTime.toISOString()}`);
+    console.log(
+      `🔍 [calculatePeriodItems] Input dates - fromDate: ${fromDate}, toDate: ${toDate}`,
+    );
+    console.log(
+      `🔍 [calculatePeriodItems] Parsed dates - fromDateTime: ${fromDateTime.toISOString()}, toDateTime: ${toDateTime.toISOString()}`,
+    );
     console.log(`🔍 [calculatePeriodItems] previousClosing:`, previousClosing);
 
     if (previousClosing?.closingDate) {
       const closingDateOnly = new Date(previousClosing.closingDate);
       closingDateOnly.setHours(0, 0, 0, 0);
 
-      console.log(`🔍 [calculatePeriodItems] closingDate full: ${new Date(previousClosing.closingDate).toISOString()}`);
-      console.log(`🔍 [calculatePeriodItems] closingDateOnly (00:00): ${closingDateOnly.toISOString()}`);
-      console.log(`🔍 [calculatePeriodItems] fromDateTime (00:00): ${fromDateTime.toISOString()}`);
-      console.log(`🔍 [calculatePeriodItems] Comparison result: ${closingDateOnly.getTime()} === ${fromDateTime.getTime()} = ${closingDateOnly.getTime() === fromDateTime.getTime()}`);
+      console.log(
+        `🔍 [calculatePeriodItems] closingDate full: ${new Date(previousClosing.closingDate).toISOString()}`,
+      );
+      console.log(
+        `🔍 [calculatePeriodItems] closingDateOnly (00:00): ${closingDateOnly.toISOString()}`,
+      );
+      console.log(
+        `🔍 [calculatePeriodItems] fromDateTime (00:00): ${fromDateTime.toISOString()}`,
+      );
+      console.log(
+        `🔍 [calculatePeriodItems] Comparison result: ${closingDateOnly.getTime()} === ${fromDateTime.getTime()} = ${closingDateOnly.getTime() === fromDateTime.getTime()}`,
+      );
 
       // Chỉ dùng closingDate nếu nó NẰM TRONG khoảng fromDate đến toDate
       // Ví dụ: chốt lúc 01/01 16:55, kỳ mở từ 01/01 00:00 → ledger phải từ SAU 16:55 (trong cùng ngày)
       if (closingDateOnly.getTime() === fromDateTime.getTime()) {
         // closingDate cùng ngày với fromDate → dùng closingDate làm mốc
         ledgerStartTime = previousClosing.closingDate;
-        console.log(`🔥 [calculatePeriodItems] Dùng closingDate làm mốc: ${ledgerStartTime.toISOString()}`);
+        console.log(
+          `🔥 [calculatePeriodItems] Dùng closingDate làm mốc: ${ledgerStartTime.toISOString()}`,
+        );
       } else {
-        console.log(`🔥 [calculatePeriodItems] KHÔNG dùng closingDate (khác ngày), giữ fromDateTime: ${ledgerStartTime.toISOString()}`);
+        console.log(
+          `🔥 [calculatePeriodItems] KHÔNG dùng closingDate (khác ngày), giữ fromDateTime: ${ledgerStartTime.toISOString()}`,
+        );
       }
       // KHÔNG dùng closingDate nếu nó là ngày hôm trước (fromDate - 1)
       // Vì điều đó sẽ lấy cả dữ liệu ngày hôm trước
@@ -859,17 +1007,30 @@ export class InventoryService {
       const tankInitialStock = Number(tank.currentStock || 0);
       let openingBalance = 0;
 
-      console.log(`\n🔷 [calculatePeriodItems] ========== Tank ${tank.tankCode} ==========`);
-      console.log(`🔷 tank.currentStock (giá trị ban đầu): ${tankInitialStock}`);
+      console.log(
+        `\n🔷 [calculatePeriodItems] ========== Tank ${tank.tankCode} ==========`,
+      );
+      console.log(
+        `🔷 tank.currentStock (giá trị ban đầu): ${tankInitialStock}`,
+      );
 
       // 🔥 Nếu có thông tin kỳ chốt trước, dùng closingBalance trực tiếp
-      if (previousClosing && previousClosing.closingBalances[tank.id] !== undefined) {
+      if (
+        previousClosing &&
+        previousClosing.closingBalances[tank.id] !== undefined
+      ) {
         openingBalance = previousClosing.closingBalances[tank.id];
-        console.log(`✅ [calculatePeriodItems] Tank ${tank.tankCode}: Lấy tồn đầu từ kỳ chốt trước = ${openingBalance}`);
+        console.log(
+          `✅ [calculatePeriodItems] Tank ${tank.tankCode}: Lấy tồn đầu từ kỳ chốt trước = ${openingBalance}`,
+        );
       } else {
         // Không có kỳ chốt trước → tính từ tank.currentStock + ledger
-        console.log(`🔍 [calculatePeriodItems] Tank ${tank.tankCode}: Không có kỳ chốt trước`);
-        console.log(`🔍 [calculatePeriodItems] fromDateTime: ${fromDateTime.toISOString()}`);
+        console.log(
+          `🔍 [calculatePeriodItems] Tank ${tank.tankCode}: Không có kỳ chốt trước`,
+        );
+        console.log(
+          `🔍 [calculatePeriodItems] fromDateTime: ${fromDateTime.toISOString()}`,
+        );
 
         // 🔥 Tồn đầu kỳ = tank.currentStock + SUM(ledger TRƯỚC fromDate)
         // - tank.currentStock là tồn ban đầu khi tạo bể
@@ -882,7 +1043,7 @@ export class InventoryService {
           .andWhere('il.tankId = :tankId', { tankId: tank.id })
           .andWhere(
             '(s.openedAt IS NOT NULL AND s.openedAt < :fromDate) OR (s.openedAt IS NULL AND il.createdAt < :fromDate)',
-            { fromDate: fromDateTime }
+            { fromDate: fromDateTime },
           )
           .getRawOne();
 
@@ -891,7 +1052,9 @@ export class InventoryService {
         // Tồn đầu kỳ = Tồn ban đầu (khi tạo bể) + Giao dịch trước kỳ
         openingBalance = tankInitialStock + ledgerBeforeFrom;
 
-        console.log(`📦 [calculatePeriodItems] Tank ${tank.tankCode}: tankInitialStock=${tankInitialStock}, ledgerBeforeFrom=${ledgerBeforeFrom}, openingBalance=${openingBalance}`);
+        console.log(
+          `📦 [calculatePeriodItems] Tank ${tank.tankCode}: tankInitialStock=${tankInitialStock}, ledgerBeforeFrom=${ledgerBeforeFrom}, openingBalance=${openingBalance}`,
+        );
       }
 
       // 🔥 Nhập trong kỳ - CHỈ tính refType = 'IMPORT'
@@ -904,7 +1067,7 @@ export class InventoryService {
         .andWhere('il.refType = :refType', { refType: 'IMPORT' })
         .andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt >= :ledgerStartTime AND s.openedAt < :toDate) OR (s.openedAt IS NULL AND il.createdAt >= :ledgerStartTime AND il.createdAt < :toDate)',
-          { ledgerStartTime, toDate: toDateTime }
+          { ledgerStartTime, toDate: toDateTime },
         )
         .getRawOne();
 
@@ -917,11 +1080,13 @@ export class InventoryService {
         .andWhere('il.tankId = :tankId', { tankId: tank.id })
         .andWhere(
           '(s.openedAt IS NOT NULL AND s.openedAt >= :ledgerStartTime AND s.openedAt < :toDate) OR (s.openedAt IS NULL AND il.createdAt >= :ledgerStartTime AND il.createdAt < :toDate)',
-          { ledgerStartTime, toDate: toDateTime }
+          { ledgerStartTime, toDate: toDateTime },
         )
         .getRawOne();
 
-      console.log(`📊 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerStartTime=${ledgerStartTime.toISOString()}, toDate=${toDateTime.toISOString()}, import=${importResult.totalIn}, export=${exportResult.totalOut}`);
+      console.log(
+        `📊 [calculatePeriodItems] Tank ${tank.tankCode}: ledgerStartTime=${ledgerStartTime.toISOString()}, toDate=${toDateTime.toISOString()}, import=${importResult.totalIn}, export=${exportResult.totalOut}`,
+      );
 
       const importQuantity = Number(importResult?.totalIn || 0);
       const exportQuantity = Number(exportResult?.totalOut || 0);
@@ -952,7 +1117,12 @@ export class InventoryService {
   /**
    * Báo cáo nhập xuất tồn theo storeId (tự động tìm warehouse)
    */
-  async getInventoryReportByStore(storeId: number, fromDate?: string, toDate?: string, priceId?: number) {
+  async getInventoryReportByStore(
+    storeId: number,
+    fromDate?: string,
+    toDate?: string,
+    priceId?: number,
+  ) {
     const warehouse = await this.warehouseRepository.findOne({
       where: { storeId, type: 'STORE' },
     });
@@ -977,15 +1147,16 @@ export class InventoryService {
       throw new NotFoundException(`Không tìm thấy kho cho cửa hàng ${storeId}`);
     }
 
-    const products = await this.stockCalculatorService.getWarehouseAllProductsStock(
-      warehouse.id,
-    );
+    const products =
+      await this.stockCalculatorService.getWarehouseAllProductsStock(
+        warehouse.id,
+      );
 
     return {
       storeId,
       warehouseId: warehouse.id,
       reportDate: new Date(),
-      products: products.map(p => ({
+      products: products.map((p) => ({
         productId: p.productId,
         productCode: p.productCode,
         productName: p.productName,
@@ -1017,7 +1188,7 @@ export class InventoryService {
     }
 
     // 2. Validate products
-    const productIds = items.map(i => i.productId);
+    const productIds = items.map((i) => i.productId);
     const products = await this.productRepository.findByIds(productIds);
     if (products.length !== productIds.length) {
       throw new BadRequestException('Một số sản phẩm không tồn tại');
@@ -1034,10 +1205,11 @@ export class InventoryService {
 
       for (const item of items) {
         // Lấy tồn hiện tại
-        const currentStock = await this.stockCalculatorService.getWarehouseProductStock(
-          warehouse.id,
-          item.productId,
-        );
+        const currentStock =
+          await this.stockCalculatorService.getWarehouseProductStock(
+            warehouse.id,
+            item.productId,
+          );
 
         const diff = item.quantity - currentStock;
 
@@ -1080,7 +1252,9 @@ export class InventoryService {
     fromDate: string,
     toDate: string,
   ) {
-    console.log(`[getDocuments] storeId=${storeId}, type=${type}, fromDate=${fromDate}, toDate=${toDate}`);
+    console.log(
+      `[getDocuments] storeId=${storeId}, type=${type}, fromDate=${fromDate}, toDate=${toDate}`,
+    );
 
     const warehouse = await this.warehouseRepository.findOne({
       where: { storeId, type: 'STORE' },
@@ -1098,7 +1272,10 @@ export class InventoryService {
       .leftJoinAndSelect('doc.items', 'item')
       .leftJoinAndSelect('item.product', 'product')
       .where('doc.warehouse_id = :warehouseId', { warehouseId: warehouse.id })
-      .andWhere('doc.doc_date BETWEEN :fromDate AND :toDate', { fromDate, toDate })
+      .andWhere('doc.doc_date BETWEEN :fromDate AND :toDate', {
+        fromDate,
+        toDate,
+      })
       .orderBy('doc.doc_date', 'DESC')
       .addOrderBy('doc.id', 'DESC');
 
@@ -1172,12 +1349,13 @@ export class InventoryService {
         invoiceNumber: doc.invoiceNumber,
         licensePlate: doc.licensePlate,
         // Trả về items từ document (format đơn giản)
-        items: doc.items?.map((item) => ({
-          productId: item.productId,
-          productName: item.product?.name,
-          tankId: item.tankId, // ✅ Thêm tankId
-          quantity: Number(item.quantity),
-        })) || [],
+        items:
+          doc.items?.map((item) => ({
+            productId: item.productId,
+            productName: item.product?.name,
+            tankId: item.tankId, // ✅ Thêm tankId
+            quantity: Number(item.quantity),
+          })) || [],
         compartments: compartments.map((c) => ({
           compartmentNumber: c.compartmentNumber,
           productId: c.productId,
@@ -1186,17 +1364,31 @@ export class InventoryService {
           receivedVolume: Number(c.receivedVolume),
           lossVolume: Number(c.lossVolume || 0),
         })),
-        totalVolume: compartments.reduce((sum, c) => sum + Number(c.receivedVolume || 0), 0)
-                     || doc.items?.reduce((sum, item) => sum + Number(item.quantity || 0), 0) || 0,
-        calculation: calculation ? {
-          status: calculation.excessShortageVolume > 0 ? 'EXCESS' :
-                  calculation.excessShortageVolume < 0 ? 'SHORTAGE' : 'NORMAL',
-          totalTruckVolume: Number(calculation.totalTruckVolume),
-          totalReceivedVolume: Number(calculation.totalReceivedVolume),
-          totalLossVolume: Number(calculation.totalLossVolume),
-          allowedLossVolume: Number(calculation.allowedLossVolume),
-          excessShortageVolume: Number(calculation.excessShortageVolume),
-        } : null,
+        totalVolume:
+          compartments.reduce(
+            (sum, c) => sum + Number(c.receivedVolume || 0),
+            0,
+          ) ||
+          doc.items?.reduce(
+            (sum, item) => sum + Number(item.quantity || 0),
+            0,
+          ) ||
+          0,
+        calculation: calculation
+          ? {
+              status:
+                calculation.excessShortageVolume > 0
+                  ? 'EXCESS'
+                  : calculation.excessShortageVolume < 0
+                    ? 'SHORTAGE'
+                    : 'NORMAL',
+              totalTruckVolume: Number(calculation.totalTruckVolume),
+              totalReceivedVolume: Number(calculation.totalReceivedVolume),
+              totalLossVolume: Number(calculation.totalLossVolume),
+              allowedLossVolume: Number(calculation.allowedLossVolume),
+              excessShortageVolume: Number(calculation.excessShortageVolume),
+            }
+          : null,
       });
     }
 
@@ -1224,7 +1416,9 @@ export class InventoryService {
   /**
    * Tạo phiếu nhập kho với xe téc và tính toán hao hụt
    */
-  async createDocumentWithTruck(createDto: CreateInventoryDocumentWithTruckDto) {
+  async createDocumentWithTruck(
+    createDto: CreateInventoryDocumentWithTruckDto,
+  ) {
     let warehouseId = createDto.warehouseId;
     if (!warehouseId && createDto.storeId) {
       const warehouse = await this.warehouseRepository.findOne({
@@ -1237,7 +1431,8 @@ export class InventoryService {
           storeId: createDto.storeId,
           type: 'STORE',
         });
-        const savedWarehouse = await this.warehouseRepository.save(newWarehouse);
+        const savedWarehouse =
+          await this.warehouseRepository.save(newWarehouse);
         warehouseId = savedWarehouse.id;
       }
     }
@@ -1271,7 +1466,7 @@ export class InventoryService {
       for (const compartment of createDto.compartments) {
         // Lấy thông tin sản phẩm
         const product = await manager.findOne(Product, {
-          where: { id: compartment.productId }
+          where: { id: compartment.productId },
         });
 
         if (!product) {
@@ -1279,15 +1474,17 @@ export class InventoryService {
         }
 
         // Tính toán cho ngăn này
-        const calculation = this.petroleumCalculationService.calculateCompartment({
-          truckVolume: compartment.truckVolume || 0,
-          truckTemperature: compartment.truckTemperature || 15,
-          actualTemperature: compartment.actualTemperature || 15,
-          productCode: product.code,
-        });
+        const calculation =
+          this.petroleumCalculationService.calculateCompartment({
+            truckVolume: compartment.truckVolume || 0,
+            truckTemperature: compartment.truckTemperature || 15,
+            actualTemperature: compartment.actualTemperature || 15,
+            productCode: product.code,
+          });
 
         // Tính hao hụt
-        const lossVolume = (compartment.truckVolume || 0) - (compartment.receivedVolume || 0);
+        const lossVolume =
+          (compartment.truckVolume || 0) - (compartment.receivedVolume || 0);
 
         // Lưu vào database
         const truckCompartment = manager.create(InventoryTruckCompartment, {
@@ -1338,12 +1535,15 @@ export class InventoryService {
       // 3. Tính toán tổng hợp cho toàn bộ phiếu
       // Kiểm tra compartmentCalculations có dữ liệu không
       if (!compartmentCalculations || compartmentCalculations.length === 0) {
-        throw new Error('No compartments to calculate. Please add at least one compartment.');
+        throw new Error(
+          'No compartments to calculate. Please add at least one compartment.',
+        );
       }
 
-      const documentCalculation = this.petroleumCalculationService.calculateDocument(
-        compartmentCalculations,
-      );
+      const documentCalculation =
+        this.petroleumCalculationService.calculateDocument(
+          compartmentCalculations,
+        );
 
       // 4. Lưu kết quả tính toán
       const lossCalculation = manager.create(InventoryLossCalculation, {
@@ -1356,7 +1556,8 @@ export class InventoryService {
         totalLossVolume: documentCalculation.totalLossVolume,
         allowedLossVolume: documentCalculation.allowedLossVolume,
         excessShortageVolume: documentCalculation.excessShortageVolume,
-        temperatureAdjustmentVolume: documentCalculation.temperatureAdjustmentVolume,
+        temperatureAdjustmentVolume:
+          documentCalculation.temperatureAdjustmentVolume,
         notes: createDto.notes,
       });
       await manager.save(InventoryLossCalculation, lossCalculation);
@@ -1421,23 +1622,28 @@ export class InventoryService {
         heightLossTruck: Number(c.heightLossTruck || 0),
         heightLossWarehouse: Number(c.heightLossWarehouse || 0),
       })),
-      calculation: calculation ? {
-        expansionCoefficient: Number(calculation.expansionCoefficient),
-        lossCoefficient: Number(calculation.lossCoefficient),
-        totalTruckVolume: Number(calculation.totalTruckVolume),
-        totalActualVolume: Number(calculation.totalActualVolume),
-        totalReceivedVolume: Number(calculation.totalReceivedVolume),
-        totalLossVolume: Number(calculation.totalLossVolume),
-        allowedLossVolume: Number(calculation.allowedLossVolume),
-        excessShortageVolume: Number(calculation.excessShortageVolume),
-        temperatureAdjustmentVolume: Number(calculation.temperatureAdjustmentVolume),
-        status: Number(calculation.excessShortageVolume) > 0
-          ? 'EXCESS'
-          : Number(calculation.excessShortageVolume) < 0
-          ? 'SHORTAGE'
-          : 'NORMAL',
-        notes: calculation.notes,
-      } : null,
+      calculation: calculation
+        ? {
+            expansionCoefficient: Number(calculation.expansionCoefficient),
+            lossCoefficient: Number(calculation.lossCoefficient),
+            totalTruckVolume: Number(calculation.totalTruckVolume),
+            totalActualVolume: Number(calculation.totalActualVolume),
+            totalReceivedVolume: Number(calculation.totalReceivedVolume),
+            totalLossVolume: Number(calculation.totalLossVolume),
+            allowedLossVolume: Number(calculation.allowedLossVolume),
+            excessShortageVolume: Number(calculation.excessShortageVolume),
+            temperatureAdjustmentVolume: Number(
+              calculation.temperatureAdjustmentVolume,
+            ),
+            status:
+              Number(calculation.excessShortageVolume) > 0
+                ? 'EXCESS'
+                : Number(calculation.excessShortageVolume) < 0
+                  ? 'SHORTAGE'
+                  : 'NORMAL',
+            notes: calculation.notes,
+          }
+        : null,
     };
   }
 
@@ -1479,11 +1685,14 @@ export class InventoryService {
         });
 
         if (!tank) {
-          throw new Error(`Tank ${item.tankId} không tồn tại hoặc không thuộc cửa hàng ${initialStockDto.storeId}`);
+          throw new Error(
+            `Tank ${item.tankId} không tồn tại hoặc không thuộc cửa hàng ${initialStockDto.storeId}`,
+          );
         }
 
         // Lấy tồn hiện tại
-        const currentStock = await this.stockCalculatorService.getTankCurrentStock(item.tankId);
+        const currentStock =
+          await this.stockCalculatorService.getTankCurrentStock(item.tankId);
 
         // Tính chênh lệch cần điều chỉnh
         const adjustment = item.quantity - currentStock;
@@ -1506,7 +1715,7 @@ export class InventoryService {
             tankId: item.tankId,
             refType: 'ADJUSTMENT',
             refId: savedDocument.id,
-            quantityIn: adjustment > 0 ? adjustment : 0,   // Tăng tồn
+            quantityIn: adjustment > 0 ? adjustment : 0, // Tăng tồn
             quantityOut: adjustment < 0 ? Math.abs(adjustment) : 0, // Giảm tồn
           });
           await manager.save(InventoryLedger, ledger);
@@ -1533,15 +1742,16 @@ export class InventoryService {
     }
 
     // Lấy tồn kho từ warehouse level (hỗ trợ cả có tank và không có tank)
-    const products = await this.stockCalculatorService.getWarehouseAllProductsStock(
-      warehouse.id,
-    );
+    const products =
+      await this.stockCalculatorService.getWarehouseAllProductsStock(
+        warehouse.id,
+      );
 
     return {
       storeId,
       warehouseId: warehouse.id,
       reportDate: new Date(),
-      products: products.map(p => ({
+      products: products.map((p) => ({
         productId: p.productId,
         productCode: p.productCode,
         productName: p.productName,
@@ -1616,7 +1826,7 @@ export class InventoryService {
          WHERE warehouse_id = $1
            AND ref_type = 'ADJUSTMENT'
            AND shift_id IS NULL`,
-        [warehouse.id]
+        [warehouse.id],
       );
 
       // Tìm hoặc tạo document nếu cần

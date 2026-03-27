@@ -1,4 +1,13 @@
-import { IsInt, IsNotEmpty, IsNumber, IsString, IsArray, ValidateNested, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsNumber,
+  IsString,
+  IsArray,
+  ValidateNested,
+  IsOptional,
+  IsDateString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 class ReceiptDetailDto {

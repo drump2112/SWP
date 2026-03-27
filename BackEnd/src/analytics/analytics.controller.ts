@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -75,9 +70,7 @@ export class AnalyticsController {
    */
   @Get('revenue/store-trends')
   @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  async getStoreTrends(
-    @Query('months') months?: string,
-  ) {
+  async getStoreTrends(@Query('months') months?: string) {
     return this.analyticsService.getStoreTrends(months ? +months : 6);
   }
 
@@ -98,9 +91,7 @@ export class AnalyticsController {
    */
   @Get('inventory/by-product')
   @Roles('SALES', 'ACCOUNTING', 'DIRECTOR', 'ADMIN')
-  async getInventoryByProduct(
-    @Query('limit') limit?: string,
-  ) {
+  async getInventoryByProduct(@Query('limit') limit?: string) {
     return this.analyticsService.getInventoryByProduct(limit ? +limit : 10);
   }
 

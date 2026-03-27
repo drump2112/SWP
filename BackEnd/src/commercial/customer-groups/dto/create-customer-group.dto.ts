@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsOptional, IsBoolean, MaxLength, Min, Max } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsBoolean,
+  MaxLength,
+  Min,
+  Max,
+} from 'class-validator';
 
 export class CreateCustomerGroupDto {
   @IsString()

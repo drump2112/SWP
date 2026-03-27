@@ -26,12 +26,16 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('🚀 Bắt đầu migration: Fix công nợ cửa hàng cho phiếu thu tiền mặt...');
+    console.log(
+      '🚀 Bắt đầu migration: Fix công nợ cửa hàng cho phiếu thu tiền mặt...',
+    );
 
     // =====================================================
     // BƯỚC 1: Ghi DEBIT cho khách INTERNAL từ phiếu thu tiền mặt
     // =====================================================
-    console.log('\n📝 Bước 1: Tìm phiếu thu tiền mặt chưa có DEBIT cho INTERNAL...');
+    console.log(
+      '\n📝 Bước 1: Tìm phiếu thu tiền mặt chưa có DEBIT cho INTERNAL...',
+    );
 
     // Tìm tất cả phiếu thu tiền mặt mà chưa có bản ghi RECEIPT_CASH_IN trong debt_ledger
     const receiptsNeedingDebit = await queryRunner.query(`
@@ -61,11 +65,14 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
       ORDER BY r.id
     `);
 
-    console.log(`   Tìm thấy ${receiptsNeedingDebit.length} phiếu thu cần bổ sung DEBIT cho INTERNAL`);
+    console.log(
+      `   Tìm thấy ${receiptsNeedingDebit.length} phiếu thu cần bổ sung DEBIT cho INTERNAL`,
+    );
 
     let debitCount = 0;
     for (const receipt of receiptsNeedingDebit) {
-      await queryRunner.query(`
+      await queryRunner.query(
+        `
         INSERT INTO debt_ledger (
           customer_id, store_id, shift_id, ref_type, ref_id,
           debit, credit, notes, ledger_at, created_at
@@ -73,15 +80,17 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
           $1, $2, $3, 'RECEIPT_CASH_IN', $4,
           $5, 0, $6, $7, NOW()
         )
-      `, [
-        receipt.internal_customer_id,
-        receipt.store_id,
-        receipt.shift_id,
-        receipt.receipt_id,
-        receipt.amount,
-        `[Migration] Thu tiền mặt từ khách nợ - Tiền vào quỹ`,
-        receipt.receipt_at || receipt.closed_at || new Date(),
-      ]);
+      `,
+        [
+          receipt.internal_customer_id,
+          receipt.store_id,
+          receipt.shift_id,
+          receipt.receipt_id,
+          receipt.amount,
+          `[Migration] Thu tiền mặt từ khách nợ - Tiền vào quỹ`,
+          receipt.receipt_at || receipt.closed_at || new Date(),
+        ],
+      );
       debitCount++;
     }
 
@@ -90,7 +99,9 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
     // =====================================================
     // BƯỚC 2: Ghi CREDIT cho khách INTERNAL từ phiếu nộp tiền mặt (nguồn RECEIPT)
     // =====================================================
-    console.log('\n📝 Bước 2: Tìm phiếu nộp tiền mặt chưa có CREDIT cho INTERNAL...');
+    console.log(
+      '\n📝 Bước 2: Tìm phiếu nộp tiền mặt chưa có CREDIT cho INTERNAL...',
+    );
 
     // Tìm phiếu nộp tiền mặt mà:
     // - Có trong ca đã đóng
@@ -136,11 +147,14 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
       ORDER BY cd.id
     `);
 
-    console.log(`   Tìm thấy ${depositsNeedingCredit.length} phiếu nộp cần bổ sung CREDIT cho INTERNAL`);
+    console.log(
+      `   Tìm thấy ${depositsNeedingCredit.length} phiếu nộp cần bổ sung CREDIT cho INTERNAL`,
+    );
 
     let creditCount = 0;
     for (const deposit of depositsNeedingCredit) {
-      await queryRunner.query(`
+      await queryRunner.query(
+        `
         INSERT INTO debt_ledger (
           customer_id, store_id, shift_id, ref_type, ref_id,
           debit, credit, notes, ledger_at, created_at
@@ -148,15 +162,17 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
           $1, $2, $3, 'DEPOSIT', $4,
           0, $5, $6, $7, NOW()
         )
-      `, [
-        deposit.internal_customer_id,
-        deposit.store_id,
-        deposit.shift_id,
-        deposit.deposit_id,
-        deposit.amount,
-        `[Migration] Nộp tiền về công ty - Giảm nợ`,
-        deposit.deposit_at || deposit.closed_at || new Date(),
-      ]);
+      `,
+        [
+          deposit.internal_customer_id,
+          deposit.store_id,
+          deposit.shift_id,
+          deposit.deposit_id,
+          deposit.amount,
+          `[Migration] Nộp tiền về công ty - Giảm nợ`,
+          deposit.deposit_at || deposit.closed_at || new Date(),
+        ],
+      );
       creditCount++;
     }
 
@@ -190,30 +206,51 @@ export class FixReceiptCashInDebtLedger1738540000000 implements MigrationInterfa
 
     console.log('\n   Tóm tắt công nợ và sổ quỹ theo cửa hàng:');
     console.log('   ' + '─'.repeat(100));
-    console.log('   | Cửa hàng             | Khách INTERNAL        | Tổng DEBIT     | Tổng CREDIT    | Công nợ        | Sổ quỹ         |');
+    console.log(
+      '   | Cửa hàng             | Khách INTERNAL        | Tổng DEBIT     | Tổng CREDIT    | Công nợ        | Sổ quỹ         |',
+    );
     console.log('   ' + '─'.repeat(100));
 
     for (const row of summary) {
       const storeName = (row.store_name || '').padEnd(20).substring(0, 20);
-      const customerName = (row.customer_name || '').padEnd(20).substring(0, 20);
-      const debit = Number(row.total_debit).toLocaleString('vi-VN').padStart(12);
-      const credit = Number(row.total_credit).toLocaleString('vi-VN').padStart(12);
+      const customerName = (row.customer_name || '')
+        .padEnd(20)
+        .substring(0, 20);
+      const debit = Number(row.total_debit)
+        .toLocaleString('vi-VN')
+        .padStart(12);
+      const credit = Number(row.total_credit)
+        .toLocaleString('vi-VN')
+        .padStart(12);
       const balance = Number(row.balance).toLocaleString('vi-VN').padStart(12);
-      const cashBalance = Number(row.cash_balance).toLocaleString('vi-VN').padStart(12);
+      const cashBalance = Number(row.cash_balance)
+        .toLocaleString('vi-VN')
+        .padStart(12);
 
-      const match = Math.abs(Number(row.balance) - Number(row.cash_balance)) < 1 ? '✅' : '⚠️';
+      const match =
+        Math.abs(Number(row.balance) - Number(row.cash_balance)) < 1
+          ? '✅'
+          : '⚠️';
 
-      console.log(`   | ${storeName} | ${customerName} | ${debit} | ${credit} | ${balance} | ${cashBalance} | ${match}`);
+      console.log(
+        `   | ${storeName} | ${customerName} | ${debit} | ${credit} | ${balance} | ${cashBalance} | ${match}`,
+      );
     }
     console.log('   ' + '─'.repeat(100));
 
     console.log('\n✅ Migration hoàn tất!');
-    console.log(`   - Đã tạo ${debitCount} bản ghi DEBIT (RECEIPT_CASH_IN) cho khách INTERNAL`);
-    console.log(`   - Đã tạo ${creditCount} bản ghi CREDIT (DEPOSIT) cho khách INTERNAL`);
+    console.log(
+      `   - Đã tạo ${debitCount} bản ghi DEBIT (RECEIPT_CASH_IN) cho khách INTERNAL`,
+    );
+    console.log(
+      `   - Đã tạo ${creditCount} bản ghi CREDIT (DEPOSIT) cho khách INTERNAL`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    console.log('🔙 Rollback migration: Xóa các bản ghi được tạo bởi migration...');
+    console.log(
+      '🔙 Rollback migration: Xóa các bản ghi được tạo bởi migration...',
+    );
 
     // Xóa các bản ghi RECEIPT_CASH_IN được tạo bởi migration
     const deletedDebit = await queryRunner.query(`

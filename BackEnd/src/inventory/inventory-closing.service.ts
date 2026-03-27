@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, Between } from 'typeorm';
 import { InventoryClosing } from '../entities/inventory-closing.entity';
@@ -7,7 +11,11 @@ import { Store } from '../entities/store.entity';
 import { Warehouse } from '../entities/warehouse.entity';
 import { InventoryLedger } from '../entities/inventory-ledger.entity';
 import { StoreLossConfig } from '../entities/store-loss-config.entity';
-import { CreateInventoryClosingDto, InventoryClosingPreviewDto, InventoryClosingItemDto } from './dto/inventory-closing.dto';
+import {
+  CreateInventoryClosingDto,
+  InventoryClosingPreviewDto,
+  InventoryClosingItemDto,
+} from './dto/inventory-closing.dto';
 
 @Injectable()
 export class InventoryClosingService {
@@ -30,7 +38,11 @@ export class InventoryClosingService {
    * Lấy tồn đầu kỳ cho tank
    * = closing_balance của kỳ chốt trước đó hoặc current_stock + ledger movements
    */
-  async getOpeningBalance(tankId: number, periodFrom: Date, warehouseId: number): Promise<number> {
+  async getOpeningBalance(
+    tankId: number,
+    periodFrom: Date,
+    warehouseId: number,
+  ): Promise<number> {
     // Tìm kỳ chốt gần nhất TRƯỚC periodFrom
     const lastClosing = await this.closingRepository.findOne({
       where: {
@@ -64,7 +76,11 @@ export class InventoryClosingService {
   /**
    * Lấy hệ số hao hụt hiệu lực cho store + category tại thời điểm
    */
-  async getLossConfig(storeId: number, productCategory: string, date: Date): Promise<{ rate: number; configId: number | null }> {
+  async getLossConfig(
+    storeId: number,
+    productCategory: string,
+    date: Date,
+  ): Promise<{ rate: number; configId: number | null }> {
     const dateStr = date.toISOString().split('T')[0];
 
     const config = await this.lossConfigRepository
@@ -72,7 +88,9 @@ export class InventoryClosingService {
       .where('slc.storeId = :storeId', { storeId })
       .andWhere('slc.productCategory = :productCategory', { productCategory })
       .andWhere('slc.effectiveFrom <= :date', { date: dateStr })
-      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :date)', { date: dateStr })
+      .andWhere('(slc.effectiveTo IS NULL OR slc.effectiveTo >= :date)', {
+        date: dateStr,
+      })
       .orderBy('slc.effectiveFrom', 'DESC')
       .getOne();
 
@@ -85,8 +103,12 @@ export class InventoryClosingService {
   /**
    * Xem trước dữ liệu chốt kỳ (chưa lưu)
    */
-  async previewClosing(dto: CreateInventoryClosingDto): Promise<InventoryClosingPreviewDto> {
-    const store = await this.storeRepository.findOne({ where: { id: dto.storeId } });
+  async previewClosing(
+    dto: CreateInventoryClosingDto,
+  ): Promise<InventoryClosingPreviewDto> {
+    const store = await this.storeRepository.findOne({
+      where: { id: dto.storeId },
+    });
     if (!store) {
       throw new NotFoundException(`Store ${dto.storeId} không tồn tại`);
     }
@@ -95,7 +117,9 @@ export class InventoryClosingService {
       where: { storeId: dto.storeId, type: 'STORE' },
     });
     if (!warehouse) {
-      throw new NotFoundException(`Không tìm thấy kho cho store ${dto.storeId}`);
+      throw new NotFoundException(
+        `Không tìm thấy kho cho store ${dto.storeId}`,
+      );
     }
 
     // Kiểm tra xem đã có kỳ chốt chồng lấn chưa
@@ -107,7 +131,9 @@ export class InventoryClosingService {
       },
     });
     if (existingClosing) {
-      throw new BadRequestException(`Kỳ ${dto.periodFrom} → ${dto.periodTo} đã được chốt trước đó`);
+      throw new BadRequestException(
+        `Kỳ ${dto.periodFrom} → ${dto.periodTo} đã được chốt trước đó`,
+      );
     }
 
     const tanks = await this.tankRepository.find({
@@ -127,7 +153,11 @@ export class InventoryClosingService {
       const productCategory = tank.product?.category || 'GASOLINE';
 
       // 1. Tồn đầu kỳ
-      const openingBalance = await this.getOpeningBalance(tank.id, periodFrom, warehouse.id);
+      const openingBalance = await this.getOpeningBalance(
+        tank.id,
+        periodFrom,
+        warehouse.id,
+      );
 
       // 2. Nhập/xuất trong kỳ
       const periodResult = await this.ledgerRepository
@@ -144,15 +174,13 @@ export class InventoryClosingService {
       const exportQuantity = Number(periodResult?.totalOut || 0);
 
       // 3. Hệ số hao hụt (lấy theo ngày cuối kỳ)
-      const { rate: lossRate, configId: lossConfigId } = await this.getLossConfig(
-        dto.storeId,
-        productCategory,
-        periodTo,
-      );
+      const { rate: lossRate, configId: lossConfigId } =
+        await this.getLossConfig(dto.storeId, productCategory, periodTo);
 
       // 4. Tính toán
       const lossAmount = exportQuantity * lossRate;
-      const closingBalance = openingBalance + importQuantity - exportQuantity - lossAmount;
+      const closingBalance =
+        openingBalance + importQuantity - exportQuantity - lossAmount;
 
       items.push({
         tankId: tank.id,
@@ -183,7 +211,10 @@ export class InventoryClosingService {
   /**
    * Thực hiện chốt kỳ (lưu vào DB)
    */
-  async executeClosing(dto: CreateInventoryClosingDto, userId?: number): Promise<InventoryClosing[]> {
+  async executeClosing(
+    dto: CreateInventoryClosingDto,
+    userId?: number,
+  ): Promise<InventoryClosing[]> {
     const preview = await this.previewClosing(dto);
     const closingDate = new Date();
 
@@ -218,7 +249,11 @@ export class InventoryClosingService {
   /**
    * Lấy danh sách kỳ đã chốt theo store
    */
-  async getClosingsByStore(storeId: number, fromDate?: string, toDate?: string): Promise<InventoryClosing[]> {
+  async getClosingsByStore(
+    storeId: number,
+    fromDate?: string,
+    toDate?: string,
+  ): Promise<InventoryClosing[]> {
     const query = this.closingRepository
       .createQueryBuilder('ic')
       .leftJoinAndSelect('ic.tank', 'tank')
@@ -229,7 +264,9 @@ export class InventoryClosingService {
       .addOrderBy('tank.tankCode', 'ASC');
 
     if (fromDate) {
-      query.andWhere('ic.periodTo >= :fromDate', { fromDate: new Date(fromDate) });
+      query.andWhere('ic.periodTo >= :fromDate', {
+        fromDate: new Date(fromDate),
+      });
     }
     if (toDate) {
       query.andWhere('ic.periodFrom <= :toDate', { toDate: new Date(toDate) });
@@ -241,7 +278,9 @@ export class InventoryClosingService {
   /**
    * Lấy danh sách kỳ chốt (unique period) theo store
    */
-  async getClosingPeriods(storeId: number): Promise<{ periodFrom: Date; periodTo: Date; closingDate: Date }[]> {
+  async getClosingPeriods(
+    storeId: number,
+  ): Promise<{ periodFrom: Date; periodTo: Date; closingDate: Date }[]> {
     const result = await this.closingRepository
       .createQueryBuilder('ic')
       .select('ic.periodFrom', 'periodFrom')
@@ -259,7 +298,11 @@ export class InventoryClosingService {
   /**
    * Xóa kỳ chốt (chỉ cho phép xóa kỳ mới nhất)
    */
-  async deleteClosing(storeId: number, periodFrom: string, periodTo: string): Promise<void> {
+  async deleteClosing(
+    storeId: number,
+    periodFrom: string,
+    periodTo: string,
+  ): Promise<void> {
     // Kiểm tra có phải kỳ mới nhất không
     const latestPeriod = await this.closingRepository
       .createQueryBuilder('ic')
@@ -268,7 +311,10 @@ export class InventoryClosingService {
       .getRawOne();
 
     const periodToDate = new Date(periodTo);
-    if (latestPeriod?.maxPeriodTo && new Date(latestPeriod.maxPeriodTo) > periodToDate) {
+    if (
+      latestPeriod?.maxPeriodTo &&
+      new Date(latestPeriod.maxPeriodTo) > periodToDate
+    ) {
       throw new BadRequestException('Chỉ được phép xóa kỳ chốt mới nhất');
     }
 
@@ -296,9 +342,9 @@ export class InventoryClosingService {
     // Logic đơn giản: nếu toDate > max(periodTo) của các kỳ chốt
     let hasUnclosedPeriod = false;
     if (closings.length > 0) {
-      const maxPeriodTo = closings.reduce((max, c) =>
-        new Date(c.periodTo) > max ? new Date(c.periodTo) : max,
-        new Date(closings[0].periodTo)
+      const maxPeriodTo = closings.reduce(
+        (max, c) => (new Date(c.periodTo) > max ? new Date(c.periodTo) : max),
+        new Date(closings[0].periodTo),
       );
       hasUnclosedPeriod = new Date(toDate) > maxPeriodTo;
     } else {

@@ -9,7 +9,7 @@ export class AddRefTypeToCashDeposits1739176800000 implements MigrationInterface
         type: 'varchar',
         length: '50',
         isNullable: true,
-        comment: "RETAIL = nộp tiền bán lẻ, RECEIPT = nộp tiền từ phiếu thu nợ",
+        comment: 'RETAIL = nộp tiền bán lẻ, RECEIPT = nộp tiền từ phiếu thu nợ',
       }),
     );
   }

@@ -167,7 +167,9 @@ export class ShiftsService {
         // 2.1. Xóa INVENTORY LEDGER (Thủ phạm số 1 gây rollback)
         // Ledger kho thường tham chiếu đến Document, không phải Shift
         if (docIds.length > 0) {
-          console.log('🗑️ Deleting Inventory Ledgers, Items, Truck Compartments & Loss Calculations...');
+          console.log(
+            '🗑️ Deleting Inventory Ledgers, Items, Truck Compartments & Loss Calculations...',
+          );
 
           // Xóa truck compartments (cho phiếu nhập xe téc)
           await manager.delete(InventoryTruckCompartment, {
@@ -365,14 +367,18 @@ export class ShiftsService {
     // Điều này đảm bảo rằng nếu giá thay đổi giữa chừng (ví dụ: đổi giá lúc 15h),
     // ca đã mở trước đó vẫn sử dụng giá đúng tại thời điểm mở ca
     const priceReferenceTime = shift.openedAt || new Date();
-    console.log(`📊 Lấy giá tại thời điểm mở ca: ${priceReferenceTime.toISOString()}`);
+    console.log(
+      `📊 Lấy giá tại thời điểm mở ca: ${priceReferenceTime.toISOString()}`,
+    );
 
     const prices = await manager
       .createQueryBuilder(ProductPrice, 'pp')
       .where('pp.product_id IN (:...productIds)', { productIds })
       .andWhere('pp.region_id = :regionId', { regionId: shift.store.regionId })
       .andWhere('pp.valid_from <= :priceReferenceTime', { priceReferenceTime })
-      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)', { priceReferenceTime })
+      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)', {
+        priceReferenceTime,
+      })
       .orderBy('pp.valid_from', 'DESC') // Lấy giá mới nhất trước
       .getMany();
 
@@ -535,7 +541,8 @@ export class ShiftsService {
       const debtByCustomer = new Map<number, number>();
       for (const debtSale of closeShiftDto.debtSales) {
         // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
-        const totalAmount = debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
+        const totalAmount =
+          debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
         const currentTotal = debtByCustomer.get(debtSale.customerId) || 0;
         debtByCustomer.set(debtSale.customerId, currentTotal + totalAmount);
       }
@@ -563,16 +570,16 @@ export class ShiftsService {
           if (!validation.isValid) {
             validationErrors.push(
               `❌ Khách hàng "${customer?.name || customerId}" (${customer?.code || ''}): ` +
-              `Vượt hạn mức ${validation.exceedAmount.toLocaleString('vi-VN')}đ. ` +
-              `Hạn mức: ${validation.creditLimit.toLocaleString('vi-VN')}đ, ` +
-              `Nợ hiện tại: ${validation.currentDebt.toLocaleString('vi-VN')}đ, ` +
-              `Nợ mới: ${newDebtAmount.toLocaleString('vi-VN')}đ, ` +
-              `Tổng nợ: ${validation.totalDebt.toLocaleString('vi-VN')}đ`
+                `Vượt hạn mức ${validation.exceedAmount.toLocaleString('vi-VN')}đ. ` +
+                `Hạn mức: ${validation.creditLimit.toLocaleString('vi-VN')}đ, ` +
+                `Nợ hiện tại: ${validation.currentDebt.toLocaleString('vi-VN')}đ, ` +
+                `Nợ mới: ${newDebtAmount.toLocaleString('vi-VN')}đ, ` +
+                `Tổng nợ: ${validation.totalDebt.toLocaleString('vi-VN')}đ`,
             );
           }
         } catch (error) {
           validationErrors.push(
-            `❌ Lỗi kiểm tra hạn mức cho khách hàng ${customerId}: ${error.message}`
+            `❌ Lỗi kiểm tra hạn mức cho khách hàng ${customerId}: ${error.message}`,
           );
         }
       }
@@ -581,10 +588,10 @@ export class ShiftsService {
       if (validationErrors.length > 0) {
         throw new BadRequestException(
           `KHÔNG THỂ CHỐT CA - Vượt hạn mức công nợ:\n\n${validationErrors.join('\n\n')}\n\n` +
-          `Vui lòng:\n` +
-          `1. Giảm số lượng bán nợ cho khách hàng vượt hạn mức\n` +
-          `2. Thu tiền trước khi bán thêm\n` +
-          `3. Hoặc liên hệ Admin để tăng hạn mức`
+            `Vui lòng:\n` +
+            `1. Giảm số lượng bán nợ cho khách hàng vượt hạn mức\n` +
+            `2. Thu tiền trước khi bán thêm\n` +
+            `3. Hoặc liên hệ Admin để tăng hạn mức`,
         );
       }
     }
@@ -592,7 +599,8 @@ export class ShiftsService {
     if (closeShiftDto.debtSales && closeShiftDto.debtSales.length > 0) {
       for (const debtSale of closeShiftDto.debtSales) {
         // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
-        const totalAmount = debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
+        const totalAmount =
+          debtSale.amount ?? Math.round(debtSale.quantity * debtSale.unitPrice);
 
         // Lưu vào shift_debt_sales
         const debtSaleRecord = await manager.save(ShiftDebtSale, {
@@ -647,7 +655,9 @@ export class ShiftsService {
     // - CREDIT sẽ được ghi khi có phiếu nộp tiền về công ty (deposit)
     if (closeShiftDto.retailSales && closeShiftDto.retailSales.length > 0) {
       for (const retailSale of closeShiftDto.retailSales) {
-        const totalAmount = Math.round(retailSale.quantity * retailSale.unitPrice); // Làm tròn để tránh phần thập phân
+        const totalAmount = Math.round(
+          retailSale.quantity * retailSale.unitPrice,
+        ); // Làm tròn để tránh phần thập phân
 
         // Lấy tên sản phẩm để ghi vào notes
         const product = await manager.findOne(Product, {
@@ -683,15 +693,17 @@ export class ShiftsService {
     if (closeShiftDto.receipts && closeShiftDto.receipts.length > 0) {
       for (const receipt of closeShiftDto.receipts) {
         // Lưu receipt với thời gian thu tiền do người dùng chọn
-        const receiptRecord = await manager.save(Receipt, {
+        const receiptRecord = (await manager.save(Receipt, {
           storeId: receipt.storeId,
           shiftId: shift.id,
           receiptType: receipt.receiptType,
           amount: receipt.amount,
           paymentMethod: receipt.paymentMethod || 'CASH',
           notes: receipt.notes,
-          receiptAt: receipt.receiptAt ? new Date(receipt.receiptAt) : new Date(),
-        }) as Receipt;
+          receiptAt: receipt.receiptAt
+            ? new Date(receipt.receiptAt)
+            : new Date(),
+        })) as Receipt;
 
         // Lưu chi tiết
         for (const detail of receipt.details) {
@@ -748,23 +760,25 @@ export class ShiftsService {
     // ✅ Ghi CREDIT cho khách hàng nội bộ (giảm nợ khi nộp tiền)
     if (closeShiftDto.deposits && closeShiftDto.deposits.length > 0) {
       // Tìm khách hàng nội bộ của cửa hàng để ghi CREDIT
-      const internalCustomer = await manager.findOne(Customer, {
-        where: {
-          type: 'INTERNAL',
-        },
-        relations: ['customerStores'],
-      }).then(async () => {
-        // Tìm khách hàng nội bộ qua customer_stores
-        const customerStore = await manager
-          .createQueryBuilder()
-          .select('cs.customerId', 'customerId')
-          .from('customer_stores', 'cs')
-          .innerJoin('customers', 'c', 'c.id = cs.customerId')
-          .where('cs.storeId = :storeId', { storeId: shift.storeId })
-          .andWhere('c.type = :type', { type: 'INTERNAL' })
-          .getRawOne();
-        return customerStore?.customerId || null;
-      });
+      const internalCustomer = await manager
+        .findOne(Customer, {
+          where: {
+            type: 'INTERNAL',
+          },
+          relations: ['customerStores'],
+        })
+        .then(async () => {
+          // Tìm khách hàng nội bộ qua customer_stores
+          const customerStore = await manager
+            .createQueryBuilder()
+            .select('cs.customerId', 'customerId')
+            .from('customer_stores', 'cs')
+            .innerJoin('customers', 'c', 'c.id = cs.customerId')
+            .where('cs.storeId = :storeId', { storeId: shift.storeId })
+            .andWhere('c.type = :type', { type: 'INTERNAL' })
+            .getRawOne();
+          return customerStore?.customerId || null;
+        });
 
       for (const deposit of closeShiftDto.deposits) {
         // Lưu deposit record
@@ -778,10 +792,18 @@ export class ShiftsService {
         const receiverLower = (deposit.receiverName || '').toLowerCase();
 
         // Keywords cho phiếu thu nợ
-        const receiptKeywords = ['phiếu thu', 'thu nợ', 'từ khách', 'thanh toán nợ', 'trả nợ', 'thu tiền khách'];
+        const receiptKeywords = [
+          'phiếu thu',
+          'thu nợ',
+          'từ khách',
+          'thanh toán nợ',
+          'trả nợ',
+          'thu tiền khách',
+        ];
 
-        const isReceiptDeposit = receiptKeywords.some(keyword =>
-          notesLower.includes(keyword) || receiverLower.includes(keyword)
+        const isReceiptDeposit = receiptKeywords.some(
+          (keyword) =>
+            notesLower.includes(keyword) || receiverLower.includes(keyword),
         );
 
         if (isReceiptDeposit) {
@@ -792,7 +814,9 @@ export class ShiftsService {
           storeId: deposit.storeId,
           shiftId: shift.id,
           amount: deposit.amount,
-          depositAt: deposit.depositAt ? new Date(deposit.depositAt) : new Date(),
+          depositAt: deposit.depositAt
+            ? new Date(deposit.depositAt)
+            : new Date(),
           receiverName: deposit.receiverName,
           paymentMethod: deposit.paymentMethod || 'CASH',
           refType: refType, // Từ sourceType hoặc phát hiện
@@ -877,7 +901,7 @@ export class ShiftsService {
       .filter((r) => r.pumpId)
       .map((r) => r.pumpId);
 
-    let pumpToTankMap = new Map<number, number>();
+    const pumpToTankMap = new Map<number, number>();
 
     if (pumpIds.length > 0) {
       const pumps = await manager
@@ -895,11 +919,16 @@ export class ShiftsService {
 
     // Tổng hợp lượng BÁN theo từng TANK + PRODUCT (thay vì chỉ productId)
     // Key: "tankId-productId", Value: { tankId, productId, quantity, unitPrice }
-    const tankSalesMap = new Map<string, { tankId: number; productId: number; quantity: number; unitPrice: number }>();
+    const tankSalesMap = new Map<
+      string,
+      { tankId: number; productId: number; quantity: number; unitPrice: number }
+    >();
     for (const reading of pumpReadingsData) {
       const tankId = reading.pumpId ? pumpToTankMap.get(reading.pumpId) : null;
       if (!tankId) {
-        console.warn(`⚠️ Không tìm thấy tankId cho pump ${reading.pumpCode} (pumpId: ${reading.pumpId})`);
+        console.warn(
+          `⚠️ Không tìm thấy tankId cho pump ${reading.pumpCode} (pumpId: ${reading.pumpId})`,
+        );
         continue;
       }
       const key = `${tankId}-${reading.productId}`;
@@ -963,7 +992,10 @@ export class ShiftsService {
     }
 
     // 6.8. Xử lý phiếu nhập hàng (inventoryImports)
-    if (closeShiftDto.inventoryImports && closeShiftDto.inventoryImports.length > 0) {
+    if (
+      closeShiftDto.inventoryImports &&
+      closeShiftDto.inventoryImports.length > 0
+    ) {
       for (const importItem of closeShiftDto.inventoryImports) {
         // Tạo document nhập
         const importDoc = await manager.save(InventoryDocument, {
@@ -1038,10 +1070,13 @@ export class ShiftsService {
       const prevShift = await manager
         .createQueryBuilder(Shift, 's')
         .where('s.store_id = :storeId', { storeId: shift.storeId })
-        .andWhere('(s.shift_date < :shiftDate OR (s.shift_date = :shiftDate AND s.shift_no < :shiftNo))', {
-          shiftDate: shift.shiftDate,
-          shiftNo: shift.shiftNo,
-        })
+        .andWhere(
+          '(s.shift_date < :shiftDate OR (s.shift_date = :shiftDate AND s.shift_no < :shiftNo))',
+          {
+            shiftDate: shift.shiftDate,
+            shiftNo: shift.shiftNo,
+          },
+        )
         .orderBy('s.shift_date', 'DESC')
         .addOrderBy('s.shift_no', 'DESC')
         .limit(1)
@@ -1092,7 +1127,8 @@ export class ShiftsService {
       }
     }
 
-    shift.openingStockJson = openingStockData.length > 0 ? openingStockData : null;
+    shift.openingStockJson =
+      openingStockData.length > 0 ? openingStockData : null;
 
     shift.status = 'CLOSED';
     const updatedShift = await manager.save(shift);
@@ -1416,7 +1452,11 @@ export class ShiftsService {
    * Cập nhật thông tin mở ca (shiftDate, shiftNo, openedAt, handoverName, receiverName)
    * Chỉ cho phép khi ca đang mở và chưa chốt lần nào
    */
-  async updateOpeningInfo(shiftId: number, dto: UpdateOpeningInfoDto, user: any): Promise<Shift> {
+  async updateOpeningInfo(
+    shiftId: number,
+    dto: UpdateOpeningInfoDto,
+    user: any,
+  ): Promise<Shift> {
     const shift = await this.shiftRepository.findOne({
       where: { id: shiftId },
       relations: ['store'],
@@ -1427,12 +1467,16 @@ export class ShiftsService {
     }
 
     if (shift.status !== 'OPEN') {
-      throw new BadRequestException('Chỉ có thể sửa thông tin mở ca khi ca đang mở');
+      throw new BadRequestException(
+        'Chỉ có thể sửa thông tin mở ca khi ca đang mở',
+      );
     }
 
     // Chỉ cho phép sửa nếu ca chưa từng chốt (closedAt = null)
     if (shift.closedAt) {
-      throw new BadRequestException('Không thể sửa thông tin mở ca sau khi ca đã chốt. Vui lòng sử dụng chức năng Sửa ca.');
+      throw new BadRequestException(
+        'Không thể sửa thông tin mở ca sau khi ca đã chốt. Vui lòng sử dụng chức năng Sửa ca.',
+      );
     }
 
     const oldData = {
@@ -1445,7 +1489,9 @@ export class ShiftsService {
 
     // Kiểm tra nếu đổi ngày hoặc số ca, đảm bảo không trùng
     if (dto.shiftDate || dto.shiftNo) {
-      const targetDate = dto.shiftDate ? new Date(dto.shiftDate) : shift.shiftDate;
+      const targetDate = dto.shiftDate
+        ? new Date(dto.shiftDate)
+        : shift.shiftDate;
       const targetNo = dto.shiftNo ?? shift.shiftNo;
 
       const existingShift = await this.shiftRepository.findOne({
@@ -1505,7 +1551,11 @@ export class ShiftsService {
   /**
    * Cập nhật thời gian mở ca và đóng ca (chỉ dành cho Admin)
    */
-  async updateShiftTimes(shiftId: number, dto: UpdateShiftTimesDto, user: any): Promise<Shift> {
+  async updateShiftTimes(
+    shiftId: number,
+    dto: UpdateShiftTimesDto,
+    user: any,
+  ): Promise<Shift> {
     const shift = await this.shiftRepository.findOne({
       where: { id: shiftId },
       relations: ['store'],
@@ -1525,7 +1575,9 @@ export class ShiftsService {
 
     // Kiểm tra closedAt phải sau openedAt
     if (closedAt <= openedAt) {
-      throw new BadRequestException('Thời gian đóng ca phải sau thời gian mở ca');
+      throw new BadRequestException(
+        'Thời gian đóng ca phải sau thời gian mở ca',
+      );
     }
 
     shift.openedAt = openedAt;
@@ -1537,7 +1589,8 @@ export class ShiftsService {
     // Giúp fix lỗi dòng bị thiếu trong báo cáo sổ quỹ
     try {
       // 1. Update DEPOSIT: lấy từ deposit_at (nếu có)
-      const depositResult = await this.dataSource.query(`
+      const depositResult = await this.dataSource.query(
+        `
         UPDATE cash_ledger cl
         INNER JOIN cash_deposits cd ON cl.ref_id = cd.id
         SET cl.ledger_at = cd.deposit_at
@@ -1545,11 +1598,16 @@ export class ShiftsService {
           AND cl.ref_type = 'DEPOSIT'
           AND cl.ledger_at IS NULL
           AND cd.deposit_at IS NOT NULL
-      `, [shiftId]);
-      console.log(`✅ Updated ${depositResult.affectedRows || 0} DEPOSIT cash_ledger rows`);
+      `,
+        [shiftId],
+      );
+      console.log(
+        `✅ Updated ${depositResult.affectedRows || 0} DEPOSIT cash_ledger rows`,
+      );
 
       // 2. Update RECEIPT: lấy từ receipt_at (nếu có)
-      const receiptResult = await this.dataSource.query(`
+      const receiptResult = await this.dataSource.query(
+        `
         UPDATE cash_ledger cl
         INNER JOIN receipts r ON cl.ref_id = r.id
         SET cl.ledger_at = r.receipt_at
@@ -1557,8 +1615,12 @@ export class ShiftsService {
           AND cl.ref_type = 'RECEIPT'
           AND cl.ledger_at IS NULL
           AND r.receipt_at IS NOT NULL
-      `, [shiftId]);
-      console.log(`✅ Updated ${receiptResult.affectedRows || 0} RECEIPT cash_ledger rows`);
+      `,
+        [shiftId],
+      );
+      console.log(
+        `✅ Updated ${receiptResult.affectedRows || 0} RECEIPT cash_ledger rows`,
+      );
 
       // 3. Fallback: TẤT CẢ bản ghi còn thiếu → dùng closedAt của ca
       const fallbackResult = await this.cashLedgerRepository
@@ -1568,7 +1630,9 @@ export class ShiftsService {
         .where('shift_id = :shiftId', { shiftId })
         .andWhere('ledger_at IS NULL')
         .execute();
-      console.log(`✅ Updated ${fallbackResult.affected || 0} remaining cash_ledger rows with closedAt`);
+      console.log(
+        `✅ Updated ${fallbackResult.affected || 0} remaining cash_ledger rows with closedAt`,
+      );
 
       console.log(`⏰ Updated ledger_at for shift ${shiftId} cash ledgers`);
     } catch (error) {
@@ -1678,10 +1742,15 @@ export class ShiftsService {
           .andWhere('pp.region_id = :regionId', {
             regionId: shift.store.regionId,
           })
-          .andWhere('pp.valid_from <= :priceReferenceTime', { priceReferenceTime })
-          .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)', {
+          .andWhere('pp.valid_from <= :priceReferenceTime', {
             priceReferenceTime,
           })
+          .andWhere(
+            '(pp.valid_to IS NULL OR pp.valid_to > :priceReferenceTime)',
+            {
+              priceReferenceTime,
+            },
+          )
           .getOne();
 
         if (price) {
@@ -1791,7 +1860,9 @@ export class ShiftsService {
       // 1. Tạo shift debt sale
       // Ưu tiên sử dụng amount từ frontend (tránh sai số làm tròn)
       // Fallback tính lại nếu frontend không gửi amount
-      const amount = createDto.amount ?? Math.round(createDto.quantity * createDto.unitPrice);
+      const amount =
+        createDto.amount ??
+        Math.round(createDto.quantity * createDto.unitPrice);
       const debtSale = manager.create(ShiftDebtSale, {
         ...createDto,
         amount,
@@ -1930,7 +2001,9 @@ export class ShiftsService {
         cashIn: 0,
         cashOut: createDto.amount,
         shiftId: shift.id,
-        ledgerAt: createDto.depositAt ? new Date(createDto.depositAt) : new Date(), // ⏰ Lấy thời gian nộp tiền user chọn
+        ledgerAt: createDto.depositAt
+          ? new Date(createDto.depositAt)
+          : new Date(), // ⏰ Lấy thời gian nộp tiền user chọn
       });
       await manager.save(cashLedger);
 
@@ -2005,7 +2078,9 @@ export class ShiftsService {
       }
 
       // 1. Tạo phiếu thu
-      const receiptAt = createDto.receiptAt ? new Date(createDto.receiptAt) : new Date();
+      const receiptAt = createDto.receiptAt
+        ? new Date(createDto.receiptAt)
+        : new Date();
       const paymentMethod = createDto.paymentMethod || 'CASH';
 
       const receipt = manager.create(Receipt, {
@@ -2149,10 +2224,12 @@ export class ShiftsService {
     }
 
     // Tính checkpoint_no tiếp theo
-    const lastCheckpoint = await this.dataSource.getRepository(ShiftCheckpoint).findOne({
-      where: { shiftId },
-      order: { checkpointNo: 'DESC' },
-    });
+    const lastCheckpoint = await this.dataSource
+      .getRepository(ShiftCheckpoint)
+      .findOne({
+        where: { shiftId },
+        order: { checkpointNo: 'DESC' },
+      });
     const nextCheckpointNo = (lastCheckpoint?.checkpointNo || 0) + 1;
 
     // Tạo checkpoint
@@ -2227,7 +2304,15 @@ export class ShiftsService {
     const checkpointRepo = this.dataSource.getRepository(ShiftCheckpoint);
     return await checkpointRepo.find({
       where: { shiftId },
-      relations: ['readings', 'readings.pump', 'readings.product', 'stocks', 'stocks.tank', 'stocks.product', 'creator'],
+      relations: [
+        'readings',
+        'readings.pump',
+        'readings.product',
+        'stocks',
+        'stocks.tank',
+        'stocks.product',
+        'creator',
+      ],
       order: { checkpointNo: 'ASC' },
     });
   }
@@ -2235,8 +2320,14 @@ export class ShiftsService {
   /**
    * Xóa checkpoint (chỉ được xóa checkpoint cuối cùng của ca đang mở)
    */
-  async deleteCheckpoint(shiftId: number, checkpointId: number, userId: number) {
-    const shift = await this.shiftRepository.findOne({ where: { id: shiftId } });
+  async deleteCheckpoint(
+    shiftId: number,
+    checkpointId: number,
+    userId: number,
+  ) {
+    const shift = await this.shiftRepository.findOne({
+      where: { id: shiftId },
+    });
 
     if (!shift) {
       throw new NotFoundException('Không tìm thấy ca làm việc');

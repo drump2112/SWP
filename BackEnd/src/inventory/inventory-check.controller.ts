@@ -12,7 +12,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { InventoryCheckService } from './inventory-check.service';
-import { CreateInventoryCheckDto, InventoryCheckQueryDto } from './dto/inventory-check.dto';
+import {
+  CreateInventoryCheckDto,
+  InventoryCheckQueryDto,
+} from './dto/inventory-check.dto';
 
 @Controller('inventory-checks')
 @UseGuards(JwtAuthGuard)
@@ -55,7 +58,10 @@ export class InventoryCheckController {
    * PUT /inventory-checks/:id
    */
   @Put(':id')
-  async update(@Param('id') id: string, @Body() dto: Partial<CreateInventoryCheckDto>) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: Partial<CreateInventoryCheckDto>,
+  ) {
     return this.inventoryCheckService.update(+id, dto);
   }
 

@@ -1,4 +1,10 @@
-import { IsNumber, IsOptional, Min, IsBoolean, IsDateString } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  Min,
+  IsBoolean,
+  IsDateString,
+} from 'class-validator';
 
 export class UpdateStoreCreditLimitDto {
   @IsOptional()

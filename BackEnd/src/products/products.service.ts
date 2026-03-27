@@ -30,7 +30,10 @@ export class ProductsService {
     return this.productRepository.findOne({ where: { id } });
   }
 
-  async update(id: number, updateProductDto: CreateProductDto): Promise<Product | null> {
+  async update(
+    id: number,
+    updateProductDto: CreateProductDto,
+  ): Promise<Product | null> {
     await this.productRepository.update(id, updateProductDto);
     return this.findOne(id);
   }
@@ -60,7 +63,9 @@ export class ProductsService {
     const price = this.productPriceRepository.create({
       ...createPriceDto,
       validFrom,
-      validTo: createPriceDto.validTo ? new Date(createPriceDto.validTo) : undefined,
+      validTo: createPriceDto.validTo
+        ? new Date(createPriceDto.validTo)
+        : undefined,
     });
 
     return this.productPriceRepository.save(price);
@@ -79,7 +84,9 @@ export class ProductsService {
       .where('pp.product_id = :productId', { productId })
       .andWhere('pp.region_id = :regionId', { regionId })
       .andWhere('pp.valid_from <= :targetTime', { targetTime })
-      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :targetTime)', { targetTime })
+      .andWhere('(pp.valid_to IS NULL OR pp.valid_to > :targetTime)', {
+        targetTime,
+      })
       .getOne();
   }
 

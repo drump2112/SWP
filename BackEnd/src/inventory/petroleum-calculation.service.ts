@@ -8,14 +8,14 @@ export class PetroleumCalculationService {
   // Hệ số giãn nở xăng dầu bình quân (β)
   private readonly EXPANSION_COEFFICIENTS = {
     GASOLINE: 0.0013, // Xăng các loại
-    DIESEL: 0.0009,   // Dầu Diesel
-    KEROSENE: 0.001,  // Dầu hỏa
+    DIESEL: 0.0009, // Dầu Diesel
+    KEROSENE: 0.001, // Dầu hỏa
   };
 
   // Hệ số hao hụt vận chuyển xăng dầu bình quân (α)
   private readonly LOSS_COEFFICIENTS = {
     GASOLINE: 0.00075, // Xăng các loại
-    DIESEL: 0.0003,    // Dầu Diesel
+    DIESEL: 0.0003, // Dầu Diesel
   };
 
   // Nhiệt độ chuẩn
@@ -140,12 +140,13 @@ export class PetroleumCalculationService {
    * Tính toán tổng hợp cho một ngăn xe téc
    */
   calculateCompartment(data: {
-    truckVolume: number;          // Thể tích tại xe téc
-    truckTemperature: number;     // Nhiệt độ tại xe téc
-    actualTemperature: number;    // Nhiệt độ thực tế
-    productCode: string;          // Mã sản phẩm
+    truckVolume: number; // Thể tích tại xe téc
+    truckTemperature: number; // Nhiệt độ tại xe téc
+    actualTemperature: number; // Nhiệt độ thực tế
+    productCode: string; // Mã sản phẩm
   }) {
-    const { truckVolume, truckTemperature, actualTemperature, productCode } = data;
+    const { truckVolume, truckTemperature, actualTemperature, productCode } =
+      data;
 
     const expansionCoeff = this.getExpansionCoefficient(productCode);
     const lossCoeff = this.getLossCoefficient(productCode);
@@ -179,12 +180,14 @@ export class PetroleumCalculationService {
   /**
    * Tính toán tổng hợp cho toàn bộ phiếu nhập
    */
-  calculateDocument(compartments: Array<{
-    truckVolume: number;
-    actualVolume: number;
-    receivedVolume: number;
-    productCode: string;
-  }>) {
+  calculateDocument(
+    compartments: Array<{
+      truckVolume: number;
+      actualVolume: number;
+      receivedVolume: number;
+      productCode: string;
+    }>,
+  ) {
     // Kiểm tra mảng compartments có rỗng không
     if (!compartments || compartments.length === 0) {
       throw new Error('Compartments array is empty or undefined');
@@ -203,7 +206,9 @@ export class PetroleumCalculationService {
       throw new Error('First compartment or productCode is missing');
     }
 
-    const expansionCoeff = this.getExpansionCoefficient(firstCompartment.productCode);
+    const expansionCoeff = this.getExpansionCoefficient(
+      firstCompartment.productCode,
+    );
     const lossCoeff = this.getLossCoefficient(firstCompartment.productCode);
 
     compartments.forEach((comp) => {
@@ -211,7 +216,10 @@ export class PetroleumCalculationService {
       totalActualVolume += comp.actualVolume;
       totalReceivedVolume += comp.receivedVolume;
 
-      const allowedLoss = this.calculateAllowedLoss(comp.truckVolume, lossCoeff);
+      const allowedLoss = this.calculateAllowedLoss(
+        comp.truckVolume,
+        lossCoeff,
+      );
       totalAllowedLoss += allowedLoss;
     });
 
@@ -219,7 +227,8 @@ export class PetroleumCalculationService {
     const totalActualLoss = totalTruckVolume - totalReceivedVolume;
 
     // Tính thừa/thiếu
-    const excessShortage = totalReceivedVolume - totalActualLoss - totalAllowedLoss;
+    const excessShortage =
+      totalReceivedVolume - totalActualLoss - totalAllowedLoss;
 
     // Tính lượng điều chỉnh do nhiệt độ
     const temperatureAdjustment = totalActualVolume - totalTruckVolume;
@@ -234,7 +243,12 @@ export class PetroleumCalculationService {
       allowedLossVolume: totalAllowedLoss,
       excessShortageVolume: excessShortage,
       temperatureAdjustmentVolume: temperatureAdjustment,
-      status: excessShortage > 0 ? 'EXCESS' : excessShortage < 0 ? 'SHORTAGE' : 'NORMAL',
+      status:
+        excessShortage > 0
+          ? 'EXCESS'
+          : excessShortage < 0
+            ? 'SHORTAGE'
+            : 'NORMAL',
     };
   }
 }

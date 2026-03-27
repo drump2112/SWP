@@ -28,12 +28,13 @@ export class TanksService {
       .getMany();
 
     // Sử dụng current_stock từ bảng tanks
-    return tanks.map(tank => ({
+    return tanks.map((tank) => ({
       ...tank,
       currentStock: Number(tank.currentStock) || 0,
-      fillPercentage: tank.capacity > 0
-        ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
-        : 0,
+      fillPercentage:
+        tank.capacity > 0
+          ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
+          : 0,
     }));
   }
 
@@ -52,12 +53,13 @@ export class TanksService {
       .getMany();
 
     // Sử dụng current_stock từ bảng tanks (giá trị được setup/cập nhật khi chốt kho)
-    return tanks.map(tank => ({
+    return tanks.map((tank) => ({
       ...tank,
       currentStock: Number(tank.currentStock) || 0,
-      fillPercentage: tank.capacity > 0
-        ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
-        : 0,
+      fillPercentage:
+        tank.capacity > 0
+          ? (Number(tank.currentStock) / Number(tank.capacity)) * 100
+          : 0,
     }));
   }
 
@@ -84,9 +86,8 @@ export class TanksService {
     return {
       ...tank,
       currentStock,
-      fillPercentage: tank.capacity > 0
-        ? (currentStock / Number(tank.capacity)) * 100
-        : 0,
+      fillPercentage:
+        tank.capacity > 0 ? (currentStock / Number(tank.capacity)) * 100 : 0,
     };
   }
 

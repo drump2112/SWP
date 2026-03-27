@@ -13,7 +13,10 @@ import {
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { LossConfigService } from './loss-config.service';
-import { CreateLossConfigDto, UpdateLossConfigDto } from './dto/loss-config.dto';
+import {
+  CreateLossConfigDto,
+  UpdateLossConfigDto,
+} from './dto/loss-config.dto';
 
 @Controller('loss-config')
 @UseGuards(JwtAuthGuard)
