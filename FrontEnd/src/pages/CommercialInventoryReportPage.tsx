@@ -1,15 +1,22 @@
-import React, { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { usePageTitle } from '../hooks/usePageTitle';
-import { inventoryReportAPI, type DetailedInventoryReport } from '../api/inventory-report';
-import { warehousesAPI } from '../api/commercial-warehouses';
-import { suppliersAPI } from '../api/commercial-suppliers';
-import { productsApi } from '../api/products';
-import Select2 from '../components/Select2';
-import { DocumentChartBarIcon, PrinterIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import React, { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "../hooks/usePageTitle";
+import {
+  inventoryReportAPI,
+  type DetailedInventoryReport,
+} from "../api/inventory-report";
+import { warehousesAPI } from "../api/commercial-warehouses";
+import { suppliersAPI } from "../api/commercial-suppliers";
+import { productsApi } from "../api/products";
+import Select2 from "../components/Select2";
+import {
+  DocumentChartBarIcon,
+  PrinterIcon,
+  ArrowDownTrayIcon,
+} from "@heroicons/react/24/outline";
 
 const CommercialInventoryReportPage: React.FC = () => {
-  usePageTitle('Báo cáo Nhập Xuất Tồn TM');
+  usePageTitle("Báo cáo Nhập Xuất Tồn TM");
 
   const [warehouseFilter, setWarehouseFilter] = useState<number | null>(null);
   const [supplierFilter, setSupplierFilter] = useState<number | null>(null);
@@ -17,12 +24,14 @@ const CommercialInventoryReportPage: React.FC = () => {
   const [startDate, setStartDate] = useState(() => {
     const date = new Date();
     date.setDate(1);
-    return date.toISOString().split('T')[0];
+    return date.toISOString().split("T")[0];
   });
-  const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(
+    () => new Date().toISOString().split("T")[0],
+  );
 
   const { data: warehouses = [] } = useQuery({
-    queryKey: ['commercial-warehouses'],
+    queryKey: ["commercial-warehouses"],
     queryFn: async () => {
       const response = await warehousesAPI.getAll();
       return response.data;
@@ -30,7 +39,7 @@ const CommercialInventoryReportPage: React.FC = () => {
   });
 
   const { data: suppliers = [] } = useQuery({
-    queryKey: ['commercial-suppliers'],
+    queryKey: ["commercial-suppliers"],
     queryFn: async () => {
       const response = await suppliersAPI.getAll();
       return response.data;
@@ -38,14 +47,26 @@ const CommercialInventoryReportPage: React.FC = () => {
   });
 
   const { data: products = [] } = useQuery({
-    queryKey: ['products'],
+    queryKey: ["products"],
     queryFn: async () => {
       return await productsApi.getAll();
     },
   });
 
-  const { data: reportData, isLoading, refetch, error } = useQuery({
-    queryKey: ['inventory-report-detailed', startDate, endDate, warehouseFilter, supplierFilter, productFilter],
+  const {
+    data: reportData,
+    isLoading,
+    refetch,
+    error,
+  } = useQuery({
+    queryKey: [
+      "inventory-report-detailed",
+      startDate,
+      endDate,
+      warehouseFilter,
+      supplierFilter,
+      productFilter,
+    ],
     queryFn: async () => {
       try {
         const response = await inventoryReportAPI.getDetailedReport({
@@ -57,7 +78,10 @@ const CommercialInventoryReportPage: React.FC = () => {
         });
         return response.data;
       } catch (err) {
-        console.error('[CommercialInventoryReportPage] Error loading report:', err);
+        console.error(
+          "[CommercialInventoryReportPage] Error loading report:",
+          err,
+        );
         throw err;
       }
     },
@@ -71,7 +95,9 @@ const CommercialInventoryReportPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
-        <h1 className="text-2xl font-bold text-gray-900">Báo cáo Nhập Xuất Tồn Kho</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Báo cáo Nhập Xuất Tồn Kho
+        </h1>
         <div className="flex gap-2">
           <button
             onClick={handlePrint}
@@ -87,7 +113,9 @@ const CommercialInventoryReportPage: React.FC = () => {
       <div className="bg-white shadow rounded-lg p-4 print:hidden">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Từ ngày</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Từ ngày
+            </label>
             <input
               type="date"
               value={startDate}
@@ -97,7 +125,9 @@ const CommercialInventoryReportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Đến ngày</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Đến ngày
+            </label>
             <input
               type="date"
               value={endDate}
@@ -107,12 +137,14 @@ const CommercialInventoryReportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Kho</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Kho
+            </label>
             <Select2
               value={warehouseFilter}
               onChange={(val) => setWarehouseFilter(val ? Number(val) : null)}
               options={[
-                { value: '', label: 'Tất cả kho' },
+                { value: "", label: "Tất cả kho" },
                 ...warehouses.map((warehouse) => ({
                   value: warehouse.id,
                   label: warehouse.name,
@@ -124,12 +156,14 @@ const CommercialInventoryReportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Nhà cung cấp</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nhà cung cấp
+            </label>
             <Select2
               value={supplierFilter}
               onChange={(val) => setSupplierFilter(val ? Number(val) : null)}
               options={[
-                { value: '', label: 'Tất cả NCC' },
+                { value: "", label: "Tất cả NCC" },
                 ...suppliers.map((supplier) => ({
                   value: supplier.id,
                   label: supplier.name,
@@ -141,12 +175,14 @@ const CommercialInventoryReportPage: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sản phẩm</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sản phẩm
+            </label>
             <Select2
               value={productFilter}
               onChange={(val) => setProductFilter(val ? Number(val) : null)}
               options={[
-                { value: '', label: 'Tất cả sản phẩm' },
+                { value: "", label: "Tất cả sản phẩm" },
                 ...products.map((product) => ({
                   value: product.id,
                   label: product.name,
@@ -176,7 +212,9 @@ const CommercialInventoryReportPage: React.FC = () => {
       ) : error ? (
         <div className="p-8 text-center bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-600 font-semibold">Lỗi khi tải báo cáo</p>
-          <p className="text-red-500 mt-2 text-sm">{error instanceof Error ? error.message : 'Không xác định được lỗi'}</p>
+          <p className="text-red-500 mt-2 text-sm">
+            {error instanceof Error ? error.message : "Không xác định được lỗi"}
+          </p>
           <button
             onClick={() => refetch()}
             className="mt-4 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
@@ -193,12 +231,16 @@ const CommercialInventoryReportPage: React.FC = () => {
         <div className="space-y-6">
           {/* Header */}
           <div className="bg-white p-6 text-center print:block">
-            <h2 className="text-xl font-bold">CÔNG TY TNHH XĂNG DẦU TÂY NAM S.W.P - CHI NHÁNH ĐỐNG ĐA</h2>
+            <h2 className="text-xl font-bold">
+              CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN
+            </h2>
             <h3 className="text-lg font-semibold mt-2">
-              TỔNG HỢP BÁN HÀNG THÁNG {new Date(startDate).getMonth() + 1}/{new Date(startDate).getFullYear()} (CÁC KHO)
+              TỔNG HỢP BÁN HÀNG THÁNG {new Date(startDate).getMonth() + 1}/
+              {new Date(startDate).getFullYear()} (CÁC KHO)
             </h3>
             <p className="text-sm text-gray-600 mt-1">
-              Từ ngày: {new Date(startDate).toLocaleDateString('vi-VN')} đến {new Date(endDate).toLocaleDateString('vi-VN')}
+              Từ ngày: {new Date(startDate).toLocaleDateString("vi-VN")} đến{" "}
+              {new Date(endDate).toLocaleDateString("vi-VN")}
             </p>
           </div>
 
@@ -211,60 +253,155 @@ const CommercialInventoryReportPage: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">STT</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">NHÀ CUNG CẤP</th>
-                    <th colSpan={4} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">SẢN LƯỢNG</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG SL NHẬP</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">GIÁ TRỊ</th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      STT
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      NHÀ CUNG CẤP
+                    </th>
+                    <th
+                      colSpan={4}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      SẢN LƯỢNG
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      TỔNG SL NHẬP
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      GIÁ TRỊ
+                    </th>
                   </tr>
                   <tr>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 05</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 001</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      A95
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO 05
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      E5
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO 001
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {reportData.imports.map((item, index) => (
                     <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-4 py-2 text-center border">{index + 1}</td>
-                      <td className="px-4 py-2 border font-medium">{item.supplier_name}</td>
-                      <td className="px-4 py-2 text-right border">{isNaN(item.quantity_a95) ? '0' : item.quantity_a95.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do) ? '0' : item.quantity_do.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 text-right border">{isNaN(item.quantity_e5) ? '0' : item.quantity_e5.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do001) ? '0' : item.quantity_do001.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.total_quantity) ? '0' : item.total_quantity.toLocaleString('vi-VN')}</td>
-                      <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.total_amount) ? '0' : item.total_amount.toLocaleString('vi-VN')}</td>
+                      <td className="px-4 py-2 text-center border">
+                        {index + 1}
+                      </td>
+                      <td className="px-4 py-2 border font-medium">
+                        {item.supplier_name}
+                      </td>
+                      <td className="px-4 py-2 text-right border">
+                        {isNaN(item.quantity_a95)
+                          ? "0"
+                          : item.quantity_a95.toLocaleString("vi-VN")}
+                      </td>
+                      <td className="px-4 py-2 text-right border">
+                        {isNaN(item.quantity_do)
+                          ? "0"
+                          : item.quantity_do.toLocaleString("vi-VN")}
+                      </td>
+                      <td className="px-4 py-2 text-right border">
+                        {isNaN(item.quantity_e5)
+                          ? "0"
+                          : item.quantity_e5.toLocaleString("vi-VN")}
+                      </td>
+                      <td className="px-4 py-2 text-right border">
+                        {isNaN(item.quantity_do001)
+                          ? "0"
+                          : item.quantity_do001.toLocaleString("vi-VN")}
+                      </td>
+                      <td className="px-4 py-2 text-right border font-semibold">
+                        {isNaN(item.total_quantity)
+                          ? "0"
+                          : item.total_quantity.toLocaleString("vi-VN")}
+                      </td>
+                      <td className="px-4 py-2 text-right border font-semibold">
+                        {isNaN(item.total_amount)
+                          ? "0"
+                          : item.total_amount.toLocaleString("vi-VN")}
+                      </td>
                     </tr>
                   ))}
                   <tr className="bg-yellow-50 font-bold">
-                    <td colSpan={2} className="px-4 py-2 text-center border">TỔNG CỘNG</td>
+                    <td colSpan={2} className="px-4 py-2 text-center border">
+                      TỔNG CỘNG
+                    </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.imports.reduce((sum, item) => sum + item.quantity_a95, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.imports.reduce(
+                            (sum, item) => sum + item.quantity_a95,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.imports.reduce((sum, item) => sum + item.quantity_do, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.imports.reduce(
+                            (sum, item) => sum + item.quantity_do,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.imports.reduce((sum, item) => sum + item.quantity_e5, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.imports.reduce(
+                            (sum, item) => sum + item.quantity_e5,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.imports.reduce((sum, item) => sum + item.quantity_do001, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.imports.reduce(
+                            (sum, item) => sum + item.quantity_do001,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
-                    <td className="px-4 py-2 text-right border">{isNaN(Number(reportData.summary.total_import_quantity)) ? '0' : Number(reportData.summary.total_import_quantity).toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-2 text-right border">{isNaN(Number(reportData.summary.total_import_amount)) ? '0' : Number(reportData.summary.total_import_amount).toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">
+                      {isNaN(Number(reportData.summary.total_import_quantity))
+                        ? "0"
+                        : Number(
+                            reportData.summary.total_import_quantity,
+                          ).toLocaleString("vi-VN")}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {isNaN(Number(reportData.summary.total_import_amount))
+                        ? "0"
+                        : Number(
+                            reportData.summary.total_import_amount,
+                          ).toLocaleString("vi-VN")}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -280,123 +417,312 @@ const CommercialInventoryReportPage: React.FC = () => {
               <table className="min-w-full divide-y divide-gray-200 text-sm">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">STT</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">KHÁCH HÀNG</th>
-                    <th colSpan={4} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">SỐ LƯỢNG (lít)</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG</th>
-                    <th colSpan={3} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DOANH THU (đồng)</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG DT</th>
-                    <th colSpan={3} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">LỢI NHUẬN (đồng)</th>
-                    <th rowSpan={2} className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">TỔNG LN</th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      STT
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      KHÁCH HÀNG
+                    </th>
+                    <th
+                      colSpan={4}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      SỐ LƯỢNG (lít)
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      TỔNG
+                    </th>
+                    <th
+                      colSpan={3}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      DOANH THU (đồng)
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      TỔNG DT
+                    </th>
+                    <th
+                      colSpan={3}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      LỢI NHUẬN (đồng)
+                    </th>
+                    <th
+                      rowSpan={2}
+                      className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border"
+                    >
+                      TỔNG LN
+                    </th>
                   </tr>
                   <tr>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO 001</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">A95</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">DO</th>
-                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">E5</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      A95
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      E5
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO 001
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      A95
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      E5
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      A95
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      DO
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase border">
+                      E5
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {reportData.exports.map((item, index) => {
                     const isGroupRow = item.customer_id === null;
-                    const displayName = isGroupRow ? item.customer_group_name : item.customer_name;
-                    console.log(`[Export Row ${index}] name=${displayName}, qty_a95=${item.quantity_a95}, rev_a95=${item.revenue_a95}, rev_do=${item.revenue_do}, rev_e5=${item.revenue_e5}`);
+                    const displayName = isGroupRow
+                      ? item.customer_group_name
+                      : item.customer_name;
+                    console.log(
+                      `[Export Row ${index}] name=${displayName}, qty_a95=${item.quantity_a95}, rev_a95=${item.revenue_a95}, rev_do=${item.revenue_do}, rev_e5=${item.revenue_e5}`,
+                    );
 
                     return (
-                      <tr key={index} className={isGroupRow ? "bg-gray-100 font-bold" : "hover:bg-gray-50"}>
-                        <td className="px-4 py-2 text-center border">{index + 1}</td>
-                        <td className={`px-4 py-2 border ${isGroupRow ? 'font-bold' : 'pl-8'}`}>
+                      <tr
+                        key={index}
+                        className={
+                          isGroupRow
+                            ? "bg-gray-100 font-bold"
+                            : "hover:bg-gray-50"
+                        }
+                      >
+                        <td className="px-4 py-2 text-center border">
+                          {index + 1}
+                        </td>
+                        <td
+                          className={`px-4 py-2 border ${isGroupRow ? "font-bold" : "pl-8"}`}
+                        >
                           {displayName}
                         </td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.quantity_a95) ? '0' : item.quantity_a95.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do) ? '0' : item.quantity_do.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.quantity_e5) ? '0' : item.quantity_e5.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.quantity_do001) ? '0' : item.quantity_do001.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.total_quantity) ? '0' : item.total_quantity.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_a95) ? '0' : item.revenue_a95.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_do) ? '0' : item.revenue_do.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.revenue_e5) ? '0' : item.revenue_e5.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border font-semibold">{isNaN(item.revenue) ? '0' : item.revenue.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_a95) ? '0' : item.profit_a95.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_do) ? '0' : item.profit_do.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border">{isNaN(item.profit_e5) ? '0' : item.profit_e5.toLocaleString('vi-VN')}</td>
-                        <td className="px-4 py-2 text-right border font-semibold text-green-600">{isNaN(item.profit) ? '0' : item.profit.toLocaleString('vi-VN')}</td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.quantity_a95)
+                            ? "0"
+                            : item.quantity_a95.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.quantity_do)
+                            ? "0"
+                            : item.quantity_do.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.quantity_e5)
+                            ? "0"
+                            : item.quantity_e5.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.quantity_do001)
+                            ? "0"
+                            : item.quantity_do001.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.total_quantity)
+                            ? "0"
+                            : item.total_quantity.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.revenue_a95)
+                            ? "0"
+                            : item.revenue_a95.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.revenue_do)
+                            ? "0"
+                            : item.revenue_do.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.revenue_e5)
+                            ? "0"
+                            : item.revenue_e5.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border font-semibold">
+                          {isNaN(item.revenue)
+                            ? "0"
+                            : item.revenue.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.profit_a95)
+                            ? "0"
+                            : item.profit_a95.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.profit_do)
+                            ? "0"
+                            : item.profit_do.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border">
+                          {isNaN(item.profit_e5)
+                            ? "0"
+                            : item.profit_e5.toLocaleString("vi-VN")}
+                        </td>
+                        <td className="px-4 py-2 text-right border font-semibold text-green-600">
+                          {isNaN(item.profit)
+                            ? "0"
+                            : item.profit.toLocaleString("vi-VN")}
+                        </td>
                       </tr>
                     );
                   })}
                   <tr className="bg-yellow-50 font-bold">
-                    <td colSpan={2} className="px-4 py-2 text-center border">TỔNG CỘNG</td>
+                    <td colSpan={2} className="px-4 py-2 text-center border">
+                      TỔNG CỘNG
+                    </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.reduce((sum, item) => sum + item.quantity_a95, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports.reduce(
+                            (sum, item) => sum + item.quantity_a95,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.reduce((sum, item) => sum + item.quantity_do, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports.reduce(
+                            (sum, item) => sum + item.quantity_do,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.reduce((sum, item) => sum + item.quantity_e5, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports.reduce(
+                            (sum, item) => sum + item.quantity_e5,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.reduce((sum, item) => sum + item.quantity_do001, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports.reduce(
+                            (sum, item) => sum + item.quantity_do001,
+                            0,
+                          ),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
-                      {isNaN(Number(reportData.summary.total_export_quantity)) ? '0' : Number(reportData.summary.total_export_quantity).toLocaleString('vi-VN')}
+                      {isNaN(Number(reportData.summary.total_export_quantity))
+                        ? "0"
+                        : Number(
+                            reportData.summary.total_export_quantity,
+                          ).toLocaleString("vi-VN")}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_a95, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
-                      })()}
-                    </td>
-                    <td className="px-4 py-2 text-right border">
-                      {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_do, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
-                      })()}
-                    </td>
-                    <td className="px-4 py-2 text-right border">
-                      {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.revenue_e5, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
-                      })()}
-                    </td>
-                    <td className="px-4 py-2 text-right border">{isNaN(Number(reportData.summary.total_revenue)) ? '0' : Number(reportData.summary.total_revenue).toLocaleString('vi-VN')}</td>
-                    <td className="px-4 py-2 text-right border">
-                      {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_a95, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.revenue_a95, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_do, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.revenue_do, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
                     <td className="px-4 py-2 text-right border">
                       {(() => {
-                        const sum = Number(reportData.exports.filter(e => e.customer_id === null).reduce((sum, item) => sum + item.profit_e5, 0));
-                        return isNaN(sum) ? '0' : sum.toLocaleString('vi-VN');
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.revenue_e5, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
                       })()}
                     </td>
-                    <td className="px-4 py-2 text-right border text-green-600">{isNaN(Number(reportData.summary.total_profit)) ? '0' : Number(reportData.summary.total_profit).toLocaleString('vi-VN')}</td>
+                    <td className="px-4 py-2 text-right border">
+                      {isNaN(Number(reportData.summary.total_revenue))
+                        ? "0"
+                        : Number(
+                            reportData.summary.total_revenue,
+                          ).toLocaleString("vi-VN")}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.profit_a95, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.profit_do, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border">
+                      {(() => {
+                        const sum = Number(
+                          reportData.exports
+                            .filter((e) => e.customer_id === null)
+                            .reduce((sum, item) => sum + item.profit_e5, 0),
+                        );
+                        return isNaN(sum) ? "0" : sum.toLocaleString("vi-VN");
+                      })()}
+                    </td>
+                    <td className="px-4 py-2 text-right border text-green-600">
+                      {isNaN(Number(reportData.summary.total_profit))
+                        ? "0"
+                        : Number(
+                            reportData.summary.total_profit,
+                          ).toLocaleString("vi-VN")}
+                    </td>
                   </tr>
                 </tbody>
               </table>
