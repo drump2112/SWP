@@ -7,9 +7,21 @@ export const STYLES = {
   normalFont: { name: "Times New Roman", size: 11 },
   boldFont: { name: "Times New Roman", size: 11, bold: true },
   italicFont: { name: "Times New Roman", size: 12, italic: true },
-  centerAlign: { vertical: "middle", horizontal: "center", wrapText: true } as Partial<ExcelJS.Alignment>,
-  leftAlign: { vertical: "middle", horizontal: "left", wrapText: true } as Partial<ExcelJS.Alignment>,
-  rightAlign: { vertical: "middle", horizontal: "right", wrapText: true } as Partial<ExcelJS.Alignment>,
+  centerAlign: {
+    vertical: "middle",
+    horizontal: "center",
+    wrapText: true,
+  } as Partial<ExcelJS.Alignment>,
+  leftAlign: {
+    vertical: "middle",
+    horizontal: "left",
+    wrapText: true,
+  } as Partial<ExcelJS.Alignment>,
+  rightAlign: {
+    vertical: "middle",
+    horizontal: "right",
+    wrapText: true,
+  } as Partial<ExcelJS.Alignment>,
   borderStyle: {
     top: { style: "thin" },
     left: { style: "thin" },
@@ -50,12 +62,12 @@ export const addReportHeader = (
     toDate?: string;
     reportDate?: string;
     customerName?: string;
-  }
+  },
 ) => {
   // Company Name
   worksheet.mergeCells("A1:E1");
   const companyCell = worksheet.getCell("A1");
-  companyCell.value = "S.W.P - CHI NHÁNH ĐỐNG ĐA";
+  companyCell.value = "CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN";
   companyCell.font = STYLES.boldFont;
   companyCell.alignment = STYLES.leftAlign;
 
@@ -79,9 +91,9 @@ export const addReportHeader = (
   worksheet.mergeCells("A4:H4");
   const dateCell = worksheet.getCell("A4");
   if (options.fromDate && options.toDate) {
-    dateCell.value = `Từ ngày ${dayjs(options.fromDate).format("DD/MM/YYYY")} đến ngày: ${dayjs(options.toDate).format(
-      "DD/MM/YYYY"
-    )}`;
+    dateCell.value = `Từ ngày ${dayjs(options.fromDate).format("DD/MM/YYYY")} đến ngày: ${dayjs(
+      options.toDate,
+    ).format("DD/MM/YYYY")}`;
   } else if (options.reportDate) {
     dateCell.value = `Ngày báo cáo: ${dayjs(options.reportDate).format("DD/MM/YYYY HH:mm")}`;
   }
@@ -104,7 +116,7 @@ export const addReportFooter = (
   worksheet: ExcelJS.Worksheet,
   options: {
     signatures?: { left?: string; center?: string; right?: string };
-  } = {}
+  } = {},
 ) => {
   worksheet.addRow([]);
   worksheet.addRow([]);
@@ -146,9 +158,14 @@ export const addReportFooter = (
   worksheet.mergeCells(`G${signTitleRow.number}:I${signTitleRow.number}`);
 };
 
-export const downloadExcel = async (workbook: ExcelJS.Workbook, fileName: string) => {
+export const downloadExcel = async (
+  workbook: ExcelJS.Workbook,
+  fileName: string,
+) => {
   const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
   const url = window.URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

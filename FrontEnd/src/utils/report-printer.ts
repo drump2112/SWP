@@ -1,4 +1,4 @@
-import dayjs from 'dayjs';
+import dayjs from "dayjs";
 
 // CSS cho print
 const getPrintStyles = () => `
@@ -154,28 +154,30 @@ interface PrintOptions {
 const generateHeader = (options: PrintOptions): string => {
   return `
     <div class="header-section">
-      <div class="company-name">S.W.P - CHI NHÁNH ĐỐNG ĐA</div>
-      ${options.storeName ? `<div class="store-name">\t${options.storeName}</div>` : ''}
+      <div class="company-name">CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN</div>
+      ${options.storeName ? `<div class="store-name">\t${options.storeName}</div>` : ""}
       <div class="report-title">${options.title}</div>
       <div class="report-date">
         ${
           options.fromDate && options.toDate
-            ? `Từ ngày ${dayjs(options.fromDate).format('DD/MM/YYYY')} đến ngày ${dayjs(options.toDate).format('DD/MM/YYYY')}`
+            ? `Từ ngày ${dayjs(options.fromDate).format("DD/MM/YYYY")} đến ngày ${dayjs(options.toDate).format("DD/MM/YYYY")}`
             : options.reportDate
-            ? `Ngày báo cáo: ${dayjs(options.reportDate).format('DD/MM/YYYY HH:mm')}`
-            : ''
+              ? `Ngày báo cáo: ${dayjs(options.reportDate).format("DD/MM/YYYY HH:mm")}`
+              : ""
         }
       </div>
-      ${options.customerName ? `<div class="t ext-center" style="margin-bottom: 10px;">${options.customerName}</div>` : ''}
+      ${options.customerName ? `<div class="t ext-center" style="margin-bottom: 10px;">${options.customerName}</div>` : ""}
     </div>
   `;
 };
 
-const generateFooter = (options?: { signatures?: { left?: string; center?: string; right?: string } }): string => {
+const generateFooter = (options?: {
+  signatures?: { left?: string; center?: string; right?: string };
+}): string => {
   const signatures = options?.signatures || {
-    left: 'Khách hàng',
-    center: 'Cửa hàng trưởng',
-    right: 'Người lập',
+    left: "Khách hàng",
+    center: "Cửa hàng trưởng",
+    right: "Người lập",
   };
 
   return `
@@ -184,18 +186,18 @@ const generateFooter = (options?: { signatures?: { left?: string; center?: strin
         Ngày ${dayjs().date()} tháng ${dayjs().month() + 1} năm ${dayjs().year()}
       </div>
       <div class="signature-row">
-        ${signatures.left ? `<div class="signature-box"><div class="signature-title">${signatures.left}</div></div>` : ''}
-        ${signatures.center ? `<div class="signature-box"><div class="signature-title">${signatures.center}</div></div>` : ''}
-        ${signatures.right ? `<div class="signature-box"><div class="signature-title">${signatures.right}</div></div>` : ''}
+        ${signatures.left ? `<div class="signature-box"><div class="signature-title">${signatures.left}</div></div>` : ""}
+        ${signatures.center ? `<div class="signature-box"><div class="signature-title">${signatures.center}</div></div>` : ""}
+        ${signatures.right ? `<div class="signature-box"><div class="signature-title">${signatures.right}</div></div>` : ""}
       </div>
     </div>
   `;
 };
 
 export const printReport = (tableHTML: string, options: PrintOptions) => {
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open("", "_blank");
   if (!printWindow) {
-    alert('Vui lòng cho phép popup để in báo cáo');
+    alert("Vui lòng cho phép popup để in báo cáo");
     return;
   }
 
@@ -231,7 +233,7 @@ export const printReport = (tableHTML: string, options: PrintOptions) => {
 
 // Helper để format số (không có ký tự tiền tệ)
 export const formatNumber = (value: number): string => {
-  return value.toLocaleString('vi-VN', {
+  return value.toLocaleString("vi-VN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   });
@@ -239,17 +241,17 @@ export const formatNumber = (value: number): string => {
 
 // Helper để format số tiền (có ký tự ₫)
 export const formatCurrency = (amount: number): string => {
-  return amount.toLocaleString('vi-VN', {
-    style: 'currency',
-    currency: 'VND',
+  return amount.toLocaleString("vi-VN", {
+    style: "currency",
+    currency: "VND",
   });
 };
 
 // Helper để format ngày
 export const formatDate = (date: string | Date): string => {
-  return dayjs(date).format('DD/MM/YYYY');
+  return dayjs(date).format("DD/MM/YYYY");
 };
 
 export const formatDateTime = (date: string | Date): string => {
-  return dayjs(date).format('DD/MM/YYYY HH:mm');
+  return dayjs(date).format("DD/MM/YYYY HH:mm");
 };

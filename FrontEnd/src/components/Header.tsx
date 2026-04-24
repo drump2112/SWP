@@ -1,10 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
-import { ArrowRightOnRectangleIcon, UserCircleIcon, Bars3Icon, XCircleIcon, ExclamationTriangleIcon, BanknotesIcon } from '@heroicons/react/24/outline';
-import Swal from 'sweetalert2';
-import { customersApi, type CreditStatus } from '../api/customers';
-import './Header.css';
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import {
+  ArrowRightOnRectangleIcon,
+  UserCircleIcon,
+  Bars3Icon,
+  XCircleIcon,
+  ExclamationTriangleIcon,
+  BanknotesIcon,
+} from "@heroicons/react/24/outline";
+import Swal from "sweetalert2";
+import { customersApi, type CreditStatus } from "../api/customers";
+import "./Header.css";
 
 interface HeaderProps {
   onMenuClick?: () => void;
@@ -27,7 +34,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
         // Ensure creditStatuses is an array (API might return HTML on error)
         if (!Array.isArray(creditStatuses)) {
-          console.error('API returned invalid data. Backend may not be running or endpoint not found.');
+          console.error(
+            "API returned invalid data. Backend may not be running or endpoint not found.",
+          );
           return;
         }
 
@@ -45,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 customerName: status.customerName,
                 currentDebt: status.currentDebt,
                 creditLimit: status.creditLimit,
-                status: 'overlimit',
+                status: "overlimit",
               });
             } else if (status.creditUsagePercent >= 70) {
               warningCounter++;
@@ -54,7 +63,7 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 customerName: status.customerName,
                 currentDebt: status.currentDebt,
                 creditLimit: status.creditLimit,
-                status: 'warning',
+                status: "warning",
               });
             }
           }
@@ -66,14 +75,17 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         const topOverLimit = overLimitCustomers.slice(0, 10);
         const topWarning = warningCustomers.slice(0, 5);
         const allNotifications = [...topOverLimit, ...topWarning];
-        const total = allNotifications.reduce((sum, debt) => sum + debt.currentDebt, 0);
+        const total = allNotifications.reduce(
+          (sum, debt) => sum + debt.currentDebt,
+          0,
+        );
 
         setOverLimitCount(overLimitCounter);
         setWarningCount(warningCounter);
         setDebtNotifications(allNotifications);
         setTotalDebt(total);
       } catch (error) {
-        console.error('Error fetching debt data:', error);
+        console.error("Error fetching debt data:", error);
       }
     };
 
@@ -84,37 +96,45 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   const handleLogout = async () => {
     const result = await Swal.fire({
-      title: 'Xác nhận đăng xuất',
-      text: 'Bạn có chắc chắn muốn đăng xuất?',
-      icon: 'question',
+      title: "Xác nhận đăng xuất",
+      text: "Bạn có chắc chắn muốn đăng xuất?",
+      icon: "question",
       showCancelButton: true,
-      confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280',
-      confirmButtonText: 'Đăng xuất',
-      cancelButtonText: 'Hủy',
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Đăng xuất",
+      cancelButtonText: "Hủy",
     });
 
     if (result.isConfirmed) {
       logout();
-      navigate('/login');
+      navigate("/login");
     }
   };
 
   // Debug: Log user data to check store info
-  console.log('🔍 User data:', user);
+  console.log("🔍 User data:", user);
 
   // Tạo chuỗi thông báo chạy - tách biệt vượt hạn và cảnh báo
   const overLimitText = debtNotifications
-    .filter(d => d.status === 'overlimit')
-    .map((debt) => `🔴 VƯỢT HẠN: ${debt.customerName}: ${debt.currentDebt.toLocaleString('vi-VN')}đ`)
-    .join(' • ');
+    .filter((d) => d.status === "overlimit")
+    .map(
+      (debt) =>
+        `🔴 VƯỢT HẠN: ${debt.customerName}: ${debt.currentDebt.toLocaleString("vi-VN")}đ`,
+    )
+    .join(" • ");
 
   const warningText = debtNotifications
-    .filter(d => d.status === 'warning')
-    .map((debt) => `⚠️ CẢNH BÁO: ${debt.customerName}: ${debt.currentDebt.toLocaleString('vi-VN')}đ`)
-    .join(' • ');
+    .filter((d) => d.status === "warning")
+    .map(
+      (debt) =>
+        `⚠️ CẢNH BÁO: ${debt.customerName}: ${debt.currentDebt.toLocaleString("vi-VN")}đ`,
+    )
+    .join(" • ");
 
-  const notificationText = [overLimitText, warningText].filter(Boolean).join(' • ');
+  const notificationText = [overLimitText, warningText]
+    .filter(Boolean)
+    .join(" • ");
 
   return (
     <>
@@ -133,9 +153,16 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-base sm:text-2xl font-bold truncate">
-                <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">TÂY NAM</span>
-                <span className="text-gray-400 mx-1 sm:mx-2 hidden xs:inline">-</span>
-                <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent hidden sm:inline"> - CHI NHÁNH ĐỐNG ĐA</span>
+                <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                  CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP
+                </span>
+                <span className="text-gray-400 mx-1 sm:mx-2 hidden xs:inline">
+                  -
+                </span>
+                <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent hidden sm:inline">
+                  {" "}
+                  - PHÚ AN
+                </span>
               </h1>
             </div>
           </div>
