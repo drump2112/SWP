@@ -331,7 +331,7 @@ const LoginPage: React.FC = () => {
               {/* Footer */}
               <div className="mt-8">
                 <p className="text-xs text-gray-500 text-center">
-                  © 2026 S.W.P - QLXD - TTD
+                  © 2026 S.W.P - QLXD - Tiến Dũng/Ngọc Thắng
                 </p>
               </div>
             </div>
