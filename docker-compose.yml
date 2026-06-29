@@ -61,7 +61,8 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ./BackEnd/docker-initdb/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      # PostgreSQL runs init files only when pgdata is empty
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./BackEnd/docker-initdb/02-data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
     networks:
       - swp-network
