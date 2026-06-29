@@ -514,7 +514,7 @@ const ShiftHandoverReportPage: React.FC = () => {
           <div class="logo-container">
             <img src="${logoBase64}" alt="Logo" />
             <div class="header-text">
-              <h1 style="margin: 0; font-size: 16px;">CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN</h1>
+              <h1 style="margin: 0; font-size: 16px;">CÔNG TY XĂNG DẦU TÂY NAM - CN ĐỐNG ĐA</h1>
             </div>
           </div>
           <h2>CỬA HÀNG XĂNG DẦU: ${report.shift.store.name}</h2>

@@ -154,7 +154,7 @@ interface PrintOptions {
 const generateHeader = (options: PrintOptions): string => {
   return `
     <div class="header-section">
-      <div class="company-name">CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN</div>
+      <div class="company-name">CÔNG TY XĂNG DẦU TÂY NAM - CN ĐỐNG ĐA</div>
       ${options.storeName ? `<div class="store-name">\t${options.storeName}</div>` : ""}
       <div class="report-title">${options.title}</div>
       <div class="report-date">

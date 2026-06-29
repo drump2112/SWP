@@ -231,9 +231,7 @@ const CommercialInventoryReportPage: React.FC = () => {
         <div className="space-y-6">
           {/* Header */}
           <div className="bg-white p-6 text-center print:block">
-            <h2 className="text-xl font-bold">
-              CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN
-            </h2>
+            <h2 className="text-xl font-bold">CHI NHÁNH ĐỐNG ĐA</h2>
             <h3 className="text-lg font-semibold mt-2">
               TỔNG HỢP BÁN HÀNG THÁNG {new Date(startDate).getMonth() + 1}/
               {new Date(startDate).getFullYear()} (CÁC KHO)

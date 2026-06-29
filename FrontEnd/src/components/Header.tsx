@@ -154,14 +154,14 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
             <div className="flex items-center gap-3 min-w-0">
               <h1 className="text-base sm:text-2xl font-bold truncate">
                 <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                  CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP
+                  TÂY NAM
                 </span>
                 <span className="text-gray-400 mx-1 sm:mx-2 hidden xs:inline">
                   -
                 </span>
                 <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent hidden sm:inline">
                   {" "}
-                  - PHÚ AN
+                  - CN ĐỐNG ĐA
                 </span>
               </h1>
             </div>
