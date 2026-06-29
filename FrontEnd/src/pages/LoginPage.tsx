@@ -352,11 +352,11 @@ const LoginPage: React.FC = () => {
                     }}
                   >
                     <span className="bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                      PHÚ AN
+                      S.W.P
                     </span>
                     <span className="text-gray-400 mx-2">-</span>
                     <span className="bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent">
-                      PHÚ AN
+                      CN MIỀN BẮC
                     </span>
                   </h2>
                   <div className="h-3 w-64 bg-gradient-to-r from-blue-600 to-orange-600 mx-auto mt-8 rounded-full shadow-lg"></div>
@@ -370,7 +370,7 @@ Chào mừng bạn đã đến-inset-2 bg-gradient-to-r from-orange-300 to-blue-
                     <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-orange-200/30 to-blue-200/30 opacity-50"></div>
                     <div className="relative">
                       <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#f26722] to-[#31b3e7] mb-4">
-                        CÔNG TY CỔ PHẦN DỊCH VỤ VÀ THƯƠNG MẠI TỔNG HỢP PHÚ AN
+                        TÂY NAM - CN ĐỐNG ĐA
                       </h3>
                       <div className="h-px w-24 bg-gradient-to-r from-[#f26722] to-[#31b3e7] mx-auto mb-6"></div>
                       <p className="text-xl font-semibold text-gray-800 leading-relaxed mb-2">

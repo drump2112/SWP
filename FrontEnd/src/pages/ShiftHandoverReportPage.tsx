@@ -148,7 +148,7 @@ const ShiftHandoverReportPage: React.FC = () => {
       // Company header
       worksheet.mergeCells(`A${row}:I${row}`);
       let cell = worksheet.getCell(`A${row}`);
-      cell.value = "CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN";
+      cell.value = "CÔNG TY XĂNG DẦU TÂY NAM - CN ĐỐNG ĐA";
       cell.font = { bold: true, size: 12 };
       cell.alignment = { horizontal: "center" };
       row++;
@@ -792,7 +792,7 @@ const ShiftHandoverReportPage: React.FC = () => {
             />
             <div className="flex-1 text-center">
               <h1 className="text-xl font-bold">
-                CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN
+                CÔNG TY XĂNG DẦU TÂY NAM - CN ĐỐNG ĐA
               </h1>
               <h2 className="text-lg font-bold">
                 CỬA HÀNG XĂNG DẦU: {report.shift.store.name}

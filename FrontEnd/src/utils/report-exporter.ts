@@ -67,7 +67,7 @@ export const addReportHeader = (
   // Company Name
   worksheet.mergeCells("A1:E1");
   const companyCell = worksheet.getCell("A1");
-  companyCell.value = "CỔ PHẦN THƯƠNG MAI DỊCH VU TỔNG HỢP - PHÚ AN";
+  companyCell.value = "CHI NHÁNH ĐỐNG ĐA";
   companyCell.font = STYLES.boldFont;
   companyCell.alignment = STYLES.leftAlign;
 
