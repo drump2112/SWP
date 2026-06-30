@@ -333,9 +333,6 @@ export class InventoryService {
                   warehouseId: warehouse.id,
                 })
                 .andWhere('il.tankId = :tankId', { tankId: tank.id })
-                .andWhere('il.refType != :adjustmentType', {
-                  adjustmentType: 'ADJUSTMENT',
-                })
                 .andWhere('il.createdAt >= :dayAfterClosing', {
                   dayAfterClosing,
                 })
@@ -382,9 +379,6 @@ export class InventoryService {
                 warehouseId: warehouse.id,
               })
               .andWhere('il.tankId = :tankId', { tankId: tank.id })
-              .andWhere('il.refType != :adjustmentType', {
-                adjustmentType: 'ADJUSTMENT',
-              })
               .andWhere(
                 '(s.openedAt IS NOT NULL AND s.openedAt >= :periodFrom AND s.openedAt < :fromDate) OR (s.openedAt IS NULL AND il.createdAt >= :periodFrom AND il.createdAt < :fromDate)',
                 { periodFrom: periodFromDate, fromDate: fromDateTime },
@@ -417,18 +411,14 @@ export class InventoryService {
               warehouseId: warehouse.id,
             })
             .andWhere('il.tankId = :tankId', { tankId: tank.id })
-            .andWhere('il.refType != :adjustmentType', {
-              adjustmentType: 'ADJUSTMENT',
-            })
             .andWhere(
               '(s.openedAt IS NOT NULL AND s.openedAt < :fromDate) OR (s.openedAt IS NULL AND il.createdAt < :fromDate)',
               { fromDate: fromDateTime },
             )
             .getRawOne();
-          openingBalance =
-            initialStock + Number(ledgerBeforeResult?.balance || 0);
+          openingBalance = Number(ledgerBeforeResult?.balance || 0);
           console.log(
-            `📦 Tank ${tank.tankCode}: Không có kỳ chốt, tính từ ledger. initialStock=${initialStock}, ledgerBefore=${ledgerBeforeResult?.balance || 0}, openingBalance=${openingBalance}`,
+            `📦 Tank ${tank.tankCode}: Không có kỳ chốt, tính từ ledger (bao gồm ADJUSTMENT). ledgerBefore=${ledgerBeforeResult?.balance || 0}, openingBalance=${openingBalance}`,
           );
         }
       }

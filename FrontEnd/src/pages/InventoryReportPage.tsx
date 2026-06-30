@@ -32,6 +32,39 @@ import {
 import DateRangePicker from "../components/DateRangePicker";
 import SearchableSelect from "../components/SearchableSelect";
 
+// Helper: flatten periods from getInventoryReportByTankWithPeriods into a flat tank list
+// openingBalance = first period's opening, closingBalance = last period's closing, import/export = sum all
+const flattenPeriodsToTanks = (reportWithPeriods: any) => {
+  const tankMap: Record<number, any> = {};
+
+  (reportWithPeriods?.periods || []).forEach((period: any) => {
+    (period.items || []).forEach((item: any) => {
+      if (!tankMap[item.tankId]) {
+        // First time seeing this tank → grab opening balance from this (first) period
+        tankMap[item.tankId] = {
+          tankId: item.tankId,
+          tankCode: item.tankCode,
+          productId: item.productId,
+          productCode: item.productCode,
+          productName: item.productName,
+          unitName: item.unitName,
+          capacity: item.capacity,
+          openingBalance: Number(item.openingBalance),
+          importQuantity: 0,
+          exportQuantity: 0,
+          closingBalance: 0,
+        };
+      }
+      tankMap[item.tankId].importQuantity += Number(item.importQuantity);
+      tankMap[item.tankId].exportQuantity += Number(item.exportQuantity);
+      // Always overwrite → last period wins for closing balance
+      tankMap[item.tankId].closingBalance = Number(item.closingBalance);
+    });
+  });
+
+  return Object.values(tankMap);
+};
+
 // Helper function to aggregate tanks by product within a store's report
 const aggregateProductsByStore = (tanks: any[]) => {
   const productMap: Record<number, any> = {};
@@ -158,6 +191,7 @@ const InventoryReportPage: React.FC = () => {
   });
 
   // Fetch inventory reports for all stores - 🔥 THEO MẶT HÀNG (Product-based per store)
+  // Dùng getInventoryReportByTankWithPeriods (cùng logic với single store) để tồn đầu kỳ luôn đúng
   const { data: allStoresReport, isLoading: isLoadingAllStoresReport } =
     useQuery({
       queryKey: ["inventory-report-all-stores-by-product", fromDate, toDate],
@@ -167,12 +201,14 @@ const InventoryReportPage: React.FC = () => {
         const reports = await Promise.all(
           stores.map(async (store: any) => {
             try {
-              const storeReport = await inventoryApi.getInventoryReportByTank(
-                store.id,
-                fromDate,
-                toDate,
-              );
-              const aggregatedProducts = aggregateProductsByStore(storeReport);
+              const reportWithPeriods =
+                await inventoryApi.getInventoryReportByTankWithPeriods(
+                  store.id,
+                  fromDate,
+                  toDate,
+                );
+              const flatTanks = flattenPeriodsToTanks(reportWithPeriods);
+              const aggregatedProducts = aggregateProductsByStore(flatTanks);
               return {
                 storeId: store.id,
                 storeName: store.name,
