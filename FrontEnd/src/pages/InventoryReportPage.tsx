@@ -388,6 +388,7 @@ const InventoryReportPage: React.FC = () => {
           { key: "opening", width: 15 },
           { key: "import", width: 15 },
           { key: "export", width: 15 },
+          { key: "loss", width: 12 },
           { key: "closing", width: 15 },
         ];
 
@@ -403,6 +404,7 @@ const InventoryReportPage: React.FC = () => {
           "Tồn đầu kỳ",
           "Nhập",
           "Xuất",
+          "Hao hụt",
           "Tồn cuối kỳ",
         ];
         headerRow.font = STYLES.headerFont;
@@ -535,6 +537,7 @@ const InventoryReportPage: React.FC = () => {
                 Number(item.openingBalance),
                 Number(item.importQuantity),
                 Number(item.exportQuantity),
+                Number(item.lossAmount || 0),
                 Number(item.closingBalance),
               ]);
 
@@ -639,6 +642,7 @@ const InventoryReportPage: React.FC = () => {
                 product.openingBalance,
                 product.importQuantity,
                 product.exportQuantity,
+                product.lossAmount || 0,
                 product.closingBalance,
               ]);
               row.font = STYLES.boldFont;
@@ -680,6 +684,7 @@ const InventoryReportPage: React.FC = () => {
               periodTotal.openingBalance,
               periodTotal.importQuantity,
               periodTotal.exportQuantity,
+              periodTotal.lossAmount,
               periodTotal.closingBalance,
             ]);
             periodTotalRow.font = STYLES.boldFont;
@@ -928,6 +933,7 @@ const InventoryReportPage: React.FC = () => {
                   <td class="text-right">${formatNumber(item.openingBalance)}</td>
                   <td class="text-right">${formatNumber(item.importQuantity)}</td>
                   <td class="text-right">${formatNumber(item.exportQuantity)}</td>
+                  <td class="text-right">-</td>
                   <td class="text-right">${formatNumber(item.closingBalance)}</td>
                 </tr>
               `;
@@ -998,6 +1004,7 @@ const InventoryReportPage: React.FC = () => {
                   <td colspan="3" class="text-left font-bold">Tổng ${product.productName}</td>
                   <td class="text-center">lít</td>
                   <td class="text-right">-</td>
+                  <td class="text-right">-</td>
                   <td class="text-right font-bold">${formatNumber(product.openingBalance)}</td>
                   <td class="text-right font-bold" style="color: green;">${formatNumber(product.importQuantity)}</td>
                   <td class="text-right font-bold" style="color: red;">${formatNumber(product.exportQuantity)}</td>
@@ -1010,7 +1017,7 @@ const InventoryReportPage: React.FC = () => {
             // Tổng tất cả mặt hàng của kỳ
             tableRows += `
               <tr style="background-color: ${bgColor}; border-bottom: 2px solid;">
-                <td colspan="5" class="text-left font-bold">🏁 Tổng cộng kỳ ${period.periodType === "CLOSED" ? "đã chốt" : "chưa chốt"}</td>
+                <td colspan="6" class="text-left font-bold">🏁 Tổng cộng kỳ ${period.periodType === "CLOSED" ? "đã chốt" : "chưa chốt"}</td>
                 <td class="text-right font-bold">${formatNumber(periodTotal.openingBalance)}</td>
                 <td class="text-right font-bold" style="color: green;">${formatNumber(periodTotal.importQuantity)}</td>
                 <td class="text-right font-bold" style="color: red;">${formatNumber(periodTotal.exportQuantity)}</td>
