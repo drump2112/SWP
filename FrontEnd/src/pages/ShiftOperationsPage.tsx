@@ -2704,7 +2704,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-4 py-3 text-right">
                                 <input
                                   type="number"
-                                  step="0.001"
+                                  step="1"
                                   min="0"
                                   value={reading.startValue}
                                   onChange={(e) =>
@@ -2757,18 +2757,8 @@ const ShiftOperationsPage: React.FC = () => {
                                     }
                                   }}
                                   onFocus={(e) => e.target.select()}
-                                  disabled={hasPreviousShift}
-                                  className={`w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all ${
-                                    hasPreviousShift
-                                      ? "bg-gray-100 cursor-not-allowed text-gray-600"
-                                      : ""
-                                  }`}
+                                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg text-right text-sm focus:ring-2 focus:ring-indigo-500 hover:border-indigo-300 transition-all"
                                   placeholder="0.000"
-                                  title={
-                                    hasPreviousShift
-                                      ? "Số đầu được tự động lấy từ ca trước và không thể thay đổi"
-                                      : ""
-                                  }
                                   data-field="startValue"
                                 />
                               </td>
@@ -2850,7 +2840,7 @@ const ShiftOperationsPage: React.FC = () => {
                               <td className="px-4 py-3 text-right">
                                 <input
                                   type="number"
-                                  step="0.001"
+                                  step="1"
                                   min="0"
                                   max={reading.endValue - reading.startValue}
                                   value={reading.testExport || 0}
