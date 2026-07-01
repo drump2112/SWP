@@ -3207,7 +3207,7 @@ const ShiftOperationsPage: React.FC = () => {
                       {retailCustomer ? (
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-lg">
                           <span className="text-sm text-gray-600">
-                            Khách nội bộ:
+                            Ghi nhận:
                           </span>
                           <span className="text-sm font-medium text-green-700">
                             {retailCustomer.code} - {retailCustomer.name}
