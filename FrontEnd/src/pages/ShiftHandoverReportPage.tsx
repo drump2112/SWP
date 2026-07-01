@@ -73,10 +73,12 @@ const ShiftHandoverReportPage: React.FC = () => {
     })) || [];
 
   const shiftOptions =
-    shifts?.map((shift) => ({
-      value: shift.id,
-      label: `Ca ${shift.shiftNo} - ${dayjs(shift.shiftDate).format("DD/MM/YYYY")}`,
-    })) || [];
+    shifts
+      ?.filter((shift) => shift.status === "CLOSED")
+      .map((shift) => ({
+        value: shift.id,
+        label: `Ca ${shift.shiftNo} - ${dayjs(shift.shiftDate).format("DD/MM/YYYY")}`,
+      })) || [];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("vi-VN", {
