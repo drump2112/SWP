@@ -304,35 +304,58 @@ export class ReportsService {
     );
     const totalRetailSales = totalFromPumps - totalDebtSales;
 
-    // Lấy dữ liệu tồn kho
-    const openingStockData = shift.openingStockJson || [];
-
     // Lấy các phiếu nhập/xuất kho trong ca này
     const inventoryDocs = await this.inventoryDocumentRepository.find({
       where: { refShiftId: shiftId },
       relations: ['items', 'items.product'],
     });
 
-    // *** Note: receiptsInShift đã được query ở trên (line 233) ***
-    // Dùng biến receiptsInShiftData (được tính từ receiptRepository)
+    // Tìm warehouse của store
+    const warehouse = await this.warehouseRepository.findOne({
+      where: { storeId: shift.storeId, type: 'STORE' },
+    });
+
+    // Tính tồn đầu ca từ inventory_ledger (không dùng openingStockJson vì có thể sai)
+    // Dùng COALESCE(s.opened_at, il.created_at) để nhất quán với báo cáo nhập xuất tồn
+    const shiftOpenedAt = shift.openedAt
+      ? shift.openedAt.toISOString()
+      : new Date(shift.shiftDate).toISOString();
+
+    const openingStockRows: { productId: number; openingStock: string }[] =
+      warehouse
+        ? await this.inventoryLedgerRepository
+            .createQueryBuilder('il')
+            .leftJoin('il.shift', 's')
+            .select('il.productId', 'productId')
+            .addSelect(
+              'COALESCE(SUM(il.quantityIn - il.quantityOut), 0)',
+              'openingStock',
+            )
+            .where('il.warehouseId = :warehouseId', {
+              warehouseId: warehouse.id,
+            })
+            .andWhere('COALESCE(s.openedAt, il.createdAt) < :shiftOpenedAt', {
+              shiftOpenedAt,
+            })
+            .groupBy('il.productId')
+            .getRawMany()
+        : [];
 
     // Tính toán dữ liệu tồn kho theo sản phẩm
     const inventoryMap = new Map<number, any>();
 
-    // Khởi tạo với giá trị mở đầu
-    if (Array.isArray(openingStockData)) {
-      openingStockData.forEach((item) => {
-        inventoryMap.set(item.productId, {
-          productId: item.productId,
-          productCode: item.productCode || '',
-          productName: item.productName || '',
-          openingStock: Number(item.openingStock || 0),
-          importQuantity: 0,
-          exportQuantity: 0,
-          closingStock: Number(item.openingStock || 0),
-        });
+    // Khởi tạo map với tồn đầu từ ledger
+    openingStockRows.forEach((row) => {
+      inventoryMap.set(row.productId, {
+        productId: row.productId,
+        productCode: '',
+        productName: '',
+        openingStock: Number(row.openingStock),
+        importQuantity: 0,
+        exportQuantity: 0,
+        closingStock: Number(row.openingStock),
       });
-    }
+    });
 
     // Tính toán import/export từ inventory documents
     inventoryDocs.forEach((doc) => {
@@ -352,6 +375,12 @@ export class ReportsService {
           }
 
           const inv = inventoryMap.get(prodId);
+          // Luôn cập nhật tên sản phẩm nếu chưa có (openingStockRows chỉ có productId)
+          if (!inv.productName && item.product?.name) {
+            inv.productCode = item.product.code || '';
+            inv.productName = item.product.name;
+          }
+
           const qty = Number(item.quantity || 0);
 
           if (doc.docType === 'IMPORT') {
@@ -363,6 +392,24 @@ export class ReportsService {
           inv.closingStock =
             inv.openingStock + inv.importQuantity - inv.exportQuantity;
         });
+      }
+    });
+
+    // Với sản phẩm chỉ có trong ledger (không có doc trong ca), lấy tên từ pump readings
+    const productNameMap = new Map<number, { code: string; name: string }>();
+    shift.pumpReadings?.forEach((r) => {
+      if (r.product && !productNameMap.has(r.product.id)) {
+        productNameMap.set(r.product.id, {
+          code: r.product.code || '',
+          name: r.product.name || '',
+        });
+      }
+    });
+    inventoryMap.forEach((inv) => {
+      if (!inv.productName && productNameMap.has(inv.productId)) {
+        const p = productNameMap.get(inv.productId)!;
+        inv.productCode = p.code;
+        inv.productName = p.name;
       }
     });
 

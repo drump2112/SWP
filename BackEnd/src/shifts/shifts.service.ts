@@ -1824,7 +1824,7 @@ export class ShiftsService {
 
   async findByStore(storeId: number, limit = 100) {
     return this.shiftRepository.find({
-      where: { storeId },
+      where: { storeId, status: 'CLOSED', isActive: true },
       order: { shiftDate: 'DESC', shiftNo: 'DESC' },
       take: limit,
       relations: ['store'],

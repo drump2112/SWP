@@ -360,7 +360,8 @@ const ShiftHandoverReportPage: React.FC = () => {
         {
           label: "Tiền mặt thu trong ca",
           value:
-            report.summary.totalRetailAmount - report.summary.totalDebtAmount,
+            report.summary.totalRetailAmount +
+            report.summary.totalReceiptAmount,
         },
         { label: "Tồn quỹ tiền mặt", value: report.summary.cashBalance },
       ];
@@ -1022,8 +1023,8 @@ const ShiftHandoverReportPage: React.FC = () => {
                   <p className="text-sm text-gray-600">Tiền mặt thu trong ca</p>
                   <p className="text-xl font-bold text-orange-600">
                     {formatCurrency(
-                      report.summary.totalRetailAmount -
-                        report.summary.totalDebtAmount,
+                      report.summary.totalRetailAmount +
+                        report.summary.totalReceiptAmount,
                     )}
                   </p>
                 </div>
@@ -1061,28 +1062,16 @@ const ShiftHandoverReportPage: React.FC = () => {
                         <tr key={item.productId}>
                           <td className="border p-2">{item.productName}</td>
                           <td className="border p-2 text-right">
-                            {((item.openingStock ?? 0) > 0
-                              ? item.openingStock
-                              : 0
-                            ).toFixed(3)}
+                            {Number(item.openingStock ?? 0).toFixed(3)}
                           </td>
                           <td className="border p-2 text-right">
-                            {((item.importQuantity ?? 0) > 0
-                              ? item.importQuantity
-                              : 0
-                            ).toFixed(3)}
+                            {Number(item.importQuantity ?? 0).toFixed(3)}
                           </td>
                           <td className="border p-2 text-right">
-                            {((item.exportQuantity ?? 0) > 0
-                              ? item.exportQuantity
-                              : 0
-                            ).toFixed(3)}
+                            {Number(item.exportQuantity ?? 0).toFixed(3)}
                           </td>
                           <td className="border p-2 text-right font-bold">
-                            {((item.closingStock ?? 0) > 0
-                              ? item.closingStock
-                              : 0
-                            ).toFixed(3)}
+                            {Number(item.closingStock ?? 0).toFixed(3)}
                           </td>
                           <td className="border p-2"></td>
                         </tr>
