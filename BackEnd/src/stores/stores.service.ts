@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Store } from '../entities/store.entity';
+import { Warehouse } from '../entities/warehouse.entity';
 import { CreateStoreDto } from './dto/create-store.dto';
 
 @Injectable()
@@ -9,11 +10,23 @@ export class StoresService {
   constructor(
     @InjectRepository(Store)
     private storeRepository: Repository<Store>,
+    @InjectRepository(Warehouse)
+    private warehouseRepository: Repository<Warehouse>,
   ) {}
 
   async create(createStoreDto: CreateStoreDto): Promise<Store> {
     const store = this.storeRepository.create(createStoreDto);
-    return this.storeRepository.save(store);
+    const savedStore = await this.storeRepository.save(store);
+
+    // Tự động tạo kho loại STORE cho cửa hàng mới
+    await this.warehouseRepository.save(
+      this.warehouseRepository.create({
+        storeId: savedStore.id,
+        type: 'STORE',
+      }),
+    );
+
+    return savedStore;
   }
 
   async findAll() {

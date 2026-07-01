@@ -2167,7 +2167,7 @@ const ShiftOperationsPage: React.FC = () => {
   const tabLabels: Record<(typeof tabs)[number], string> = {
     pump: "B1 - Số máy cột bơm",
     debt: "B2 - Ghi Nợ/Công Nợ",
-    receipt: "B3 - Thu Nợ",
+    receipt: "B3 - Tiền Thu",
     deposit: "B4 - Nộp tiền",
     import: "B5 - Nhập hàng",
     export: "B6 - Xuất hàng",
@@ -3948,7 +3948,7 @@ const ShiftOperationsPage: React.FC = () => {
               {/* Section 1: Phiếu Thu Tiền */}
               <div className="border border-gray-200 rounded-lg p-4">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  📥 Phiếu Thu Tiền (Thanh toán nợ)
+                  📥 Phiếu Thu Tiền
                 </h3>
 
                 {canEdit && (
