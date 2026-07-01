@@ -94,10 +94,10 @@ export interface PricePeriod {
   productId: number;
   productCode: string;
   productName: string;
-  validFrom: Date;
-  validTo: Date | null;
+  validFrom: string;
+  validTo: string | null;
   price: number;
-  label: string; // "Xăng RON95: 01/01/2025 15:00 -> 08/01/2025 15:00"
+  label: string; // "01/01/2025 15:00 → 08/01/2025 15:00"
 }
 
 /**

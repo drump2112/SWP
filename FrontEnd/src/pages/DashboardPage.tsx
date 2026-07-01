@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { usePageTitle } from '../hooks/usePageTitle';
-import { analyticsApi } from '../api/analytics';
-import MetricCard from '../components/MetricCard';
-import RevenueChart from '../components/RevenueChart';
-import StoreComparisonChart from '../components/StoreComparisonChart';
-import StoreTrendsChart from '../components/StoreTrendsChart';
+import React, { useState } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import { usePageTitle } from "../hooks/usePageTitle";
+import { analyticsApi } from "../api/analytics";
+import MetricCard from "../components/MetricCard";
+import RevenueChart from "../components/RevenueChart";
+import StoreComparisonChart from "../components/StoreComparisonChart";
+import StoreTrendsChart from "../components/StoreTrendsChart";
 import {
   CurrencyDollarIcon,
   ShoppingCartIcon,
@@ -14,10 +14,10 @@ import {
   ChartBarIcon,
   CubeIcon,
   BuildingStorefrontIcon,
-} from '@heroicons/react/24/outline';
+} from "@heroicons/react/24/outline";
 
 const DashboardPage: React.FC = () => {
-  usePageTitle('Trang chủ');
+  usePageTitle("Trang chủ");
   const { user } = useAuth();
 
   // Date range cho overview (mặc định: tháng hiện tại)
@@ -26,13 +26,13 @@ const DashboardPage: React.FC = () => {
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return {
-      fromDate: firstDay.toISOString().split('T')[0],
-      toDate: lastDay.toISOString().split('T')[0],
+      fromDate: firstDay.toISOString().split("T")[0],
+      toDate: lastDay.toISOString().split("T")[0],
     };
   });
 
   // Kiểm tra xem user có phải là STORE role không
-  const isStoreRole = user?.roleCode === 'STORE';
+  const isStoreRole = user?.roleCode === "STORE";
 
   // Nếu là STORE, hiển thị dashboard cũ (đơn giản)
   if (isStoreRole) {
@@ -40,7 +40,13 @@ const DashboardPage: React.FC = () => {
   }
 
   // Dashboard cho các role quản lý
-  return <ManagementDashboard user={user} dateRange={dateRange} setDateRange={setDateRange} />;
+  return (
+    <ManagementDashboard
+      user={user}
+      dateRange={dateRange}
+      setDateRange={setDateRange}
+    />
+  );
 };
 
 // Dashboard đơn giản cho STORE role
@@ -79,56 +85,56 @@ const ManagementDashboard: React.FC<{
 }> = ({ user, dateRange, setDateRange }) => {
   // Fetch overview data
   const { data: overviewData, isLoading: overviewLoading } = useQuery({
-    queryKey: ['analytics-overview', dateRange],
+    queryKey: ["analytics-overview", dateRange],
     queryFn: () => analyticsApi.getOverview(dateRange),
   });
 
   // Fetch monthly revenue (6 tháng gần nhất)
   const { data: monthlyRevenue } = useQuery({
-    queryKey: ['monthly-revenue'],
+    queryKey: ["monthly-revenue"],
     queryFn: () => analyticsApi.getMonthlyRevenue({ months: 6 }),
   });
 
   // Fetch store trends
   const { data: storeTrends } = useQuery({
-    queryKey: ['store-trends'],
+    queryKey: ["store-trends"],
     queryFn: () => analyticsApi.getStoreTrends({ months: 6 }),
   });
 
   // Fetch quantity by store and product
   const { data: quantityByStore } = useQuery({
-    queryKey: ['quantity-by-store', dateRange],
+    queryKey: ["quantity-by-store", dateRange],
     queryFn: () => analyticsApi.getQuantityByStore(dateRange),
   });
 
   // Fetch total inventory
   const { data: inventoryData } = useQuery({
-    queryKey: ['total-inventory'],
+    queryKey: ["total-inventory"],
     queryFn: () => analyticsApi.getTotalInventory(),
   });
 
   // Fetch debt summary
   const { data: debtSummary } = useQuery({
-    queryKey: ['debt-summary'],
+    queryKey: ["debt-summary"],
     queryFn: () => analyticsApi.getDebtSummary(),
   });
 
   // Fetch top products
   const { data: topProducts } = useQuery({
-    queryKey: ['top-products', dateRange],
+    queryKey: ["top-products", dateRange],
     queryFn: () => analyticsApi.getTopProducts({ ...dateRange, limit: 5 }),
   });
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('vi-VN', {
-      style: 'currency',
-      currency: 'VND',
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
       maximumFractionDigits: 0,
     }).format(value);
   };
 
   const formatNumber = (value: number) => {
-    return new Intl.NumberFormat('vi-VN').format(value);
+    return new Intl.NumberFormat("vi-VN").format(value);
   };
 
   return (
@@ -149,14 +155,18 @@ const ManagementDashboard: React.FC<{
           <input
             type="date"
             value={dateRange.fromDate}
-            onChange={(e) => setDateRange({ ...dateRange, fromDate: e.target.value })}
+            onChange={(e) =>
+              setDateRange({ ...dateRange, fromDate: e.target.value })
+            }
             className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
           <span className="flex items-center text-gray-500">đến</span>
           <input
             type="date"
             value={dateRange.toDate}
-            onChange={(e) => setDateRange({ ...dateRange, toDate: e.target.value })}
+            onChange={(e) =>
+              setDateRange({ ...dateRange, toDate: e.target.value })
+            }
             className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -174,13 +184,20 @@ const ManagementDashboard: React.FC<{
                   <CurrencyDollarIcon className="h-8 w-8 text-blue-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Tổng doanh thu</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(overviewData?.revenue?.current || 0)}</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Tổng doanh thu
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatCurrency(overviewData?.revenue?.current || 0)}
+                  </p>
                 </div>
               </div>
               {overviewData?.revenue?.change !== undefined && (
-                <div className={`text-sm font-semibold ${overviewData.revenue.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {overviewData.revenue.change >= 0 ? '↑' : '↓'} {Math.abs(overviewData.revenue.change).toFixed(1)}%
+                <div
+                  className={`text-sm font-semibold ${overviewData.revenue.change >= 0 ? "text-green-600" : "text-red-600"}`}
+                >
+                  {overviewData.revenue.change >= 0 ? "↑" : "↓"}{" "}
+                  {Math.abs(overviewData.revenue.change).toFixed(1)}%
                 </div>
               )}
             </div>
@@ -192,8 +209,12 @@ const ManagementDashboard: React.FC<{
                   <UserGroupIcon className="h-8 w-8 text-red-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Khách hàng công nợ</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatNumber(overviewData?.debt?.customersCount || 0)}</p>
+                  <p className="text-sm font-medium text-gray-600">
+                    Khách hàng công nợ
+                  </p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(overviewData?.debt?.customersCount || 0)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -214,32 +235,38 @@ const ManagementDashboard: React.FC<{
           <div className="flex items-center mb-4">
             <BuildingStorefrontIcon className="h-6 w-6 text-green-600 mr-2" />
             <h3 className="text-lg font-medium text-gray-900">
-              Sản lượng bán theo mặt hàng
+              Sản lượng/Doanh Thu theo mặt hàng
             </h3>
           </div>
           <div className="space-y-3">
-            {Array.isArray(topProducts) && topProducts.map((product, index) => (
-              <div key={product.productId} className="flex items-center justify-between border-b border-gray-200 pb-3 hover:bg-gray-50 px-2 rounded">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                    {index + 1}
+            {Array.isArray(topProducts) &&
+              topProducts.map((product, index) => (
+                <div
+                  key={product.productId}
+                  className="flex items-center justify-between border-b border-gray-200 pb-3 hover:bg-gray-50 px-2 rounded"
+                >
+                  <div className="flex items-center gap-3 flex-1">
+                    <div className="flex-shrink-0 w-7 h-7 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                      {index + 1}
+                    </div>
+                    <p className="text-base font-semibold text-gray-900">
+                      {product.productName}
+                    </p>
                   </div>
-                  <p className="text-base font-semibold text-gray-900">
-                    {product.productName}
-                  </p>
+                  <div className="flex items-center gap-8">
+                    <p className="text-base font-bold text-blue-600 whitespace-nowrap">
+                      {formatNumber(product.totalQuantity)} lít
+                    </p>
+                    <p className="text-base font-bold text-green-600 whitespace-nowrap min-w-[140px] text-right">
+                      {formatCurrency(product.totalRevenue)}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-8">
-                  <p className="text-base font-bold text-blue-600 whitespace-nowrap">
-                    {formatNumber(product.totalQuantity)} lít
-                  </p>
-                  <p className="text-base font-bold text-green-600 whitespace-nowrap min-w-[140px] text-right">
-                    {formatCurrency(product.totalRevenue)}
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))}
             {!Array.isArray(topProducts) && (
-              <p className="text-gray-500 text-sm text-center py-4">Không có dữ liệu</p>
+              <p className="text-gray-500 text-sm text-center py-4">
+                Không có dữ liệu
+              </p>
             )}
           </div>
         </div>
@@ -259,32 +286,43 @@ const ManagementDashboard: React.FC<{
                   <th className="px-3 py-2 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
                     Cửa hàng
                   </th>
-                  {Array.isArray(quantityByStore?.products) && quantityByStore.products.map((product) => (
-                    <th key={product.id} className="px-3 py-2 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">
-                      {product.name}
-                    </th>
-                  ))}
+                  {Array.isArray(quantityByStore?.products) &&
+                    quantityByStore.products.map((product) => (
+                      <th
+                        key={product.id}
+                        className="px-3 py-2 text-right text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200"
+                      >
+                        {product.name}
+                      </th>
+                    ))}
                   <th className="px-3 py-2 text-right text-xs font-bold text-blue-700 uppercase tracking-wider">
                     Tổng (lít)
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {Array.isArray(quantityByStore?.storeData) && quantityByStore.storeData.map((store) => (
-                  <tr key={store.storeId} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-sm font-semibold text-gray-900 border-r border-gray-100">
-                      {store.storeName}
-                    </td>
-                    {Array.isArray(quantityByStore?.products) && quantityByStore.products.map((product) => (
-                      <td key={product.id} className="px-3 py-2 text-sm text-right font-medium text-gray-700 border-r border-gray-100">
-                        {formatNumber(store.productQuantities[product.name] || 0)}
+                {Array.isArray(quantityByStore?.storeData) &&
+                  quantityByStore.storeData.map((store) => (
+                    <tr key={store.storeId} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-sm font-semibold text-gray-900 border-r border-gray-100">
+                        {store.storeName}
                       </td>
-                    ))}
-                    <td className="px-3 py-2 text-sm text-right font-bold text-blue-600">
-                      {formatNumber(store.totalQuantity)}
-                    </td>
-                  </tr>
-                ))}
+                      {Array.isArray(quantityByStore?.products) &&
+                        quantityByStore.products.map((product) => (
+                          <td
+                            key={product.id}
+                            className="px-3 py-2 text-sm text-right font-medium text-gray-700 border-r border-gray-100"
+                          >
+                            {formatNumber(
+                              store.productQuantities[product.name] || 0,
+                            )}
+                          </td>
+                        ))}
+                      <td className="px-3 py-2 text-sm text-right font-bold text-blue-600">
+                        {formatNumber(store.totalQuantity)}
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -308,18 +346,24 @@ const ManagementDashboard: React.FC<{
             </h3>
           </div>
           <div className="space-y-2 max-h-80 overflow-y-auto">
-            {Array.isArray(inventoryData?.byProduct) && inventoryData.byProduct.slice(0, 10).map((item) => (
-              <div key={item.productId} className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
-                <div className="flex-1">
-                  <span className="text-gray-900 font-medium">{item.productName}</span>
+            {Array.isArray(inventoryData?.byProduct) &&
+              inventoryData.byProduct.slice(0, 10).map((item) => (
+                <div
+                  key={item.productId}
+                  className="flex justify-between items-center text-sm border-b border-gray-100 pb-2"
+                >
+                  <div className="flex-1">
+                    <span className="text-gray-900 font-medium">
+                      {item.productName}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-medium text-blue-600">
+                      {formatNumber(item.quantity)} lít
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-medium text-blue-600">
-                    {formatNumber(item.quantity)} lít
-                  </span>
-                </div>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
 
@@ -338,14 +382,20 @@ const ManagementDashboard: React.FC<{
             {debtSummary?.customersCount || 0} khách hàng đang có công nợ
           </div>
           <div className="space-y-2 max-h-40 overflow-y-auto">
-            {Array.isArray(debtSummary?.topDebtors) && debtSummary.topDebtors.slice(0, 5).map((debtor) => (
-              <div key={debtor.customerId} className="flex justify-between text-sm">
-                <span className="text-gray-600 truncate">{debtor.customerName}</span>
-                <span className="font-medium text-red-600 ml-2">
-                  {formatCurrency(debtor.debtAmount)}
-                </span>
-              </div>
-            ))}
+            {Array.isArray(debtSummary?.topDebtors) &&
+              debtSummary.topDebtors.slice(0, 5).map((debtor) => (
+                <div
+                  key={debtor.customerId}
+                  className="flex justify-between text-sm"
+                >
+                  <span className="text-gray-600 truncate">
+                    {debtor.customerName}
+                  </span>
+                  <span className="font-medium text-red-600 ml-2">
+                    {formatCurrency(debtor.debtAmount)}
+                  </span>
+                </div>
+              ))}
           </div>
         </div>
       </div>
@@ -359,7 +409,6 @@ const ManagementDashboard: React.FC<{
 
       {/* Charts Row 1: Revenue trends */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
         {monthlyRevenue && (
           <RevenueChart
             data={monthlyRevenue}

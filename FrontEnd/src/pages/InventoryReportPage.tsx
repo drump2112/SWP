@@ -4,7 +4,7 @@ import { inventoryApi } from "../api/inventory";
 import { lossConfigApi, type ProductCategory } from "../api/loss-config";
 import { usePageTitle } from "../hooks/usePageTitle";
 import { storesApi } from "../api/stores";
-import { productsApi } from "../api/products";
+import { reportsApi } from "../api/reports";
 import { useAuth } from "../contexts/AuthContext";
 import {
   ArchiveBoxIcon,
@@ -108,9 +108,9 @@ const InventoryReportPage: React.FC = () => {
   const [selectedStoreId, setSelectedStoreId] = useState<number | undefined>(
     user?.storeId,
   );
-  const [selectedPriceId, setSelectedPriceId] = useState<number | undefined>(
-    undefined,
-  );
+  const [selectedPricePeriodKey, setSelectedPricePeriodKey] = useState<
+    string | null
+  >(null);
   const [reportType, setReportType] = useState<"summary" | "import" | "export">(
     "summary",
   );
@@ -132,21 +132,34 @@ const InventoryReportPage: React.FC = () => {
     enabled: !user?.storeId,
   });
 
-  // Get selected store's regionId
-  const selectedStore =
-    stores?.find((s) => s.id === selectedStoreId) || user?.store;
-  const regionId = (selectedStore as any)?.regionId;
-
-  // Fetch prices for the selected store's region only
-  const { data: allPrices } = useQuery({
-    queryKey: ["region-prices", regionId],
-    queryFn: () => productsApi.getPricesByRegion(regionId!),
-    enabled: !!regionId && !isAllStores,
+  // Fetch kỳ giá (chain A→B→C→D→Hiện tại)
+  const { data: pricePeriods } = useQuery({
+    queryKey: ["price-periods"],
+    queryFn: () => reportsApi.getPricePeriods(),
   });
 
-  // Reset selected price when store changes
+  // Khi chọn kỳ giá → tự động set fromDate / toDate
+  // toDate = NGÀY CỦA validTo (KHÔNG trừ 1 ngày)
+  // → ngày đổi giá nằm trong CẢ 2 kỳ liền kề (bắt được ca 1 giá cũ + ca 2 giá mới)
+  const handlePricePeriodChange = (validFromKey: string | null) => {
+    setSelectedPricePeriodKey(validFromKey);
+    if (validFromKey && pricePeriods) {
+      const period = pricePeriods.find((p) => p.validFrom === validFromKey);
+      if (period) {
+        setFromDate(dayjs(period.validFrom).format("YYYY-MM-DD"));
+        setToDate(
+          period.validTo
+            ? dayjs(period.validTo).format("YYYY-MM-DD")
+            : dayjs().format("YYYY-MM-DD"),
+        );
+      }
+    }
+    // Khi xóa chọn → giữ nguyên date range hiện tại
+  };
+
+  // Reset kỳ giá khi đổi cửa hàng
   useEffect(() => {
-    setSelectedPriceId(undefined);
+    setSelectedPricePeriodKey(null);
   }, [selectedStoreId]);
 
   // Reset loss column when store, date range, or report type changes
@@ -1254,19 +1267,24 @@ const InventoryReportPage: React.FC = () => {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Kỳ giá
+              {selectedPricePeriodKey && (
+                <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
+                  đang lọc theo kỳ giá
+                </span>
+              )}
             </label>
             <SearchableSelect
               options={
-                allPrices?.map((price) => ({
-                  value: price.id,
-                  label: `${price.product?.name} - ${price.region?.name} (${new Intl.NumberFormat("vi-VN").format(price.price)}đ) - ${new Date(price.validFrom).toLocaleDateString("vi-VN")}`,
+                pricePeriods?.map((p) => ({
+                  value: p.validFrom,
+                  label: p.label,
                 })) || []
               }
-              value={selectedPriceId || null}
+              value={selectedPricePeriodKey}
               onChange={(val) =>
-                setSelectedPriceId(val ? Number(val) : undefined)
+                handlePricePeriodChange(val ? String(val) : null)
               }
-              placeholder="Tất cả kỳ giá"
+              placeholder="Chọn kỳ giá..."
               isClearable
             />
           </div>

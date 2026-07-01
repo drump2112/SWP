@@ -1285,48 +1285,48 @@ export class ReportsService {
    * @returns Danh sách kỳ giá với label đã format
    */
   async getPricePeriods(): Promise<PricePeriod[]> {
-    // Lấy các khoảng thời gian duy nhất bằng GROUP BY
-    // Sử dụng GROUP BY thay vì DISTINCT để xử lý đúng với NULL values trong PostgreSQL
-    const prices = await this.productPriceRepository
-      .createQueryBuilder('price')
-      .select('price.validFrom', 'validFrom')
-      .addSelect('price.validTo', 'validTo')
-      .groupBy('price.validFrom')
-      .addGroupBy('price.validTo')
-      .orderBy('price.validFrom', 'DESC')
-      .getRawMany();
+    // Native SQL: DISTINCT valid_from (1 cột) → không bị duplicate dù validTo khác nhau giữa sản phẩm
+    const rows: { validFrom: Date }[] =
+      await this.productPriceRepository.manager.query(
+        `SELECT DISTINCT valid_from AS "validFrom"
+         FROM product_prices
+         WHERE valid_from IS NOT NULL
+         ORDER BY valid_from ASC`,
+      );
 
-    return prices.map((row, index) => {
-      const validFromStr = row.validFrom
-        ? new Date(row.validFrom).toLocaleString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : '';
-      const validToStr = row.validTo
-        ? new Date(row.validTo).toLocaleString('vi-VN', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : 'Hiện tại';
+    const dates: Date[] = rows.map((r) => new Date(r.validFrom));
+
+    if (dates.length === 0) return [];
+
+    const fmt = (d: Date) =>
+      d.toLocaleString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+    // Build chain: A→B, B→C, C→D, D→null(Hiện tại)
+    // validTo = đúng thời điểm bắt đầu kỳ tiếp theo (frontend dùng YYYY-MM-DD nên ngày đổi giá nằm trong cả 2 kỳ)
+    const periods: PricePeriod[] = dates.map((validFrom, i) => {
+      const nextDate = dates[i + 1] || null;
+      const label = `${fmt(validFrom)} → ${nextDate ? fmt(nextDate) : 'Hiện tại'}`;
 
       return {
-        priceId: index + 1, // Dùng index vì không có id duy nhất
-        productId: 0, // Không cần productId vì kỳ giá áp dụng cho tất cả mặt hàng
+        priceId: i + 1,
+        productId: 0,
         productCode: '',
         productName: '',
-        validFrom: row.validFrom,
-        validTo: row.validTo,
-        price: 0, // Không cần giá cụ thể
-        label: `${validFromStr} → ${validToStr}`,
+        validFrom: validFrom.toISOString(),
+        validTo: nextDate ? nextDate.toISOString() : null,
+        price: 0,
+        label,
       };
     });
+
+    // Trả về mới nhất trước (DESC) cho dropdown
+    return periods.reverse();
   }
 
   /**

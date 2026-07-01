@@ -891,17 +891,18 @@ export class InventoryService {
         );
 
         // 🔥 Tồn đầu kỳ = SUM(ADJUSTMENT + ledger TRƯỚC fromDate)
-        // Query: Lấy TẤT CẢ ledger entries (ADJUSTMENT + imports/exports) TRƯỚC fromDate
-        // ĐIỀU QUAN TRỌNG: PHẢI INCLUDE ADJUSTMENT entries vì đó là tồn đầu!
+        // Dùng COALESCE(s.opened_at, il.created_at) để nhất quán với getInventoryReportByTank
+        // → Ca mở trước fromDate nhưng đóng trong kỳ = thuộc về kỳ trước (không tính vào opening)
         const ledgerBeforeResultRaw = await this.dataSource.query(
           `
           SELECT COALESCE(SUM(il.quantity_in - il.quantity_out), 0) as "balance"
           FROM inventory_ledger il
+          LEFT JOIN shifts s ON s.id = il.shift_id
           WHERE il.warehouse_id = $1
             AND il.tank_id = $2
-            AND DATE(il.created_at) < $3::date
+            AND (COALESCE(s.opened_at, il.created_at) < $3::timestamp)
           `,
-          [warehouseId, tank.id, fromDate],
+          [warehouseId, tank.id, fromDate + 'T00:00:00'],
         );
 
         const ledgerBeforeFrom = Number(
@@ -916,30 +917,45 @@ export class InventoryService {
         );
       }
 
-      // 🔥 Nhập trong kỳ - Tính SUM(quantity_in) từ TẤT CẢ entries (ADJUSTMENT + IMPORT + ...)
+      // 🔥 Nhập trong kỳ - dùng COALESCE(s.opened_at, il.created_at) để nhất quán
+      // → Ca mở trong kỳ tính vào kỳ này, dù đóng ca sau ngày cuối kỳ
       const importResultRaw = await this.dataSource.query(
         `
         SELECT COALESCE(SUM(il.quantity_in), 0) as "totalIn"
         FROM inventory_ledger il
+        LEFT JOIN shifts s ON s.id = il.shift_id
         WHERE il.warehouse_id = $1
           AND il.tank_id = $2
-          AND DATE(il.created_at) >= $3::date
-          AND DATE(il.created_at) <= $4::date
+          AND (il.ref_type = 'IMPORT' OR il.ref_type = 'ADJUSTMENT')
+          AND (COALESCE(s.opened_at, il.created_at) >= $3::timestamp)
+          AND (COALESCE(s.opened_at, il.created_at) <= $4::timestamp)
         `,
-        [warehouseId, tank.id, fromDate, toDate],
+        [
+          warehouseId,
+          tank.id,
+          fromDate + 'T00:00:00',
+          toDate + 'T23:59:59.999',
+        ],
       );
 
-      // 🔥 Xuất trong kỳ - Tính SUM(quantity_out) từ TẤT CẢ entries
+      // 🔥 Xuất trong kỳ - dùng COALESCE(s.opened_at, il.created_at) để nhất quán
       const exportResultRaw = await this.dataSource.query(
         `
         SELECT COALESCE(SUM(il.quantity_out), 0) as "totalOut"
         FROM inventory_ledger il
+        LEFT JOIN shifts s ON s.id = il.shift_id
         WHERE il.warehouse_id = $1
           AND il.tank_id = $2
-          AND DATE(il.created_at) >= $3::date
-          AND DATE(il.created_at) <= $4::date
+          AND il.ref_type != 'ADJUSTMENT'
+          AND (COALESCE(s.opened_at, il.created_at) >= $3::timestamp)
+          AND (COALESCE(s.opened_at, il.created_at) <= $4::timestamp)
         `,
-        [warehouseId, tank.id, fromDate, toDate],
+        [
+          warehouseId,
+          tank.id,
+          fromDate + 'T00:00:00',
+          toDate + 'T23:59:59.999',
+        ],
       );
 
       console.log(
