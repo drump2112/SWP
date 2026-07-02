@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState, useRef } from "react";
+import { Link, useLocation } from "react-router-dom";
 import {
   HomeIcon,
   ClockIcon,
@@ -34,8 +34,8 @@ import {
   ShoppingCartIcon,
   ArrowDownTrayIcon,
   ArrowUpTrayIcon,
-} from '@heroicons/react/24/outline';
-import { useAuth } from '../contexts/AuthContext';
+} from "@heroicons/react/24/outline";
+import { useAuth } from "../contexts/AuthContext";
 
 interface NavItem {
   name: string;
@@ -50,73 +50,208 @@ interface SidebarProps {
 }
 
 const navigation: NavItem[] = [
-  { name: 'Trang chủ', href: '/', icon: HomeIcon },
+  { name: "Trang chủ", href: "/", icon: HomeIcon },
   {
-    name: 'Quản lý ca',
-    href: '/shifts',
+    name: "Quản lý ca",
+    href: "/shifts",
     icon: ClockIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'STORE']
+    roles: ["ADMIN", "DIRECTOR", "STORE"],
   },
   {
-    name: 'Báo cáo',
-    href: '/reports',
+    name: "Báo cáo",
+    href: "/reports",
     icon: ChartBarIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'],
+    roles: ["ADMIN", "DIRECTOR", "STORE", "SALES", "ACCOUNTING"],
     children: [
-      { name: 'Báo cáo ca', href: '/reports/shifts', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Sổ giao ca', href: '/reports/shift-handover', icon: CheckBadgeIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Sổ quỹ', href: '/reports/cash', icon: BanknotesIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
+      // { name: 'Báo cáo ca', href: '/reports/shifts', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      {
+        name: "Sổ giao ca",
+        href: "/reports/shift-handover",
+        icon: CheckBadgeIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "SALES", "ACCOUNTING"],
+      },
+      {
+        name: "Sổ quỹ",
+        href: "/reports/cash",
+        icon: BanknotesIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "ACCOUNTING"],
+      },
 
-      { name: 'Báo cáo công nợ', href: '/reports/debt', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Định mức công nợ', href: '/customers/credit', icon: CreditCardIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Doanh thu/ Xuất Hàng', href: '/reports/sales', icon: CurrencyDollarIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
+      {
+        name: "Báo cáo công nợ",
+        href: "/reports/debt",
+        icon: DocumentChartBarIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "SALES", "ACCOUNTING"],
+      },
+      {
+        name: "Định mức công nợ",
+        href: "/customers/credit",
+        icon: CreditCardIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "SALES", "ACCOUNTING"],
+      },
+      {
+        name: "Doanh thu/ Xuất Hàng",
+        href: "/reports/sales",
+        icon: CurrencyDollarIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "SALES", "ACCOUNTING"],
+      },
       // { name: 'Báo cáo tồn kho', href: '/inventory/stock-report', icon: ArchiveBoxIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'SALES', 'ACCOUNTING'] },
-      { name: 'Nhập Xuất Tồn', href: '/inventory/report', icon: ArrowsRightLeftIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE', 'ACCOUNTING'] },
-      { name: 'Biên bản kiểm kê', href: '/inventory/checks', icon: ClipboardDocumentListIcon, roles: ['ADMIN', 'DIRECTOR', 'STORE'] },
-      { name: 'Chốt Tồn Kho', href: '/inventory/closing', icon: CheckBadgeIcon, roles: ['ADMIN'] },
+      {
+        name: "Nhập Xuất Tồn",
+        href: "/inventory/report",
+        icon: ArrowsRightLeftIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE", "ACCOUNTING"],
+      },
+      {
+        name: "Biên bản kiểm kê",
+        href: "/inventory/checks",
+        icon: ClipboardDocumentListIcon,
+        roles: ["ADMIN", "DIRECTOR", "STORE"],
+      },
+      {
+        name: "Chốt Tồn Kho",
+        href: "/inventory/closing",
+        icon: CheckBadgeIcon,
+        roles: ["ADMIN"],
+      },
     ],
   },
   {
-    name: 'Danh mục',
-    href: '/categories',
+    name: "Danh mục",
+    href: "/categories",
     icon: DocumentTextIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'],
+    roles: ["ADMIN", "DIRECTOR", "SALES", "ACCOUNTING"],
     children: [
-      { name: 'Cửa hàng', href: '/stores', icon: BuildingStorefrontIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Mặt hàng', href: '/products', icon: CubeIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
-      { name: 'Quản Lý Giá', href: '/prices', icon: TagIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES'] },
-      { name: 'Khách hàng', href: '/customers', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'SALES', 'ACCOUNTING'] },
-      { name: 'Tài khoản', href: '/users', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR'] },
+      {
+        name: "Cửa hàng",
+        href: "/stores",
+        icon: BuildingStorefrontIcon,
+        roles: ["ADMIN", "DIRECTOR"],
+      },
+      {
+        name: "Mặt hàng",
+        href: "/products",
+        icon: CubeIcon,
+        roles: ["ADMIN", "DIRECTOR", "SALES"],
+      },
+      {
+        name: "Quản Lý Giá",
+        href: "/prices",
+        icon: TagIcon,
+        roles: ["ADMIN", "DIRECTOR", "SALES"],
+      },
+      {
+        name: "Khách hàng",
+        href: "/customers",
+        icon: UserGroupIcon,
+        roles: ["ADMIN", "DIRECTOR", "SALES", "ACCOUNTING"],
+      },
+      {
+        name: "Tài khoản",
+        href: "/users",
+        icon: UsersIcon,
+        roles: ["ADMIN", "DIRECTOR"],
+      },
     ],
   },
   {
-    name: 'Bán Thương Mại',
-    href: '/commercial',
+    name: "Bán Thương Mại",
+    href: "/commercial",
     icon: TruckIcon,
-    roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'],
+    roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
     children: [
-      { name: 'Nhà cung cấp', href: '/commercial/suppliers', icon: BuildingOfficeIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'Kho thương mại', href: '/commercial/warehouses', icon: BuildingStorefrontIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'Nhóm khách hàng', href: '/commercial/customer-groups', icon: UserGroupIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'Khách hàng TM', href: '/commercial/customers', icon: UsersIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'Nhập hàng (Lô)', href: '/commercial/import-batches', icon: ArrowDownTrayIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'Xuất hàng TM', href: '/commercial/export-orders', icon: ArrowUpTrayIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
-      { name: 'BC Nhập Xuất Tồn', href: '/commercial/inventory-report', icon: DocumentChartBarIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      {
+        name: "Nhà cung cấp",
+        href: "/commercial/suppliers",
+        icon: BuildingOfficeIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "Kho thương mại",
+        href: "/commercial/warehouses",
+        icon: BuildingStorefrontIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "Nhóm khách hàng",
+        href: "/commercial/customer-groups",
+        icon: UserGroupIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "Khách hàng TM",
+        href: "/commercial/customers",
+        icon: UsersIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "Nhập hàng (Lô)",
+        href: "/commercial/import-batches",
+        icon: ArrowDownTrayIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "Xuất hàng TM",
+        href: "/commercial/export-orders",
+        icon: ArrowUpTrayIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
+      {
+        name: "BC Nhập Xuất Tồn",
+        href: "/commercial/inventory-report",
+        icon: DocumentChartBarIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
     ],
   },
   {
-    name: 'Cài đặt',
-    href: '/settings',
+    name: "Cài đặt",
+    href: "/settings",
     icon: Cog6ToothIcon,
-    roles: ['ADMIN'],
+    roles: ["ADMIN"],
     children: [
-      { name: 'Bồn bể', href: '/tanks', icon: CircleStackIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Vòi bơm', href: '/pumps', icon: WrenchScrewdriverIcon, roles: ['ADMIN', 'DIRECTOR'] },
-      { name: 'Hệ số hao hụt', href: '/loss-config', icon: AdjustmentsHorizontalIcon, roles: ['ADMIN'] },
-      { name: 'Nhập tồn đầu', href: '/inventory/initial-stock', icon: ArchiveBoxIcon, roles: ['ADMIN'] },
-      { name: 'Số dư đầu sổ quỹ', href: '/cash/opening-balance', icon: CalculatorIcon, roles: ['ADMIN', 'ACCOUNTING'] },
-      { name: 'Số dư đầu công nợ', href: '/customers/opening-balance', icon: ScaleIcon, roles: ['ADMIN'] },
-      { name: 'Hóa đơn', href: '/receipts', icon: DocumentDuplicateIcon, roles: ['ADMIN', 'DIRECTOR', 'ACCOUNTING'] },
+      {
+        name: "Bồn bể",
+        href: "/tanks",
+        icon: CircleStackIcon,
+        roles: ["ADMIN", "DIRECTOR"],
+      },
+      {
+        name: "Vòi bơm",
+        href: "/pumps",
+        icon: WrenchScrewdriverIcon,
+        roles: ["ADMIN", "DIRECTOR"],
+      },
+      {
+        name: "Hệ số hao hụt",
+        href: "/loss-config",
+        icon: AdjustmentsHorizontalIcon,
+        roles: ["ADMIN"],
+      },
+      {
+        name: "Nhập tồn đầu",
+        href: "/inventory/initial-stock",
+        icon: ArchiveBoxIcon,
+        roles: ["ADMIN"],
+      },
+      {
+        name: "Số dư đầu sổ quỹ",
+        href: "/cash/opening-balance",
+        icon: CalculatorIcon,
+        roles: ["ADMIN", "ACCOUNTING"],
+      },
+      {
+        name: "Số dư đầu công nợ",
+        href: "/customers/opening-balance",
+        icon: ScaleIcon,
+        roles: ["ADMIN"],
+      },
+      {
+        name: "Hóa đơn",
+        href: "/receipts",
+        icon: DocumentDuplicateIcon,
+        roles: ["ADMIN", "DIRECTOR", "ACCOUNTING"],
+      },
     ],
   },
 ];
@@ -131,7 +266,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
     navigation.forEach((item) => {
       if (item.children) {
         const hasActiveChild = item.children.some(
-          (child) => location.pathname === child.href || location.pathname.startsWith(child.href + '/')
+          (child) =>
+            location.pathname === child.href ||
+            location.pathname.startsWith(child.href + "/"),
         );
         if (hasActiveChild) {
           openMenus.push(item.name);
@@ -165,23 +302,23 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
     if (!item.roles || item.roles.length === 0) return true; // Nếu không có roles thì mọi người đều truy cập được
     if (!user?.roleCode) return false;
     // SUPER_ADMIN có quyền truy cập tất cả
-    if (user.roleCode === 'SUPER_ADMIN') return true;
+    if (user.roleCode === "SUPER_ADMIN") return true;
     return item.roles.includes(user.roleCode);
   };
 
   // Lọc navigation dựa trên quyền (không mutate navigation gốc)
   const filteredNavigation = navigation
-    .filter(item => hasPermission(item))
-    .map(item => {
+    .filter((item) => hasPermission(item))
+    .map((item) => {
       if (item.children) {
         return {
           ...item,
-          children: item.children.filter(child => hasPermission(child))
+          children: item.children.filter((child) => hasPermission(child)),
         };
       }
       return item;
     })
-    .filter(item => {
+    .filter((item) => {
       // Nếu item có children mà bị filter hết thì ẩn luôn parent
       if (item.children && item.children.length === 0) {
         return false;
@@ -191,13 +328,13 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
 
   const toggleMenu = (name: string) => {
     setOpenMenus((prev) =>
-      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
+      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name],
     );
   };
 
   const isActive = (href: string, hasChildren: boolean = false) => {
-    if (href === '/') {
-      return location.pathname === '/';
+    if (href === "/") {
+      return location.pathname === "/";
     }
 
     // Nếu là menu có children, chỉ active khi exact match với href chính
@@ -209,30 +346,34 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
     const hasChildRoute = navigation.some((nav) => {
       if (nav.children) {
         return nav.children.some(
-          (child) => child.href !== href &&
-                     (location.pathname === child.href || location.pathname.startsWith(child.href + '/'))
+          (child) =>
+            child.href !== href &&
+            (location.pathname === child.href ||
+              location.pathname.startsWith(child.href + "/")),
         );
       }
       return false;
     });
 
     // Nếu có child route match, thì parent không active
-    if (hasChildRoute && location.pathname.startsWith(href + '/')) {
+    if (hasChildRoute && location.pathname.startsWith(href + "/")) {
       return false;
     }
 
     // Exact match hoặc starts with + '/'
-    return location.pathname === href || location.pathname.startsWith(href + '/');
+    return (
+      location.pathname === href || location.pathname.startsWith(href + "/")
+    );
   };
 
   return (
     <div
       className={`flex flex-col h-full shadow-2xl transition-all duration-300 ease-in-out relative ${
-        isCollapsed ? 'w-20 lg:w-20' : 'w-64'
+        isCollapsed ? "w-20 lg:w-20" : "w-64"
       }`}
       style={{
-        background: 'linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%)',
-        overflow: 'visible',
+        background: "linear-gradient(180deg, #f8fafc 0%, #e0f2fe 100%)",
+        overflow: "visible",
         zIndex: 1000,
       }}
     >
@@ -249,7 +390,7 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="hidden lg:block absolute -right-3 top-8 z-50 bg-white rounded-full p-1.5 shadow-lg border border-gray-200 hover:bg-blue-50 transition-all duration-200 hover:shadow-xl"
-        title={isCollapsed ? 'Mở rộng' : 'Thu gọn'}
+        title={isCollapsed ? "Mở rộng" : "Thu gọn"}
       >
         {isCollapsed ? (
           <ChevronRightIcon className="h-4 w-4 text-blue-600" />
@@ -261,11 +402,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
       {/* Logo Section */}
       <div
         className={`flex items-center justify-center py-3 relative overflow-hidden ${
-          isCollapsed ? 'px-2' : 'px-4'
+          isCollapsed ? "px-2" : "px-4"
         }`}
         style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15), inset 0 -1px 0 rgba(49, 94, 172, 0.2)'
+          background: "rgba(255, 255, 255, 0.95)",
+          boxShadow:
+            "0 4px 12px rgba(0, 0, 0, 0.15), inset 0 -1px 0 rgba(49, 94, 172, 0.2)",
         }}
       >
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 to-white opacity-60" />
@@ -274,12 +416,19 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
             <span className="text-white font-bold text-lg">QL</span>
           </div>
         ) : (
-          <img src="/logo.png" alt="QLXD System" className="h-10 w-auto drop-shadow-xl relative z-10" />
+          <img
+            src="/logo.png"
+            alt="QLXD System"
+            className="h-10 w-auto drop-shadow-xl relative z-10"
+          />
         )}
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar" style={{ overflowX: 'visible' }}>
+      <nav
+        className="flex-1 px-3 py-6 space-y-1.5 overflow-y-auto custom-scrollbar"
+        style={{ overflowX: "visible" }}
+      >
         {filteredNavigation.map((item) => {
           const hasChildren = item.children && item.children.length > 0;
           const isMenuOpen = openMenus.includes(item.name);
@@ -290,7 +439,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
             <div
               key={item.name}
               className="relative menu-item-wrapper"
-              onMouseEnter={() => isCollapsed && hasChildren && handleMenuMouseEnter(item.name)}
+              onMouseEnter={() =>
+                isCollapsed && hasChildren && handleMenuMouseEnter(item.name)
+              }
               onMouseLeave={handleMenuMouseLeave}
             >
               {hasChildren ? (
@@ -299,27 +450,32 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                     id={`menu-${item.name}`}
                     onClick={() => !isCollapsed && toggleMenu(item.name)}
                     className={`
-                      w-full group flex items-center ${isCollapsed ? 'justify-center px-2' : 'justify-between px-4'} py-3 text-sm font-semibold rounded-lg
+                      w-full group flex items-center ${isCollapsed ? "justify-center px-2" : "justify-between px-4"} py-3 text-sm font-semibold rounded-lg
                       transition-all duration-200 ease-in-out relative overflow-visible
-                      ${itemActive
-                        ? 'text-blue-900 shadow-lg transform scale-[1.02]'
-                        : 'text-gray-700 hover:text-blue-900 hover:shadow-md'
+                      ${
+                        itemActive
+                          ? "text-blue-900 shadow-lg transform scale-[1.02]"
+                          : "text-gray-700 hover:text-blue-900 hover:shadow-md"
                       }
                     `}
                     style={{
                       background: itemActive
-                        ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)'
-                        : 'transparent',
-                      backdropFilter: itemActive ? 'blur(10px)' : 'none',
+                        ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)"
+                        : "transparent",
+                      backdropFilter: itemActive ? "blur(10px)" : "none",
                     }}
                     onMouseEnter={(e) => {
                       if (!itemActive) {
-                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                        e.currentTarget.style.background =
+                          "rgba(59, 130, 246, 0.08)";
                       }
                       // Update tooltip position
                       if (isCollapsed && hasChildren) {
                         const rect = e.currentTarget.getBoundingClientRect();
-                        const tooltip = e.currentTarget.parentElement?.querySelector('.submenu-tooltip') as HTMLElement;
+                        const tooltip =
+                          e.currentTarget.parentElement?.querySelector(
+                            ".submenu-tooltip",
+                          ) as HTMLElement;
                         if (tooltip) {
                           tooltip.style.top = `${rect.top}px`;
                         }
@@ -327,24 +483,30 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                     }}
                     onMouseLeave={(e) => {
                       if (!itemActive) {
-                        e.currentTarget.style.background = 'transparent';
+                        e.currentTarget.style.background = "transparent";
                       }
                     }}
-                    title={isCollapsed ? item.name : ''}
+                    title={isCollapsed ? item.name : ""}
                   >
                     {itemActive && (
                       <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
                     )}
                     <div className="flex items-center">
                       <Icon
-                        className={`${isCollapsed ? '' : 'mr-3'} h-6 w-6 transition-transform duration-200 ${
-                          itemActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-110'
+                        className={`${isCollapsed ? "" : "mr-3"} h-6 w-6 transition-transform duration-200 ${
+                          itemActive
+                            ? "text-blue-700 scale-110"
+                            : "text-gray-600 group-hover:text-blue-700 group-hover:scale-110"
                         }`}
                       />
-                      {!isCollapsed && <span className="tracking-wide">{item.name}</span>}
+                      {!isCollapsed && (
+                        <span className="tracking-wide">{item.name}</span>
+                      )}
                     </div>
                     {!isCollapsed && (
-                      <div className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-0' : '-rotate-90'}`}>
+                      <div
+                        className={`transition-transform duration-200 ${isMenuOpen ? "rotate-0" : "-rotate-90"}`}
+                      >
                         <ChevronDownIcon className="h-5 w-5" />
                       </div>
                     )}
@@ -355,68 +517,84 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                     <div
                       className={`
                         ml-4 mt-1 space-y-1 overflow-hidden transition-all duration-300 ease-in-out
-                        ${isMenuOpen ? 'opacity-100' : 'max-h-0 opacity-0'}
+                        ${isMenuOpen ? "opacity-100" : "max-h-0 opacity-0"}
                       `}
                       style={{
-                        background: isMenuOpen ? 'rgba(241, 245, 249, 0.5)' : 'transparent',
-                        borderRadius: '8px',
-                        padding: isMenuOpen ? '8px' : '0',
-                        maxHeight: isMenuOpen ? 'fit-content' : '0',
-                        overflow: 'hidden',
+                        background: isMenuOpen
+                          ? "rgba(241, 245, 249, 0.5)"
+                          : "transparent",
+                        borderRadius: "8px",
+                        padding: isMenuOpen ? "8px" : "0",
+                        maxHeight: isMenuOpen ? "fit-content" : "0",
+                        overflow: "hidden",
                       }}
                     >
-                      {item.children && item.children.map((child) => {
-                        const childActive = isActive(child.href);
-                        const ChildIcon = child.icon;
-                        return (
-                          <Link
-                            key={child.name}
-                            to={child.href}
-                            onClick={onCloseMobile}
-                            className={`
+                      {item.children &&
+                        item.children.map((child) => {
+                          const childActive = isActive(child.href);
+                          const ChildIcon = child.icon;
+                          return (
+                            <Link
+                              key={child.name}
+                              to={child.href}
+                              onClick={onCloseMobile}
+                              className={`
                               group flex items-center px-4 py-2.5 text-sm font-medium rounded-lg
                               transition-all duration-200 ease-in-out relative
-                              ${childActive
-                                ? 'text-blue-900 shadow-md transform translate-x-1'
-                                : 'text-gray-600 hover:text-blue-900 hover:translate-x-1'
+                              ${
+                                childActive
+                                  ? "text-blue-900 shadow-md transform translate-x-1"
+                                  : "text-gray-600 hover:text-blue-900 hover:translate-x-1"
                               }
                             `}
-                            style={{
-                              background: childActive
-                                ? 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(219, 234, 254, 0.8) 100%)'
-                                : 'rgba(255, 255, 255, 0.6)',
-                              borderLeft: childActive ? '3px solid rgba(59, 130, 246, 0.9)' : '3px solid transparent',
-                              backdropFilter: childActive ? 'blur(10px)' : 'none',
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!childActive) {
-                                e.currentTarget.style.background = 'rgba(219, 234, 254, 0.7)';
-                                e.currentTarget.style.borderLeft = '3px solid rgba(59, 130, 246, 0.5)';
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!childActive) {
-                                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.6)';
-                                e.currentTarget.style.borderLeft = '3px solid transparent';
-                              }
-                            }}
-                          >
-                            <ChildIcon
-                              className={`mr-3 h-5 w-5 transition-transform duration-200 ${
-                                childActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-105'
-                              }`}
-                            />
-                            <span className="tracking-wide">{child.name}</span>
-                          </Link>
-                        );
-                      })}
+                              style={{
+                                background: childActive
+                                  ? "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(219, 234, 254, 0.8) 100%)"
+                                  : "rgba(255, 255, 255, 0.6)",
+                                borderLeft: childActive
+                                  ? "3px solid rgba(59, 130, 246, 0.9)"
+                                  : "3px solid transparent",
+                                backdropFilter: childActive
+                                  ? "blur(10px)"
+                                  : "none",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (!childActive) {
+                                  e.currentTarget.style.background =
+                                    "rgba(219, 234, 254, 0.7)";
+                                  e.currentTarget.style.borderLeft =
+                                    "3px solid rgba(59, 130, 246, 0.5)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (!childActive) {
+                                  e.currentTarget.style.background =
+                                    "rgba(255, 255, 255, 0.6)";
+                                  e.currentTarget.style.borderLeft =
+                                    "3px solid transparent";
+                                }
+                              }}
+                            >
+                              <ChildIcon
+                                className={`mr-3 h-5 w-5 transition-transform duration-200 ${
+                                  childActive
+                                    ? "text-blue-700 scale-110"
+                                    : "text-gray-600 group-hover:text-blue-700 group-hover:scale-105"
+                                }`}
+                              />
+                              <span className="tracking-wide">
+                                {child.name}
+                              </span>
+                            </Link>
+                          );
+                        })}
                     </div>
                   )}
 
                   {/* Tooltip for collapsed state */}
                   {isCollapsed && item.children && item.children.length > 0 && (
                     <div
-                      className={`submenu-tooltip ${hoveredMenu === item.name ? 'submenu-tooltip-visible' : ''}`}
+                      className={`submenu-tooltip ${hoveredMenu === item.name ? "submenu-tooltip-visible" : ""}`}
                       onMouseEnter={() => handleMenuMouseEnter(item.name)}
                       onMouseLeave={handleMenuMouseLeave}
                     >
@@ -434,14 +612,19 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                                 to={child.href}
                                 onClick={onCloseMobile}
                                 className={`flex items-center px-4 py-2.5 text-sm transition-all duration-150
-                                  ${childActive
-                                    ? 'bg-blue-50 text-blue-900 font-semibold border-l-4 border-blue-600'
-                                    : 'text-gray-700 hover:bg-blue-50 hover:text-blue-900 border-l-4 border-transparent'
+                                  ${
+                                    childActive
+                                      ? "bg-blue-50 text-blue-900 font-semibold border-l-4 border-blue-600"
+                                      : "text-gray-700 hover:bg-blue-50 hover:text-blue-900 border-l-4 border-transparent"
                                   }
                                 `}
                               >
-                                <ChildIcon className={`mr-3 h-4 w-4 flex-shrink-0 ${childActive ? 'text-blue-600' : 'text-gray-500'}`} />
-                                <span className="whitespace-nowrap">{child.name}</span>
+                                <ChildIcon
+                                  className={`mr-3 h-4 w-4 flex-shrink-0 ${childActive ? "text-blue-600" : "text-gray-500"}`}
+                                />
+                                <span className="whitespace-nowrap">
+                                  {child.name}
+                                </span>
                               </Link>
                             );
                           })}
@@ -455,40 +638,46 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
                   to={item.href}
                   onClick={onCloseMobile}
                   className={`
-                    group flex items-center ${isCollapsed ? 'justify-center px-2' : 'px-4'} py-3 text-sm font-semibold rounded-lg
+                    group flex items-center ${isCollapsed ? "justify-center px-2" : "px-4"} py-3 text-sm font-semibold rounded-lg
                     transition-all duration-200 ease-in-out relative overflow-hidden
-                    ${itemActive
-                      ? 'text-blue-900 shadow-lg transform scale-[1.02]'
-                      : 'text-gray-700 hover:text-blue-900 hover:shadow-md'
+                    ${
+                      itemActive
+                        ? "text-blue-900 shadow-lg transform scale-[1.02]"
+                        : "text-gray-700 hover:text-blue-900 hover:shadow-md"
                     }
                   `}
                   style={{
                     background: itemActive
-                      ? 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)'
-                      : 'transparent',
-                    backdropFilter: itemActive ? 'blur(10px)' : 'none',
+                      ? "linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 197, 253, 0.1) 100%)"
+                      : "transparent",
+                    backdropFilter: itemActive ? "blur(10px)" : "none",
                   }}
                   onMouseEnter={(e) => {
                     if (!itemActive) {
-                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.08)';
+                      e.currentTarget.style.background =
+                        "rgba(59, 130, 246, 0.08)";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!itemActive) {
-                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.background = "transparent";
                     }
                   }}
-                  title={isCollapsed ? item.name : ''}
+                  title={isCollapsed ? item.name : ""}
                 >
                   {itemActive && (
                     <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-600 rounded-r-full" />
                   )}
                   <Icon
-                    className={`${isCollapsed ? '' : 'mr-3'} h-6 w-6 transition-transform duration-200 ${
-                      itemActive ? 'text-blue-700 scale-110' : 'text-gray-600 group-hover:text-blue-700 group-hover:scale-110'
+                    className={`${isCollapsed ? "" : "mr-3"} h-6 w-6 transition-transform duration-200 ${
+                      itemActive
+                        ? "text-blue-700 scale-110"
+                        : "text-gray-600 group-hover:text-blue-700 group-hover:scale-110"
                     }`}
                   />
-                  {!isCollapsed && <span className="tracking-wide">{item.name}</span>}
+                  {!isCollapsed && (
+                    <span className="tracking-wide">{item.name}</span>
+                  )}
                 </Link>
               )}
             </div>
@@ -497,10 +686,14 @@ const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
       </nav>
 
       {/* Footer decoration */}
-      <div className="h-1" style={{
-        background: 'linear-gradient(90deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.6) 50%, rgba(59, 130, 246, 0.3) 100%)',
-        boxShadow: '0 -2px 10px rgba(59, 130, 246, 0.2)'
-      }} />
+      <div
+        className="h-1"
+        style={{
+          background:
+            "linear-gradient(90deg, rgba(59, 130, 246, 0.3) 0%, rgba(59, 130, 246, 0.6) 50%, rgba(59, 130, 246, 0.3) 100%)",
+          boxShadow: "0 -2px 10px rgba(59, 130, 246, 0.2)",
+        }}
+      />
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
