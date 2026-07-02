@@ -1030,6 +1030,56 @@ const CashReportPage: React.FC = () => {
                                               </div>
                                             </div>
                                           )}
+                                          {ledger.details.type ===
+                                            "SHIFT_CLOSE_DEPOSIT" && (
+                                            <div className="text-xs text-gray-700 space-y-2">
+                                              {ledger.details.deposits?.length >
+                                                0 && (
+                                                <div>
+                                                  <div className="font-medium text-red-600 mb-1">
+                                                    Phiếu nộp tiền (
+                                                    {
+                                                      ledger.details.deposits
+                                                        .length
+                                                    }
+                                                    ):
+                                                  </div>
+                                                  {ledger.details.deposits.map(
+                                                    (d: any, idx: number) => (
+                                                      <div
+                                                        key={idx}
+                                                        className="pl-3 border-l-2 border-red-200 mb-1"
+                                                      >
+                                                        <span className="text-gray-500">
+                                                          #{idx + 1}
+                                                        </span>{" "}
+                                                        Số tiền:{" "}
+                                                        <span className="font-semibold text-red-600">
+                                                          {d.amount?.toLocaleString(
+                                                            "vi-VN",
+                                                          )}
+                                                          ₫
+                                                        </span>
+                                                        {d.receiverName && (
+                                                          <span>
+                                                            {" "}
+                                                            · Người nhận:{" "}
+                                                            {d.receiverName}
+                                                          </span>
+                                                        )}
+                                                        {d.notes && (
+                                                          <span>
+                                                            {" "}
+                                                            · {d.notes}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                    ),
+                                                  )}
+                                                </div>
+                                              )}
+                                            </div>
+                                          )}
                                         </td>
                                       </tr>
                                     )}
@@ -1290,6 +1340,57 @@ const CashReportPage: React.FC = () => {
                                     <span className="font-medium">
                                       {ledger.details.notes}
                                     </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {ledger.details.type === "SHIFT_CLOSE_DEPOSIT" && (
+                              <div className="bg-white rounded-lg p-4 border border-red-200 text-xs space-y-3">
+                                {ledger.details.deposits?.length > 0 && (
+                                  <div>
+                                    <div className="font-semibold text-red-600 mb-2">
+                                      Phiếu nộp tiền (
+                                      {ledger.details.deposits.length}):
+                                    </div>
+                                    {ledger.details.deposits.map(
+                                      (d: any, idx: number) => (
+                                        <div
+                                          key={idx}
+                                          className="pl-3 border-l-2 border-red-200 mb-2 space-y-0.5"
+                                        >
+                                          <div className="font-medium text-gray-700">
+                                            Phiếu #{idx + 1}
+                                          </div>
+                                          <div>
+                                            <span className="text-gray-500">
+                                              Số tiền:
+                                            </span>{" "}
+                                            <span className="font-bold text-red-600">
+                                              {d.amount?.toLocaleString(
+                                                "vi-VN",
+                                              )}
+                                              ₫
+                                            </span>
+                                          </div>
+                                          {d.receiverName && (
+                                            <div>
+                                              <span className="text-gray-500">
+                                                Người nhận:
+                                              </span>{" "}
+                                              {d.receiverName}
+                                            </div>
+                                          )}
+                                          {d.notes && (
+                                            <div>
+                                              <span className="text-gray-500">
+                                                Ghi chú:
+                                              </span>{" "}
+                                              {d.notes}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ),
+                                    )}
                                   </div>
                                 )}
                               </div>
